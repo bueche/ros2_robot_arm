@@ -134,6 +134,16 @@ class SquareDrawerSim(Node):
             clearance = paper_x - max_x
             self.get_logger().info( f"✓ Safe: {clearance*100:.1f}cm clearance from paper") 
             passed = True
+       min_z = min(corner[2] for corner in corners)
+       max_z = max(corner[2] for corner in corners)
+       GROUND_CLEARANCE = 0.05  # 5cm minimum
+       self.get_logger().info(f"Z range: {min_z:.3f}m to {max_z:.3f}m")
+       if min_z < GROUND_CLEARANCE:
+           self.get_logger().error( f"❌ GROUND COLLISION! Square bottom at Z={min_z:.3f}m "
+                                    f"(minimum {GROUND_CLEARANCE:.3f}m required)")
+           passed = False
+       else:
+           self.get_logger().info( f"✓ Ground clearance: {min_z*100:.1f}cm above ground")
        self.get_logger().info("=" * 60)
        return passed, max_x
 
@@ -151,6 +161,8 @@ class SquareDrawerSim(Node):
         # Check if position is reasonable
         if z < 0.0:
             issues.append(f"Z={z:.3f}m is BELOW ground (negative!)")
+        elif z < GROUND_CLEARANCE:
+            issues.append(f"Z={z:.3f}m is too close to ground (min {GROUND_CLEARANCE*100:.0f}cm required)")
         
         if z > 0.30:
             issues.append(f"Z={z:.3f}m is suspiciously HIGH (>30cm)")
@@ -221,7 +233,7 @@ class SquareDrawerSim(Node):
         
         return passed
     
-    def create_square_trajectory(self, center_x=0.25, center_y=0.0, center_z=0.15, 
+    def create_square_trajectory(self, center_x=0.25, center_y=0.0, center_z=0.45, 
                                  size=0.05):
         """Create trajectory to draw a square on a VERTICAL surface"""
         

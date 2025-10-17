@@ -73,8 +73,8 @@ def generate_launch_description():
             'surface_x': 0.355,       # Pen draws at X = 0.225-0.275, center = 0.25
             'surface_y': 0.005, # -0.01,      # Surface BEHIND the pen (pen is at Y=0)
             'surface_z': 0.155,       # Pen Z = 0.125-0.175, center = 0.15
-            'surface_width': 0.08,   # Width in X: 0.275-0.225 = 0.05, add margin = 0.06
-            'surface_height': 0.08,  # Height in Z: 0.175-0.125 = 0.05, add margin = 0.06
+            'surface_width': 0.28,   # Width in X: 0.275-0.225 = 0.05, add margin = 0.06
+            'surface_height': 0.28,  # Height in Z: 0.175-0.125 = 0.05, add margin = 0.06
             'surface_angle': 1.57,    #  0.0 = No rotation, 1.57 = 90 degrees - vertical surface
             'surface_rotation_axis': 'z_axis',
         }]
