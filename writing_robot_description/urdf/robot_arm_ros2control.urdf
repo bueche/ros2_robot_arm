@@ -1,0 +1,202 @@
+<?xml version="1.0"?>
+<robot name="writing_arm">
+  
+  <!-- Base Link - BIGGER and more visible -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.015" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.08" length="0.03"/>
+      </geometry>
+      <material name="gray">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Joint 1: Base rotation -->
+  <joint name="joint_1" type="revolute">
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <origin xyz="0 0 0.03" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="1.0" velocity="2.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Link 1 - VERY visible red box -->
+  <link name="link_1">
+    <visual>
+      <origin xyz="0 0 0.075" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.06 0.06 0.15"/>
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Joint 2: Shoulder -->
+  <joint name="joint_2" type="revolute">
+    <parent link="link_1"/>
+    <child link="link_2"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1.0" velocity="2.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Link 2 - VERY visible green box -->
+  <link name="link_2">
+    <visual>
+      <origin xyz="0.1 0 0" rpy="0 1.57 0"/>
+      <geometry>
+        <box size="0.06 0.06 0.20"/>
+      </geometry>
+      <material name="green">
+        <color rgba="0.0 1.0 0.0 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Joint 3: Elbow -->
+  <joint name="joint_3" type="revolute">
+    <parent link="link_2"/>
+    <child link="link_3"/>
+    <origin xyz="0.20 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1.0" velocity="2.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Link 3 - VERY visible blue box -->
+  <link name="link_3">
+    <visual>
+      <origin xyz="0.075 0 0" rpy="0 1.57 0"/>
+      <geometry>
+        <box size="0.05 0.05 0.15"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0.0 0.0 1.0 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Joint 4: Wrist -->
+  <joint name="joint_4" type="revolute">
+    <parent link="link_3"/>
+    <child link="pen_link"/>
+    <origin xyz="0.15 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1.0" velocity="2.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Pen Link - VERY visible yellow cylinder -->
+  <link name="pen_link">
+    <visual>
+      <origin xyz="0.05 0 0" rpy="0 1.57 0"/>
+      <geometry>
+        <cylinder radius="0.01" length="0.10"/>
+      </geometry>
+      <material name="yellow">
+        <color rgba="1.0 1.0 0.0 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <!-- Pen Tip -->
+  <link name="pen_tip"/>
+  <joint name="pen_tip_joint" type="fixed">
+    <parent link="pen_link"/>
+    <child link="pen_tip"/>
+    <origin xyz="0.10 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ========================================= -->
+  <!-- ROS2_CONTROL - For simulation and hardware -->
+  <!-- ========================================= -->
+  
+  <ros2_control name="writing_arm_system" type="system">
+    
+    <!-- For simulation, use mock hardware -->
+    <hardware>
+      <plugin>mock_components/GenericSystem</plugin>
+    </hardware>
+    
+    <!-- Joint 1 -->
+    <joint name="joint_1">
+      <command_interface name="position">
+        <param name="min">-3.14159</param>
+        <param name="max">3.14159</param>
+      </command_interface>
+      <state_interface name="position">
+	<param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <!-- Joint 2 -->
+    <joint name="joint_2">
+      <command_interface name="position">
+        <param name="min">-1.57</param>
+        <param name="max">1.57</param>
+      </command_interface>
+      <state_interface name="position">
+	<param name="initial_value">-1.57</param>
+      </state_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <!-- Joint 3 -->
+    <joint name="joint_3">
+      <command_interface name="position">
+        <param name="min">-1.57</param>
+        <param name="max">1.57</param>
+      </command_interface>
+      <state_interface name="position">
+	<param name="initial_value">1.57</param>
+      </state_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <!-- Joint 4 -->
+    <joint name="joint_4">
+      <command_interface name="position">
+        <param name="min">-1.57</param>
+        <param name="max">1.57</param>
+      </command_interface>
+      <state_interface name="position">
+	<param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+  </ros2_control>
+
+</robot>

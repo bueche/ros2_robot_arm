@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+"""
+Draw a Square - Horizontal Surface Version
+Uses ros2_control action interface
+Draws on a HORIZONTAL surface (like a flat table)
+"""
+
+import rclpy
+from rclpy.node import Node
+from rclpy.action import ActionClient
+from control_msgs.action import FollowJointTrajectory
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from builtin_interfaces.msg import Duration
+import math
+
+
+class SquareDrawerSim(Node):
+    def __init__(self):
+        super().__init__('square_drawer_sim')
+        
+        # Action client for trajectory execution
+        self._action_client = ActionClient(
+            self,
+            FollowJointTrajectory,
+            '/arm_controller/follow_joint_trajectory'
+        )
+        
+        self.get_logger().info('Waiting for action server...')
+        self._action_client.wait_for_server()
+        self.get_logger().info('Action server ready!')
+    
+    def simple_ik_2d(self, x, y, l1, l2):
+        """
+        Simplified 2D IK for shoulder and elbow
+        Returns (theta1, theta2) or None if unreachable
+        """
+        r = math.sqrt(x**2 + y**2)
+        
+        if r > (l1 + l2) or r < abs(l1 - l2):
+            self.get_logger().error(f'Target ({x:.3f}, {y:.3f}) unreachable!')
+            return None
+        
+        cos_theta2 = (r**2 - l1**2 - l2**2) / (2 * l1 * l2)
+        cos_theta2 = max(-1.0, min(1.0, cos_theta2))
+        theta2 = math.acos(cos_theta2)
+        
+        alpha = math.atan2(y, x)
+        beta = math.acos((l1**2 + r**2 - l2**2) / (2 * l1 * r))
+        theta1 = alpha - beta
+        
+        return (theta1, theta2)
+    
+    def create_square_trajectory(self, center_x=0.25, center_y=0.0, center_z=0.02, 
+                                 size=0.05):
+        """Create trajectory to draw a square on a HORIZONTAL surface"""
+        
+        half_size = size / 2
+        pen_up_height = 0.05  # How high to lift pen (5cm above surface)
+        pen_down_height = 0.01  # How close to surface when drawing (1cm)
+        
+        # Define corners - drawing in X-Y plane (horizontal)
+        corners = [
+            # Start above square (pen up)
+            (center_x - half_size, center_y - half_size, pen_up_height),
+            # Move down to surface (pen down)
+            (center_x - half_size, center_y - half_size, pen_down_height),
+            # Draw square in X-Y plane (Z stays constant)
+            (center_x + half_size, center_y - half_size, pen_down_height),  # Bottom right
+            (center_x + half_size, center_y + half_size, pen_down_height),  # Top right
+            (center_x - half_size, center_y + half_size, pen_down_height),  # Top left
+            (center_x - half_size, center_y - half_size, pen_down_height),  # Back to start
+            # Lift pen up
+            (center_x - half_size, center_y - half_size, pen_up_height),
+        ]
+        
+        # Robot link lengths (ADJUST FOR YOUR ROBOT!)
+        L1 = 0.15  # Base to shoulder
+        L2 = 0.20  # Shoulder to elbow
+        L3 = 0.15  # Elbow to pen tip
+        
+        # Create trajectory
+        trajectory = JointTrajectory()
+        trajectory.joint_names = ['joint_1', 'joint_2', 'joint_3', 'joint_4']
+        
+        time_per_segment = 2.0  # seconds
+        current_time = 0.0
+        
+        for i, (x, y, z) in enumerate(corners):
+            # Calculate joint angles for HORIZONTAL drawing
+            base_angle = math.atan2(y, x)  # Rotate base to point at target
+            r_xy = math.sqrt(x**2 + y**2)  # Radial distance in X-Y plane
+            
+            # For horizontal surface, we need to reach out to r_xy at height z
+            # Account for pen length
+            effective_r = r_xy - L3 * 0.3  # Slightly offset for pen
+            effective_z = z  # Height above surface
+            
+            result = self.simple_ik_2d(effective_r, effective_z, L1, L2)
+            
+            if result is None:
+                self.get_logger().error(f'Could not reach corner {i+1}')
+                continue
+            
+            theta1, theta2 = result
+            theta3 = 0.0 # 1.57  # Point pen DOWN (perpendicular to horizontal surface)
+            
+            # Create waypoint
+            point = JointTrajectoryPoint()
+            point.positions = [base_angle, theta1, theta2, theta3]
+            point.velocities = [0.0, 0.0, 0.0, 0.0]
+            point.accelerations = [0.0, 0.0, 0.0, 0.0]
+            
+            current_time += time_per_segment
+            point.time_from_start = Duration(
+                sec=int(current_time),
+                nanosec=int((current_time % 1) * 1e9)
+            )
+            
+            trajectory.points.append(point)
+            
+            self.get_logger().info(
+                f'Waypoint {i+1}: Target=({x:.3f}, {y:.3f}, {z:.3f}) '
+                f'→ Angles=({math.degrees(base_angle):.1f}°, '
+                f'{math.degrees(theta1):.1f}°, {math.degrees(theta2):.1f}°, '
+                f'{math.degrees(theta3):.1f}°)'
+            )
+        
+        return trajectory
+    
+    def send_goal(self, trajectory):
+        """Send trajectory goal via action"""
+        goal_msg = FollowJointTrajectory.Goal()
+        goal_msg.trajectory = trajectory
+        
+        self.get_logger().info('Sending trajectory goal...')
+        
+        send_goal_future = self._action_client.send_goal_async(
+            goal_msg,
+            feedback_callback=self.feedback_callback
+        )
+        send_goal_future.add_done_callback(self.goal_response_callback)
+    
+    def goal_response_callback(self, future):
+        """Handle goal acceptance"""
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().error('Goal rejected!')
+            return
+        
+        self.get_logger().info('Goal accepted! Drawing square...')
+        
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.get_result_callback)
+    
+    def feedback_callback(self, feedback_msg):
+        """Progress updates"""
+        # Could log progress here if needed
+        pass
+    
+    def get_result_callback(self, future):
+        """Handle completion"""
+        result = future.result().result
+        self.get_logger().info(f'Square drawing complete! Result: {result.error_code}')
+    
+    def draw_square(self):
+        """Execute the square drawing"""
+        self.get_logger().info('Creating square trajectory...')
+        
+        # ADJUST these parameters for HORIZONTAL surface:
+        # - center_x, center_y: position on surface
+        # - center_z: height above surface (should match surface_z + small offset)
+        # - size: size of square
+        trajectory = self.create_square_trajectory(
+            center_x=0.25,   # 25cm in front
+            center_y=0.0,    # centered left/right
+            center_z=0.02,   # 2cm above surface (for pen down positions)
+            size=0.05        # 5cm square
+        )
+        
+        if len(trajectory.points) == 0:
+            self.get_logger().error('No valid trajectory!')
+            return
+        
+        self.get_logger().info(f'Trajectory has {len(trajectory.points)} waypoints')
+        self.send_goal(trajectory)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    drawer = SquareDrawerSim()
+    
+    # Draw the square
+    drawer.draw_square()
+    
+    # Keep spinning to handle callbacks
+    try:
+        rclpy.spin(drawer)
+    except KeyboardInterrupt:
+        pass
+    
+    drawer.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

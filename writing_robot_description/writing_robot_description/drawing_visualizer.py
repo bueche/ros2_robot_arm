@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""
+Drawing Visualizer for RViz
+- Shows pen trail (what the robot has drawn)
+- Shows writing surface/pad
+- Updates in real-time as robot moves
+"""
+
+import rclpy
+from rclpy.node import Node
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point
+from tf2_ros import TransformListener, Buffer
+from std_msgs.msg import ColorRGBA
+import math
+
+
+class DrawingVisualizer(Node):
+    def __init__(self):
+        super().__init__('drawing_visualizer')
+        
+        # TF listener to track pen tip position
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        
+        # Publishers
+        self.marker_pub = self.create_publisher(
+            MarkerArray,
+            'drawing_markers',
+            10
+        )
+        
+        # Store pen trajectory points
+        self.pen_trail = []
+        self.pen_down = True  # Track if pen is touching surface
+        self.last_z = None
+        
+        # Parameters for writing surface
+        self.declare_parameter('surface_x', 0.25)  # Center position
+        self.declare_parameter('surface_y', 0.0)
+        self.declare_parameter('surface_z', 0.10)  # Bottom of surface
+        self.declare_parameter('surface_width', 0.15)
+        self.declare_parameter('surface_height', 0.15)
+        self.declare_parameter('surface_angle', 0.0)  # Angle from vertical (radians)
+        self.declare_parameter('surface_rotation_axis', 'y_axis')  # 'x_axis', 'y_axis', or 'z_axis'
+        
+        # Timer to update visualization
+        self.create_timer(0.05, self.update_visualization)  # 20Hz
+        
+        self.get_logger().info('Drawing Visualizer Started!')
+        self.get_logger().info('Tracking pen_tip frame...')
+    
+    def update_visualization(self):
+        """Update markers every cycle"""
+        try:
+            # Get current pen tip position
+            transform = self.tf_buffer.lookup_transform(
+                'base_link',
+                'pen_tip',
+                rclpy.time.Time()
+            )
+            
+            pen_pos = Point()
+            pen_pos.x = transform.transform.translation.x
+            pen_pos.y = transform.transform.translation.y
+            pen_pos.z = transform.transform.translation.z
+            
+            # Determine if pen is "down" (touching surface)
+            # For VERTICAL surface: pen is down when Y is close to surface
+            surface_y = self.get_parameter('surface_y').value
+            pen_down_threshold = surface_y + 0.015  # Within 1.5cm of surface = drawing
+            
+            self.get_logger().debug(f'Pen Y: {pen_pos.y:.3f}, Threshold: {pen_down_threshold:.3f}')
+            
+            if abs(pen_pos.y - surface_y) < 0.015:  # Within 1.5cm of surface
+                if not self.pen_down:
+                    # Pen just touched down - start new stroke
+                    self.get_logger().info('Pen DOWN - drawing')
+                self.pen_down = True
+                self.pen_trail.append(pen_pos)
+            else:
+                if self.pen_down:
+                    # Pen just lifted - end stroke
+                    self.get_logger().info('Pen UP - not drawing')
+                self.pen_down = False
+            
+            self.last_z = pen_pos.z
+            
+        except Exception as e:
+            # TF not ready yet
+            pass
+        
+        # Publish all markers
+        self.publish_markers()
+    
+    def publish_markers(self):
+        """Create and publish all visualization markers"""
+        marker_array = MarkerArray()
+        
+        # Marker 1: Writing Surface (the pad/paper)
+        surface_marker = self.create_surface_marker()
+        marker_array.markers.append(surface_marker)
+        
+        # Marker 2: Pen Trail (what's been drawn)
+        trail_marker = self.create_trail_marker()
+        marker_array.markers.append(trail_marker)
+        
+        # Marker 3: Current pen position indicator
+        pen_marker = self.create_pen_marker()
+        if pen_marker:
+            marker_array.markers.append(pen_marker)
+        
+        self.marker_pub.publish(marker_array)
+    
+    def create_surface_marker(self):
+        """Create visualization of the writing surface"""
+        marker = Marker()
+        marker.header.frame_id = 'base_link'
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'writing_surface'
+        marker.id = 0
+        marker.type = Marker.CUBE
+        marker.action = Marker.ADD
+        
+        # Position
+        surface_x = self.get_parameter('surface_x').value
+        surface_y = self.get_parameter('surface_y').value
+        surface_z = self.get_parameter('surface_z').value
+        surface_angle = self.get_parameter('surface_angle').value
+        
+        marker.pose.position.x = surface_x
+        marker.pose.position.y = surface_y
+        marker.pose.position.z = surface_z
+        
+        # Rotation (if angled)
+        # Convert angle to quaternion based on rotation axis
+        surface_angle = self.get_parameter('surface_angle').value
+        rotation_axis = self.get_parameter('surface_rotation_axis').value
+        
+        if rotation_axis == 'x_axis':
+            # Rotation around X axis (pitch - forward/back tilt)
+            marker.pose.orientation.x = math.sin(surface_angle / 2)
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = math.cos(surface_angle / 2)
+        elif rotation_axis == 'z_axis':
+            # Rotation around Z axis (yaw - left/right spin)
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = math.sin(surface_angle / 2)
+            marker.pose.orientation.w = math.cos(surface_angle / 2)
+        else:  # 'y_axis' or default
+            # Rotation around Y axis (roll - side tilt)
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = math.sin(surface_angle / 2)
+            marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = math.cos(surface_angle / 2)
+        
+        # Size
+        width = self.get_parameter('surface_width').value
+        height = self.get_parameter('surface_height').value
+        marker.scale.x = width
+        marker.scale.y = 0.001  # Very thin (like paper)
+        marker.scale.z = height
+        
+        # Color (white paper with slight transparency)
+        marker.color.r = 1.0
+        marker.color.g = 1.0
+        marker.color.b = 1.0
+        marker.color.a = 0.8
+        
+        return marker
+    
+    def create_trail_marker(self):
+        """Create line strip showing pen trail"""
+        marker = Marker()
+        marker.header.frame_id = 'base_link'
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'pen_trail'
+        marker.id = 1
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+        
+        # Line properties
+        marker.scale.x = 0.002  # Line width (2mm)
+        
+        # Color (black ink)
+        marker.color.r = 0.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 1.0
+        
+        # Add all trail points
+        marker.points = self.pen_trail.copy()
+        
+        # Lifetime
+        marker.lifetime.sec = 0  # Persistent
+        
+        return marker
+    
+    def create_pen_marker(self):
+        """Create marker showing current pen position"""
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                'base_link',
+                'pen_tip',
+                rclpy.time.Time()
+            )
+        except:
+            return None
+        
+        marker = Marker()
+        marker.header.frame_id = 'base_link'
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'pen_indicator'
+        marker.id = 2
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        
+        # Position
+        marker.pose.position.x = transform.transform.translation.x
+        marker.pose.position.y = transform.transform.translation.y
+        marker.pose.position.z = transform.transform.translation.z
+        marker.pose.orientation.w = 1.0
+        
+        # Size (small sphere)
+        marker.scale.x = 0.005
+        marker.scale.y = 0.005
+        marker.scale.z = 0.005
+        
+        # Color changes based on pen state
+        if self.pen_down:
+            # Red when drawing
+            marker.color.r = 1.0
+            marker.color.g = 0.0
+            marker.color.b = 0.0
+        else:
+            # Green when not drawing
+            marker.color.r = 0.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+        marker.color.a = 1.0
+        
+        return marker
+    
+    def clear_drawing(self):
+        """Clear the pen trail"""
+        self.pen_trail = []
+        self.get_logger().info('Drawing cleared!')
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    visualizer = DrawingVisualizer()
+    
+    try:
+        rclpy.spin(visualizer)
+    except KeyboardInterrupt:
+        pass
+    
+    visualizer.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

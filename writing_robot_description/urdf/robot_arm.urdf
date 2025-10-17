@@ -1,0 +1,112 @@
+<?xml version="1.0"?>
+<robot name="writing_arm">
+  
+  <!-- Base Link (fixed to table) -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.05" length="0.03"/>
+      </geometry>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Joint 1: Base rotation (XL430) -->
+  <joint name="joint_1" type="revolute">
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>  <!-- Rotates around Z axis -->
+    <limit lower="-3.14159" upper="3.14159" effort="1.0" velocity="2.0"/>
+  </joint>
+
+  <!-- Link 1: First arm segment -->
+  <link name="link_1">
+    <visual>
+      <origin xyz="0 0 0.075" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.04 0.04 0.15"/>  <!-- Adjust length: 15cm -->
+      </geometry>
+      <material name="blue">
+        <color rgba="0.2 0.4 0.8 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Joint 2: Shoulder (XL-330) -->
+  <joint name="joint_2" type="revolute">
+    <parent link="link_1"/>
+    <child link="link_2"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>  <!-- Rotates around Y axis (pitch) -->
+    <limit lower="-1.57" upper="1.57" effort="1.0" velocity="2.0"/>
+  </joint>
+
+  <!-- Link 2: Second arm segment -->
+  <link name="link_2">
+    <visual>
+      <origin xyz="0.1 0 0" rpy="0 1.57 0"/>
+      <geometry>
+        <box size="0.04 0.04 0.20"/>  <!-- Adjust length: 20cm -->
+      </geometry>
+      <material name="green">
+        <color rgba="0.2 0.8 0.4 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Joint 3: Elbow (XL-330) -->
+  <joint name="joint_3" type="revolute">
+    <parent link="link_2"/>
+    <child link="link_3"/>
+    <origin xyz="0.20 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>  <!-- Rotates around Y axis (pitch) -->
+    <limit lower="-1.57" upper="1.57" effort="1.0" velocity="2.0"/>
+  </joint>
+
+  <!-- Link 3: Third arm segment -->
+  <link name="link_3">
+    <visual>
+      <origin xyz="0.075 0 0" rpy="0 1.57 0"/>
+      <geometry>
+        <box size="0.03 0.03 0.15"/>  <!-- Adjust length: 15cm -->
+      </geometry>
+      <material name="red">
+        <color rgba="0.8 0.2 0.2 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Joint 4: Wrist (XL-330) -->
+  <joint name="joint_4" type="revolute">
+    <parent link="link_3"/>
+    <child link="pen_link"/>
+    <origin xyz="0.15 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>  <!-- Rotates around Y axis (pitch) -->
+    <limit lower="-1.57" upper="1.57" effort="1.0" velocity="2.0"/>
+  </joint>
+
+  <!-- Pen/End Effector Link -->
+  <link name="pen_link">
+    <visual>
+      <origin xyz="0.05 0 0" rpy="0 1.57 0"/>
+      <geometry>
+        <cylinder radius="0.005" length="0.10"/>  <!-- Pen -->
+      </geometry>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Tool Center Point (TCP) - the pen tip -->
+  <link name="pen_tip"/>
+  <joint name="pen_tip_joint" type="fixed">
+    <parent link="pen_link"/>
+    <child link="pen_tip"/>
+    <origin xyz="0.10 0 0" rpy="0 0 0"/>
+  </joint>
+
+</robot>
