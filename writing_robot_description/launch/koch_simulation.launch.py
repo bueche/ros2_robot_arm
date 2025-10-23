@@ -20,6 +20,7 @@ from launch.event_handlers import OnProcessExit
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -35,16 +36,18 @@ def generate_launch_description():
         )
     )
     
-    # Get URDF via xacro
-    robot_description_content = Command([
-        PathJoinSubstitution([FindExecutable(name='xacro')]),
-        ' ',
-        PathJoinSubstitution([
-            FindPackageShare('writing_robot_description'),
-            'urdf',
-            'koch_writing_arm.urdf'  # New Koch URDF
-        ])
+    # Get URDF path
+    urdf_file_path = PathJoinSubstitution([
+        FindPackageShare('writing_robot_description'),
+        'urdf',
+        'koch_writing_arm.urdf'
     ])
+    
+    # Read URDF content and wrap as ParameterValue with type string
+    robot_description_content = ParameterValue(
+        Command(['cat ', urdf_file_path]),
+        value_type=str
+    )
     
     robot_description = {'robot_description': robot_description_content}
     
