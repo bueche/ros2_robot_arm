@@ -13,7 +13,8 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 import math
 import time
-from koch_ik_solver import KochWritingIK, validate_joint_angles
+from writing_robot_control.koch_v11_ik_solver import KochWritingIK, validate_joint_angles
+
 
 
 class KochSquareDrawer(Node):
