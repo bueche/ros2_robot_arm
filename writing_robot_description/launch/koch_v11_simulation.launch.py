@@ -1,123 +1,104 @@
-#!/usr/bin/env python3
-"""
-Koch v1.1 Simulation Launch
-Following the exact pattern of the working 4-DOF simulation
-"""
-
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler
+from launch.actions import RegisterEventHandler, TimerAction
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
-from launch_ros.parameter_descriptions import ParameterValue  # CRITICAL IMPORT
+import os
+from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
-    # Declare arguments
-    declared_arguments = []
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'use_sim_time',
-            default_value='true',
-            description='Use simulation time'
-        )
-    )
     
-    # Get URDF via cat command (same as working 4-DOF)
-    robot_description_content = Command([
-        PathJoinSubstitution([FindExecutable(name='cat')]),
-        ' ',
-        PathJoinSubstitution([
-            FindPackageShare('writing_robot_description'),
-            'urdf',
-            'koch_v11_arm.urdf'
-        ])
-    ])
+    # Get paths
+    pkg_path = get_package_share_directory('writing_robot_description')
+    urdf_file = os.path.join(pkg_path, 'urdf', 'koch_v11_arm.urdf')
+    rviz_config_file = os.path.join(pkg_path, 'rviz', 'koch_v11_rviz_config.rviz')
+    controllers_file = os.path.join(pkg_path, 'config', 'koch_v11_controllers.yaml')
     
-    # Wrap in ParameterValue with value_type=str (CRITICAL!)
-    robot_description = {
-        'robot_description': ParameterValue(robot_description_content, value_type=str)
-    }
+    # Read URDF (EXACT pattern from working 4-DOF)
+    with open(urdf_file, 'r') as file:
+        robot_description = file.read()
     
-    # Get controllers configuration
-    robot_controllers = PathJoinSubstitution([
-        FindPackageShare('writing_robot_description'),
-        'config',
-        'koch_v11_controllers.yaml'
-    ])
-    
-    # Node 1: robot_state_publisher
-    robot_state_publisher_node = Node(
+    # Robot State Publisher
+    robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
-        output='both',
-        parameters=[
-            robot_description,
-            {'use_sim_time': LaunchConfiguration('use_sim_time')}
-        ]
+        output='screen',
+        parameters=[{
+            'robot_description': robot_description,
+            'use_sim_time': False
+        }]
     )
     
-    # Node 2: controller_manager
-    controller_manager_node = Node(
+    # Controller Manager
+    controller_manager = Node(
         package='controller_manager',
         executable='ros2_control_node',
         parameters=[
-            robot_description,
-            robot_controllers,
-            {'use_sim_time': LaunchConfiguration('use_sim_time')}
+            {'robot_description': robot_description},
+            controllers_file
         ],
-        output='both'
+        output='screen',
     )
     
-    # Node 3: Spawn joint_state_broadcaster
+    # Joint State Broadcaster Spawner
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=['joint_state_broadcaster'],
-        output='screen'
+        output='screen',
     )
     
-    # Node 4: Spawn koch_v11_controller
-    koch_v11_controller_spawner = Node(
-        package='controller_manager',
-        executable='spawner',
-        arguments=['koch_v11_controller'],
-        output='screen'
-    )
-    
-    # Delay controller spawning (same pattern as working 4-DOF)
-    delay_joint_state_broadcaster_after_controller_manager = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=controller_manager_node,
-            on_exit=[joint_state_broadcaster_spawner],
-        )
-    )
-    
-    delay_koch_v11_controller_after_joint_state_broadcaster = RegisterEventHandler(
+    # Koch v11 Controller Spawner (delayed - waits for joint_state_broadcaster spawner to exit)
+    koch_v11_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=joint_state_broadcaster_spawner,
-            on_exit=[koch_v11_controller_spawner],
+            on_exit=[
+                Node(
+                    package='controller_manager',
+                    executable='spawner',
+                    arguments=['koch_v11_controller'],
+                    output='screen',
+                )
+            ],
         )
     )
     
-    # Optional: drawing visualizer
-    drawing_visualizer_node = Node(
+    # Drawing Visualizer - shows pen trail and writing surface
+    drawing_visualizer = Node(
         package='writing_robot_description',
         executable='drawing_visualizer',
-        name='drawing_visualizer',
         output='screen',
         parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time')
+            'surface_x': 0.255,
+            'surface_y': 0.005,
+            'surface_z': 0.155,
+            'surface_width': 0.08,
+            'surface_height': 0.08,
+            'surface_angle': 1.57,
+            'surface_rotation_axis': 'z_axis',
         }]
     )
     
-    nodes_to_start = [
-        robot_state_publisher_node,
-        controller_manager_node,
-        delay_joint_state_broadcaster_after_controller_manager,
-        delay_koch_v11_controller_after_joint_state_broadcaster,
-        drawing_visualizer_node,
-    ]
+    # RViz (optional - uncomment to enable)
+    '''
+    rviz = TimerAction(
+        period=5.0,
+        actions=[
+            Node(
+                package='rviz2',
+                executable='rviz2',
+                arguments=['-d', rviz_config_file] if os.path.exists(rviz_config_file) else [],
+                output='screen',
+            )
+        ]
+    )
+    '''
     
-    return LaunchDescription(declared_arguments + nodes_to_start)
+    return LaunchDescription([
+        robot_state_publisher,
+        controller_manager,
+        joint_state_broadcaster_spawner,
+        koch_v11_controller_spawner,
+        drawing_visualizer,
+        # rviz,
+    ])
