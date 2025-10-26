@@ -16,7 +16,6 @@ import time
 from writing_robot_control.koch_v11_ik_solver import KochWritingIK, validate_joint_angles
 
 
-
 class KochSquareDrawer(Node):
     """Node to draw a square using Koch v1.1 arm"""
     
@@ -49,10 +48,10 @@ class KochSquareDrawer(Node):
             wrist_to_pen=0.15        # Measure: wrist to pen tip
         )
         
-        # Writing surface configuration
-        self.surface_x = 0.355      # X position of vertical surface (35.5cm from base)
-        self.pen_touch_x = 0.355    # X position when pen touches (same as surface)
-        self.pen_away_x = 0.37      # X position when pen is away (2cm back)
+        # Writing surface configuration (matches launch file surface)
+        self.surface_x = 0.30       # X position of vertical surface (30cm from base)
+        self.pen_touch_x = 0.30     # X position when pen touches (same as surface)
+        self.pen_away_x = 0.32      # X position when pen is away (2cm back)
         
         # Square parameters
         self.square_center_y = 0.0  # Y center (left-right)
@@ -93,17 +92,17 @@ class KochSquareDrawer(Node):
         self.get_logger().info(f'Published trajectory with {len(waypoints)} waypoints')
     
     def move_to_home(self):
-        """Move arm to safe home position (straight up)"""
+        """Move arm to safe home position (vertical, arm up)"""
         self.get_logger().info('Moving to home position...')
         
-        # Home position: arm pointing straight up
+        # Home position: arm pointing mostly vertical, safe height
         home_angles = (
-            0.0,    # shoulder_pan: centered
-            1.57,   # shoulder_lift: 90° (pointing up)
-            -1.57,  # elbow_flex: -90° (straight)
-            0.0,    # wrist_flex: 0° (straight)
-            0.0,    # wrist_roll: 0° (neutral)
-            0.0     # pen_holder: 0° (neutral)
+            0.0,     # shoulder_pan: centered
+            0.0,     # shoulder_lift: 0° (horizontal from shoulder)
+            -1.57,   # elbow_flex: -90° (bends up)
+            1.57,    # wrist_flex: +90° (compensates, keeps pen up)
+            0.0,     # wrist_roll: 0° (neutral)
+            0.0      # pen_holder: 0° (pen up/neutral)
         )
         
         if not validate_joint_angles(home_angles):
@@ -226,7 +225,7 @@ class KochSquareDrawer(Node):
                 self.get_logger().error(f'Pen up position {i} unreachable!')
                 return False
             
-            # Move pen to surface
+            # Move pen to surface AND set pen_holder to indicate "pen down"
             angles_pen_down = self.ik_solver.solve_for_vertical_surface(
                 self.pen_touch_x, y_from, z_from
             )
@@ -234,6 +233,11 @@ class KochSquareDrawer(Node):
             if not angles_pen_down:
                 self.get_logger().error(f'Pen down position {i} unreachable!')
                 return False
+            
+            # Modify pen_holder to indicate pen is DOWN (small positive value)
+            angles_pen_down = list(angles_pen_down)
+            angles_pen_down[5] = 0.2  # pen_holder: positive = pen down
+            angles_pen_down = tuple(angles_pen_down)
             
             # Validate safety
             if not self.validate_collision_safety(angles_pen_down):
@@ -252,7 +256,12 @@ class KochSquareDrawer(Node):
                 self.get_logger().error(f'Corner {i+1} unreachable!')
                 return False
             
-            # Interpolate between current and next position
+            # Set pen_holder to indicate pen DOWN for next corner too
+            angles_next = list(angles_next)
+            angles_next[5] = 0.2  # pen_holder: positive = pen down
+            angles_next = tuple(angles_next)
+            
+            # Interpolate between current and next position (pen stays down)
             interpolated = self.interpolate_points(
                 angles_pen_down, angles_next, self.interpolation_points
             )
@@ -271,8 +280,8 @@ class KochSquareDrawer(Node):
         if final_pen_up:
             all_waypoints.append(final_pen_up)
         
-        # Add home position
-        home_angles = (0.0, 1.57, -1.57, 0.0, 0.0, 0.0)
+        # Add home position (matches move_to_home function)
+        home_angles = (0.0, 0.0, -1.57, 1.57, 0.0, 0.0)
         all_waypoints.append(home_angles)
         
         # Step 5: Execute trajectory

@@ -69,12 +69,12 @@ def generate_launch_description():
         executable='drawing_visualizer',
         output='screen',
         parameters=[{
-            'surface_x': 0.255,
-            'surface_y': 0.005,
-            'surface_z': 0.155,
-            'surface_width': 0.08,
-            'surface_height': 0.08,
-            'surface_angle': 1.57,
+            'surface_x': 0.30,        # Moved forward to match pen drawing position
+            'surface_y': 0.0,         # Centered
+            'surface_z': 0.20,        # Match square center height
+            'surface_width': 0.12,    # Wider to see full square
+            'surface_height': 0.12,   # Taller to see full square
+            'surface_angle': 1.57,    # 90 degrees - vertical surface
             'surface_rotation_axis': 'z_axis',
         }]
     )
