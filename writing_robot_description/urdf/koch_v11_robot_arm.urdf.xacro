@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="koch_v11">
+
+  <!-- Arguments for hardware selection -->
+  <xacro:arg name="use_real_hardware" default="false" />
+  <xacro:arg name="usb_port" default="/dev/ttyUSB0" />
+  <xacro:arg name="baud_rate" default="1000000" />
+  
+  <!-- Include your base URDF -->
+  <!-- Adjust this path to match your actual URDF structure -->
+  <xacro:include filename="$(find writing_robot_description)/urdf/koch_v11_arm.urdf" />
+  
+  <!-- ros2_control hardware interface -->
+  <ros2_control name="koch_v11_system" type="system">
+    
+    <!-- Choose hardware based on argument -->
+    <xacro:if value="$(arg use_real_hardware)">
+      <!-- REAL HARDWARE: Dynamixel interface -->
+      <hardware>
+        <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
+        <param name="usb_port">$(arg usb_port)</param>
+        <param name="baud_rate">$(arg baud_rate)</param>
+      </hardware>
+    </xacro:if>
+    
+    <xacro:unless value="$(arg use_real_hardware)">
+      <!-- SIMULATION: Mock hardware -->
+      <hardware>
+        <plugin>mock_components/GenericSystem</plugin>
+        <param name="mock_sensor_commands">false</param>
+        <param name="state_following_offset">0.0</param>
+      </hardware>
+    </xacro:unless>
+    
+    <!-- Define all joints - update these limits with your measured values! -->
+    <xacro:macro name="koch_joint" params="name id model min_pos max_pos">
+      <joint name="${name}">
+        <command_interface name="position">
+          <param name="min">${min_pos}</param>
+          <param name="max">${max_pos}</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <xacro:if value="$(arg use_real_hardware)">
+          <param name="id">${id}</param>
+          <param name="model">${model}</param>
+        </xacro:if>
+      </joint>
+    </xacro:macro>
+    
+    <!-- Joint 1 - Base (XL430) - Measured limits with safety margin -->
+    <xacro:koch_joint name="shoulder_pan" id="1" model="XL430-W250" 
+                       min_pos="2.3685" max_pos="3.7583"/>
+    
+    <!-- Joint 2 (XL330) - Measured limits with safety margin -->
+    <xacro:koch_joint name="shoulder_lift" id="2" model="XL330-M288" 
+                       min_pos="0.8713" max_pos="2.9314"/>
+    
+    <!-- Joint 3 (XL330) - Measured limits with safety margin -->
+    <xacro:koch_joint name="elbow_flex" id="3" model="XL330-M288" 
+                       min_pos="-0.0936" max_pos="2.9130"/>
+    
+    <!-- Joint 4 (XL330) - Measured limits with safety margin -->
+    <xacro:koch_joint name="wrist_flex" id="4" model="XL330-M288" 
+                       min_pos="-0.1181" max_pos="3.0572"/>
+    
+    <!-- Joint 5 (XL330) - Measured limits with safety margin -->
+    <xacro:koch_joint name="wrist_roll" id="5" model="XL330-M288" 
+                       min_pos="-1.1888" max_pos="3.0081"/>
+    
+    <!-- Joint 6 (XL330) - Measured limits with safety margin -->
+    <xacro:koch_joint name="pen_holder" id="6" model="XL330-M288" 
+                       min_pos="1.5861" max_pos="1.8254"/>
+    
+  </ros2_control>
+
+</robot>

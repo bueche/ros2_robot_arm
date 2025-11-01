@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-Draw Square with Koch v1.1 6-DOF Arm
-Adapted from original 4-DOF draw_square_sim.py
+Draw Square with Koch v1.1 6-DOF Arm - ros2_control version
+Adapted to use FollowJointTrajectory action interface
 
-This script demonstrates writing a square on a vertical surface using
-the Koch v1.1 robot arm configuration.
+This version works with BOTH simulation and real Dynamixel hardware!
+No code changes needed when switching between sim and real robot.
 """
 
 import rclpy
 from rclpy.node import Node
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from rclpy.action import ActionClient
+from control_msgs.action import FollowJointTrajectory
+from trajectory_msgs.msg import JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 import math
 import time
@@ -17,16 +19,16 @@ from writing_robot_control.koch_v11_ik_solver import KochWritingIK, validate_joi
 
 
 class KochSquareDrawer(Node):
-    """Node to draw a square using Koch v1.1 arm"""
+    """Node to draw a square using Koch v1.1 arm with ros2_control"""
     
     def __init__(self):
         super().__init__('koch_square_drawer')
         
-        # Publisher for joint trajectory commands
-        self.trajectory_pub = self.create_publisher(
-            JointTrajectory,
-            '/koch_v11_controller/joint_trajectory',
-            10
+        # Action client for joint trajectory controller
+        self._action_client = ActionClient(
+            self,
+            FollowJointTrajectory,
+            '/koch_v11_controller/follow_joint_trajectory'
         )
         
         # Koch v1.1 joint names (in order)
@@ -63,19 +65,27 @@ class KochSquareDrawer(Node):
         self.home_position_time = 4.0   # Seconds to move to home
         self.interpolation_points = 5   # Points between corners for smoother lines
         
-        self.get_logger().info('Koch Square Drawer initialized')
+        self.get_logger().info('Koch Square Drawer initialized (ros2_control version)')
         self.get_logger().info(f'Workspace: max_reach={self.ik_solver.max_reach:.3f}m')
+        
+        # Wait for action server
+        self.get_logger().info('Waiting for action server...')
+        self._action_client.wait_for_server()
+        self.get_logger().info('✓ Action server connected')
     
     def send_trajectory(self, waypoints, time_per_segment):
         """
-        Send a trajectory with multiple waypoints
+        Send a trajectory with multiple waypoints using action interface
         
         Args:
             waypoints: List of joint angle tuples (6 angles each)
             time_per_segment: Time in seconds for each segment
+            
+        Returns:
+            Future for the action goal
         """
-        trajectory_msg = JointTrajectory()
-        trajectory_msg.joint_names = self.joint_names
+        goal_msg = FollowJointTrajectory.Goal()
+        goal_msg.trajectory.joint_names = self.joint_names
         
         current_time = 0.0
         for waypoint in waypoints:
@@ -85,11 +95,35 @@ class KochSquareDrawer(Node):
                 sec=int(current_time),
                 nanosec=int((current_time % 1.0) * 1e9)
             )
-            trajectory_msg.points.append(point)
+            goal_msg.trajectory.points.append(point)
             current_time += time_per_segment
         
-        self.trajectory_pub.publish(trajectory_msg)
-        self.get_logger().info(f'Published trajectory with {len(waypoints)} waypoints')
+        self.get_logger().info(f'Sending trajectory with {len(waypoints)} waypoints...')
+        
+        # Send goal and wait for result
+        send_goal_future = self._action_client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(self, send_goal_future)
+        
+        goal_handle = send_goal_future.result()
+        
+        if not goal_handle.accepted:
+            self.get_logger().error('Goal rejected by action server!')
+            return None
+        
+        self.get_logger().info('Goal accepted, executing trajectory...')
+        
+        # Wait for result
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, result_future)
+        
+        result = result_future.result()
+        
+        if result.status == 4:  # SUCCEEDED
+            self.get_logger().info('✓ Trajectory execution succeeded')
+            return True
+        else:
+            self.get_logger().error(f'Trajectory execution failed with status: {result.status}')
+            return False
     
     def move_to_home(self):
         """Move arm to safe home position (vertical, arm up)"""
@@ -109,11 +143,14 @@ class KochSquareDrawer(Node):
             self.get_logger().error('Home position out of joint limits!')
             return False
         
-        self.send_trajectory([home_angles], self.home_position_time)
-        time.sleep(self.home_position_time + 0.5)
+        success = self.send_trajectory([home_angles], self.home_position_time)
         
-        self.get_logger().info('✓ Reached home position')
-        return True
+        if success:
+            self.get_logger().info('✓ Reached home position')
+        else:
+            self.get_logger().error('Failed to reach home position')
+        
+        return success
     
     def interpolate_points(self, start_angles, end_angles, num_points):
         """
@@ -286,13 +323,14 @@ class KochSquareDrawer(Node):
         
         # Step 5: Execute trajectory
         self.get_logger().info(f'\nExecuting complete trajectory with {len(all_waypoints)} waypoints...')
-        self.send_trajectory(all_waypoints, self.time_per_segment)
+        success = self.send_trajectory(all_waypoints, self.time_per_segment)
+        
+        if not success:
+            self.get_logger().error('Trajectory execution failed!')
+            return False
         
         total_time = len(all_waypoints) * self.time_per_segment
-        self.get_logger().info(f'Trajectory duration: {total_time:.1f} seconds')
-        
-        # Wait for completion
-        time.sleep(total_time + 1.0)
+        self.get_logger().info(f'Trajectory completed in ~{total_time:.1f} seconds')
         
         self.get_logger().info('\n' + '=' * 60)
         self.get_logger().info('✓ Square drawing complete!')
@@ -306,9 +344,6 @@ def main(args=None):
     
     node = KochSquareDrawer()
     
-    # Give time for connections to establish
-    time.sleep(2.0)
-    
     # Draw the square
     success = node.draw_square()
     
@@ -316,9 +351,6 @@ def main(args=None):
         node.get_logger().info('\n🎉 SUCCESS! Square drawn successfully!')
     else:
         node.get_logger().error('\n❌ FAILED to draw square')
-    
-    # Keep node alive briefly to ensure messages are sent
-    time.sleep(2.0)
     
     node.destroy_node()
     rclpy.shutdown()
