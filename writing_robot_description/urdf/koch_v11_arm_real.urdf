@@ -200,77 +200,140 @@
     <hardware>
         <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
 	<param name="usb_port">/dev/ttyUSB0</param>
+	<param name="port_name">/dev/ttyUSB0</param>
 	<param name="baud_rate">1000000</param>
         <param name="number_of_joints">6</param>
 	<param name="number_of_transmissions">6</param> 
-	<param name="transmission_to_joint_matrix">1 0 0 0 0 0 0 1 0 0 0 0 0 0 1 0 0 0 0 0 0 1 0 0 0 0 0 0 1 0 0 0 0 0 0 1</param>
-
+	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,-1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,-1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	<param name="dynamixel_model_folder">/param/dxl_model</param>
+	<!-- <param name="disable_torque_at_init">true</param> -->
+	<param name="protocol_version">2.0</param>
     </hardware>
-    <!-- Joint 1: shoulder_pan (ID 1, XL430) -->
-    <joint name="shoulder_pan">
-        <command_interface name="position">
-	   <param name="min">2.3685</param>
-	   <param name="max">3.7583</param>
- 	</command_interface>
-	<state_interface name="position"/>
-	<state_interface name="velocity"/>
-	<param name="id">1</param>
-	<param name="model">XL430-W250</param>
-    </joint>
-    <!-- Joint 2: shoulder_lift (ID 2, XL330) -->
-    <joint name="shoulder_lift">
-        <command_interface name="position">
-            <param name="min">0.8713</param>
-	    <param name="max">2.9314</param>
-	</command_interface>
-	<state_interface name="position"/>
-	<state_interface name="velocity"/>
-	<param name="id">2</param>
-	<param name="model">XL330-M288</param>
-    </joint>
-    <!-- Joint 3: elbow_flex (ID 3, XL330) -->
-    <joint name="elbow_flex">
-        <command_interface name="position">
-	    <param name="min">-0.0936</param>
-	    <param name="max">2.9130</param>
-	</command_interface>
-	<state_interface name="position"/>
-	<state_interface name="velocity"/>
-	<param name="id">3</param>
-	<param name="model">XL330-M288</param>
-    </joint>
-    <!-- Joint 4: wrist_flex (ID 4, XL330) -->
-    <joint name="wrist_flex">
-	<command_interface name="position">
-	    <param name="min">-0.1181</param>
-	    <param name="max">3.0572</param>
-        </command_interface>
-	<state_interface name="position"/>
-        <state_interface name="velocity"/>
-	<param name="id">4</param> 
-	<param name="model">XL330-M288</param>
-     </joint>
-     <!-- Joint 5: wrist_roll (ID 5, XL330) -->
-     <joint name="wrist_roll">
-        <command_interface name="position">
-	     <param name="min">-1.1888</param>
-	     <param name="max">3.0081</param>
-	</command_interface>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-        <param name="id">5</param>
-        <param name="model">XL330-M288</param>
-     </joint>
-     <!-- Joint 6: pen_holder (ID 6, XL330) -->
-     <joint name="pen_holder">
-	<command_interface name="position">
-	     <param name="min">1.5861</param> 
-	     <param name="max">1.8254</param>
-	</command_interface>
-	<state_interface name="position"/>
-	<state_interface name="velocity"/>
-	<param name="id">6</param>
-	<param name="model">XL330-M288</param>
-      </joint> 
-  </ros2_control>
+
+  <!-- ===== JOINTS: ros2_control interfaces ===== -->
+  
+  <!-- Joint 1: shoulder_pan (base rotation) -->
+  <joint name="shoulder_pan">
+    <command_interface name="position">
+      <param name="min">1.9522</param>  <!-- far left -->
+      <param name="max">3.1078</param>  <!-- far right -->
+    </command_interface>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+  
+  <!-- Joint 2: shoulder_lift -->
+  <joint name="shoulder_lift">
+    <command_interface name="position">
+      <param name="min">-0.8149</param>  <!-- highest physical position -->
+      <param name="max">2.8946</param>   <!-- lowest physical position -->
+    </command_interface>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+  
+  <!-- Joint 3: elbow_flex -->
+  <joint name="elbow_flex">
+    <command_interface name="position">
+      <param name="min">-3.1201</param>  <!-- lowest physical position -->
+      <param name="max">0.2086</param>   <!-- highest physical position -->
+    </command_interface>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+  
+  <!-- Joint 4: wrist_flex -->
+  <joint name="wrist_flex">
+    <command_interface name="position">
+      <param name="min">-2.7290</param>  <!-- highest physical position -->
+      <param name="max">-0.4080</param>  <!-- lowest physical position -->
+    </command_interface>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+  
+  <!-- Joint 5: wrist_roll -->
+  <joint name="wrist_roll">
+    <command_interface name="position">
+      <param name="min">-1.5417</param>  <!-- jacks on same side -->
+      <param name="max">1.5086</param>   <!-- jacks on opposite side (180° rotation) -->
+    </command_interface>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+  
+  <!-- Joint 6: pen_holder (gripper) -->
+  <joint name="pen_holder">
+    <command_interface name="position">
+      <param name="min">1.5117</param>  <!-- completely closed -->
+      <param name="max">2.9329</param>  <!-- completely open -->
+    </command_interface>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+  
+  <!-- ===== GPIO: Actual Dynamixel Motors ===== -->
+  
+  <!-- Motor 1: XL430-W250 (base) -->
+  <gpio name="dxl1">
+    <param name="type">dxl</param>
+    <param name="ID">1</param>
+    <command_interface name="Goal Position"/>
+    <state_interface name="Present Position"/>
+    <state_interface name="Present Velocity"/>
+	    <!-- <state_interface name="Present Current"/> -->
+  </gpio>
+  
+  <!-- Motor 2: XL330-M288 (shoulder_lift) -->
+  <gpio name="dxl2">
+    <param name="type">dxl</param>
+    <param name="ID">2</param>
+    <command_interface name="Goal Position"/>
+    <state_interface name="Present Position"/>
+    <state_interface name="Present Velocity"/>
+    <state_interface name="Present Current"/>
+  </gpio>
+  
+  <!-- Motor 3: XL330-M288 (elbow_flex) -->
+  <gpio name="dxl3">
+    <param name="type">dxl</param>
+    <param name="ID">3</param>
+    <command_interface name="Goal Position"/>
+    <state_interface name="Present Position"/>
+    <state_interface name="Present Velocity"/>
+    <state_interface name="Present Current"/>
+  </gpio>
+  
+  <!-- Motor 4: XL330-M288 (wrist_flex) -->
+  <gpio name="dxl4">
+    <param name="type">dxl</param>
+    <param name="ID">4</param>
+    <command_interface name="Goal Position"/>
+    <state_interface name="Present Position"/>
+    <state_interface name="Present Velocity"/>
+    <state_interface name="Present Current"/>
+  </gpio>
+  
+  <!-- Motor 5: XL330-M288 (wrist_roll) -->
+  <gpio name="dxl5">
+    <param name="type">dxl</param>
+    <param name="ID">5</param>
+    <command_interface name="Goal Position"/>
+    <state_interface name="Present Position"/>
+    <state_interface name="Present Velocity"/>
+    <state_interface name="Present Current"/>
+  </gpio>
+  
+  <!-- Motor 6: XL330-M288 (pen_holder/gripper) -->
+  <gpio name="dxl6">
+    <param name="type">dxl</param>
+    <param name="ID">6</param>
+    <command_interface name="Goal Position"/>
+    <state_interface name="Present Position"/>
+    <state_interface name="Present Velocity"/>
+    <state_interface name="Present Current"/>
+  </gpio>
+  
+</ros2_control>
 </robot>
