@@ -204,8 +204,8 @@
 	<param name="baud_rate">1000000</param>
         <param name="number_of_joints">6</param>
 	<param name="number_of_transmissions">6</param> 
-	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,-1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
-	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,-1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
 	<param name="dynamixel_model_folder">/param/dxl_model</param>
 	<!-- <param name="disable_torque_at_init">true</param> -->
 	<param name="protocol_version">2.0</param>
@@ -216,8 +216,8 @@
   <!-- Joint 1: shoulder_pan (base rotation) -->
   <joint name="shoulder_pan">
     <command_interface name="position">
-      <param name="min">1.9522</param>  <!-- far left -->
-      <param name="max">3.1078</param>  <!-- far right -->
+      <param name="min">0.4281</param>  <!-- far left -->
+      <param name="max">-0.483</param>  <!-- far right -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -226,8 +226,8 @@
   <!-- Joint 2: shoulder_lift -->
   <joint name="shoulder_lift">
     <command_interface name="position">
-      <param name="min">-0.8149</param>  <!-- highest physical position -->
-      <param name="max">2.8946</param>   <!-- lowest physical position -->
+      <param name="min">-2.6857</param>  <!-- highest physical position -->
+      <param name="max">-2.486</param>   <!-- lowest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -256,8 +256,8 @@
   <!-- Joint 5: wrist_roll -->
   <joint name="wrist_roll">
     <command_interface name="position">
-      <param name="min">-1.5417</param>  <!-- jacks on same side -->
-      <param name="max">1.5086</param>   <!-- jacks on opposite side (180° rotation) -->
+      <param name="min">1.448</param>  <!-- jacks on same side -->
+      <param name="max">-1.475</param>   <!-- jacks on opposite side (180° rotation) -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -282,7 +282,7 @@
     <command_interface name="Goal Position"/>
     <state_interface name="Present Position"/>
     <state_interface name="Present Velocity"/>
-	    <!-- <state_interface name="Present Current"/> -->
+    <state_interface name="Present Current"/>
   </gpio>
   
   <!-- Motor 2: XL330-M288 (shoulder_lift) -->
@@ -292,7 +292,7 @@
     <command_interface name="Goal Position"/>
     <state_interface name="Present Position"/>
     <state_interface name="Present Velocity"/>
-    <state_interface name="Present Current"/>
+	    <!-- <state_interface name="Present Current"/> -->
   </gpio>
   
   <!-- Motor 3: XL330-M288 (elbow_flex) -->
