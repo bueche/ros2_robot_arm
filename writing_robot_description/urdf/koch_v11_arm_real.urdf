@@ -216,8 +216,8 @@
   <!-- Joint 1: shoulder_pan (base rotation) -->
   <joint name="shoulder_pan">
     <command_interface name="position">
-      <param name="min">0.4281</param>  <!-- far left -->
-      <param name="max">-0.483</param>  <!-- far right -->
+      <param name="min">0.818</param>  <!-- far left -->
+      <param name="max">0.380</param>  <!-- far right -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -226,8 +226,8 @@
   <!-- Joint 2: shoulder_lift -->
   <joint name="shoulder_lift">
     <command_interface name="position">
-      <param name="min">-2.6857</param>  <!-- highest physical position -->
-      <param name="max">-2.486</param>   <!-- lowest physical position -->
+      <param name="min">2.8857</param>  <!-- highest physical position -->
+      <param name="max">2.486</param>   <!-- lowest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -236,8 +236,8 @@
   <!-- Joint 3: elbow_flex -->
   <joint name="elbow_flex">
     <command_interface name="position">
-      <param name="min">-3.1201</param>  <!-- lowest physical position -->
-      <param name="max">0.2086</param>   <!-- highest physical position -->
+      <param name="min">-1.200</param>  <!-- lowest physical position -->
+      <param name="max">-1.45</param>   <!-- highest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -246,8 +246,8 @@
   <!-- Joint 4: wrist_flex -->
   <joint name="wrist_flex">
     <command_interface name="position">
-      <param name="min">-2.7290</param>  <!-- highest physical position -->
-      <param name="max">-0.4080</param>  <!-- lowest physical position -->
+      <param name="min">1.91</param>  <!-- highest physical position -->
+      <param name="max">0.297</param>  <!-- lowest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -282,10 +282,9 @@
     <command_interface name="Goal Position"/>
     <state_interface name="Present Position"/>
     <state_interface name="Present Velocity"/>
-    <state_interface name="Present Current"/>
   </gpio>
   
-  <!-- Motor 2: XL330-M288 (shoulder_lift) -->
+  <!-- Motor 2: XL430-W250 (shoulder_lift) -->
   <gpio name="dxl2">
     <param name="type">dxl</param>
     <param name="ID">2</param>
