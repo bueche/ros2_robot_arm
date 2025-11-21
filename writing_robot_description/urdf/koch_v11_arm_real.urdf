@@ -8,7 +8,7 @@
     <visual>
       <geometry>
 	      <!-- <cylinder radius="0.05" length="0.02"/> -->
-	      <mesh filename="package://writing_robot_description/meshes/Follower_Base.STL"/>
+	      <mesh filename="package://writing_robot_description/meshes/Follower_Base_binary.STL"/>
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1"/>
