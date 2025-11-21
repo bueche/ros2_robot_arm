@@ -6,9 +6,10 @@
   <!-- Base Link -->
   <link name="base_link">
     <visual>
+      <origin xyz="0 0 0.00" rpy="0 0 0"/>  <!-- Adjust xyz to position base -->
       <geometry>
 	      <!-- <cylinder radius="0.05" length="0.02"/> -->
-	      <mesh filename="package://writing_robot_description/meshes/Follower_Base_binary.STL"/>
+	      <mesh filename="package://writing_robot_description/meshes/Follower_Base_binary.stl"  scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -16,7 +17,7 @@
     </visual>
     <!-- Add XL430 body mesh here too, positioned at motor location -->
     <visual>
-      <origin xyz="0 0 0.04" rpy="0 0 0"/>  <!-- Adjust xyz to position motor -->
+      <origin xyz="0 0 0.02" rpy="0 3.1416 0"/>  <!-- Adjust xyz to position motor -->
       <geometry>
 	<mesh filename="package://writing_robot_description/meshes/XL-430_new.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -36,14 +37,14 @@
   <joint name="shoulder_pan" type="revolute">
     <parent link="base_link"/>
     <child link="shoulder_link"/>
-    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+    <origin xyz="0 0 0.04" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-3.14159" upper="3.14159" effort="2.0" velocity="3.14"/>
   </joint>
 
   <link name="shoulder_link">
     <visual>
-      <origin xyz="0 0 0.02" rpy="0 0 0"/>
+      <origin xyz="0 0 0.02" rpy="0 3.1416 1.5708"/>
       <geometry>
 	      <!-- <cylinder radius="0.025" length="0.04"/> -->
 	  <mesh filename="package://writing_robot_description/meshes/fr12_s102.stl" scale="0.001 0.001 0.001"/>
@@ -54,7 +55,7 @@
     </visual>
     <!-- Add XL430 body mesh #2 -->
     <visual>
-      <origin xyz="0 0 0.04" rpy="0 1.5708 0"/>  <!-- position motor horizontally-->
+      <origin xyz="0 0 0.04" rpy="1.5708 0 3.1416"/>  <!-- position motor horizontally-->
       <geometry>
 	<mesh filename="package://writing_robot_description/meshes/XL-430_new.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -78,12 +79,19 @@
     <visual>
       <origin xyz="0.10 0 0" rpy="0 1.5708 0"/>
       <geometry>
-        <cylinder radius="0.015" length="0.20"/>
+	<!-- <cylinder radius="0.015" length="0.20"/> -->
+	<mesh filename="package://writing_robot_description/meshes/Follower_Shoulder_To_Elbow_binary.stl"  scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="blue">
         <color rgba="0.2 0.4 0.8 1"/>
       </material>
     </visual>
+    <visual>
+      <origin xyz="0 0 0.04" rpy="1.5708 0 3.1416"/>  <!-- position motor horizontally-->
+      <geometry>
+	<mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+   </visual>
     <inertial>
       <mass value="0.2"/>
       <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
