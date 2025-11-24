@@ -77,7 +77,7 @@
 
   <link name="upper_arm_link">
     <visual>
-      <origin xyz="0.10 0 0" rpy="0 1.5708 0"/>
+      <origin xyz="0 0.1 0" rpy="1.5708 -1.0000 0"/>
       <geometry>
 	<!-- <cylinder radius="0.015" length="0.20"/> -->
 	<mesh filename="package://writing_robot_description/meshes/Follower_Shoulder_To_Elbow_binary.stl"  scale="0.001 0.001 0.001"/>
@@ -226,10 +226,17 @@
 	<param name="usb_port">/dev/ttyUSB0</param>
 	<param name="port_name">/dev/ttyUSB0</param>
 	<param name="baud_rate">1000000</param>
+	<!--
+	TEMP-FOR-NEW-SERVO
         <param name="number_of_joints">6</param>
 	<param name="number_of_transmissions">6</param> 
 	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
 	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	-->
+        <param name="number_of_joints">5</param>
+	<param name="number_of_transmissions">5</param> 
+	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,1,0,0,0,0,0,-1,0,0,0,0,0,1,0,0,0,0,0,1</param>
+	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,1,0,0,0,0,0,-1,0,0,0,0,0,1,0,0,0,0,0,1</param>
 	<param name="dynamixel_model_folder">/param/dxl_model</param>
 	<!-- <param name="disable_torque_at_init">true</param> -->
 	<param name="protocol_version">2.0</param>
@@ -287,15 +294,17 @@
     <state_interface name="velocity"/>
   </joint>
   
-  <!-- Joint 6: pen_holder (gripper) -->
+  <!-- Joint 6: pen_holder (gripper)  -->
+  <!-- TEMP-FOR-NEW-SERVO
   <joint name="pen_holder">
     <command_interface name="position">
-      <param name="min">1.5117</param>  <!-- completely closed -->
-      <param name="max">2.9329</param>  <!-- completely open -->
+      <param name="min">1.5117</param>   <!-completely closed 
+      <param name="max">2.9329</param>   <!-completely open 
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
   </joint>
+      -->
   
   <!-- ===== GPIO: Actual Dynamixel Motors ===== -->
   
@@ -349,6 +358,7 @@
   </gpio>
   
   <!-- Motor 6: XL330-M288 (pen_holder/gripper) -->
+  <!-- TEMP-FOR-NEW-SERVO
   <gpio name="dxl6">
     <param name="type">dxl</param>
     <param name="ID">6</param>
@@ -357,6 +367,7 @@
     <state_interface name="Present Velocity"/>
     <state_interface name="Present Current"/>
   </gpio>
+  -->
   
 </ros2_control>
 </robot>
