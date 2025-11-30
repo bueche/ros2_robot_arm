@@ -234,6 +234,8 @@
     <hardware>
       <!-- For simulation -->
       <plugin>mock_components/GenericSystem</plugin>
+      <param name="mock_sensor_commands">false</param>
+      <param name="state_following_offset">0.0</param>
       <!-- For real hardware, replace with: -->
       <!-- <plugin>dynamixel_hardware/DynamixelHardware</plugin> -->
     </hardware>
@@ -243,7 +245,9 @@
         <param name="min">-3.14</param>
         <param name="max">3.14</param>
       </command_interface>
-      <state_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
       <state_interface name="velocity"/>
     </joint>
 
@@ -252,7 +256,9 @@
         <param name="min">-2.0</param>
         <param name="max">2.0</param>
       </command_interface>
-      <state_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
       <state_interface name="velocity"/>
     </joint>
 
@@ -261,7 +267,9 @@
         <param name="min">-2.5</param>
         <param name="max">2.5</param>
       </command_interface>
-      <state_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">-1.5</param>
+      </state_interface>
       <state_interface name="velocity"/>
     </joint>
 
@@ -270,7 +278,9 @@
         <param name="min">-2.0</param>
         <param name="max">2.0</param>
       </command_interface>
-      <state_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">1.5</param>
+      </state_interface>
       <state_interface name="velocity"/>
     </joint>
 
@@ -279,7 +289,9 @@
         <param name="min">-3.14</param>
         <param name="max">3.14</param>
       </command_interface>
-      <state_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
       <state_interface name="velocity"/>
     </joint>
 
@@ -288,7 +300,9 @@
         <param name="min">-0.5</param>
         <param name="max">0.5</param>
       </command_interface>
-      <state_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
       <state_interface name="velocity"/>
     </joint>
   </ros2_control>
