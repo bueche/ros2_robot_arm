@@ -18,8 +18,7 @@ koch_v11_controller:
       - elbow_flex
       - wrist_flex
       - wrist_roll
-     # TEMP-FOR-NEW-SERVO
-     # - pen_holder
+      - pen_holder
     
     command_interfaces:
       - position
@@ -58,7 +57,6 @@ koch_v11_controller:
       wrist_roll:
         trajectory: 1.0  # Increased from 0.05
         goal: 0.05       # Increased from 0.02
-      # TEMP-FOR-NEW-SERVO
-      # pen_holder:
-      #   trajectory: 1.0  # Kept tighter for gripper precision
-      #   goal: 0.03        # Increased slightly from 0.01
+      pen_holder:
+        trajectory: 1.0  # Kept tighter for gripper precision
+        goal: 0.03        # Increased slightly from 0.01
