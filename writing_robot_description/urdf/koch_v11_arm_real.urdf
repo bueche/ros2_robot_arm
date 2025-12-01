@@ -112,7 +112,7 @@
     <visual name="XL330-ID4_visual">
       <origin xyz="0.000000 0.000000 0.000000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
-	<mesh filename="package://writing_robot_description/meshes/XL330-ID4.stl" scale="0.001 0.001 0.001"/>
+	<mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="green">
         <color rgba="0.2 0.8 0.4 1"/>
@@ -155,7 +155,7 @@
     <visual name="XL330-ID5_visual">
       <origin xyz="0.000000 0.000000 0.000000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
-        <mesh filename="package://writing_robot_description/meshes/XL330-ID5.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="orange">
         <color rgba="0.9 0.5 0.2 1"/>
@@ -189,7 +189,7 @@
     <visual name="XL330-ID5_visual">
       <origin xyz="0.000000 0.000000 0.000000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
-        <mesh filename="package://writing_robot_description/meshes/XL330-ID5.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="red">
         <color rgba="0.8 0.2 0.2 1"/>
@@ -215,7 +215,7 @@
     <visual name="XL330-ID6_visual">
       <origin xyz="0.000000 0.000000 0.000000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
-        <mesh filename="package://writing_robot_description/meshes/XL330-ID6.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="purple">
         <color rgba="0.6 0.2 0.8 1"/>
