@@ -19,7 +19,7 @@ LINK_PARTS = [
     "forearm_link",
     "wrist_link",
     "hand_link",
-    "pen_link",
+    "pen_tip",
 ]
 
 # Joint names (one fewer than links)
@@ -177,7 +177,7 @@ def extract_link_data(part):
         urdf.append(f'    <collision name="{mesh.Label}_collision">')
         urdf.append(f'      <origin xyz="{format_xyz(pos)}" rpy="{format_rpy(rpy_rad)}"/>')
         urdf.append(f'      <geometry>')
-        urdf.append(f'        <mesh filename="package://YOUR_PACKAGE/meshes/{mesh_name}"/>')
+        urdf.append(f'        <mesh filename="package://writing_robot_description/meshes/{mesh_name}"/>')
         urdf.append(f'      </geometry>')
         urdf.append(f'    </collision>')
     
