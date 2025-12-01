@@ -226,17 +226,17 @@
 	<param name="usb_port">/dev/ttyUSB0</param>
 	<param name="port_name">/dev/ttyUSB0</param>
 	<param name="baud_rate">1000000</param>
-	<!--
-	TEMP-FOR-NEW-SERVO
         <param name="number_of_joints">6</param>
 	<param name="number_of_transmissions">6</param> 
 	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
 	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
-	-->
+	<!--
+	Temp
         <param name="number_of_joints">5</param>
 	<param name="number_of_transmissions">5</param> 
 	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,1,0,0,0,0,0,-1,0,0,0,0,0,1,0,0,0,0,0,1</param>
 	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,1,0,0,0,0,0,-1,0,0,0,0,0,1,0,0,0,0,0,1</param>
+	-->
 	<param name="dynamixel_model_folder">/param/dxl_model</param>
 	<!-- <param name="disable_torque_at_init">true</param> -->
 	<param name="protocol_version">2.0</param>
@@ -268,7 +268,7 @@
   <joint name="elbow_flex">
     <command_interface name="position">
       <param name="min">-1.200</param>  <!-- lowest physical position -->
-      <param name="max">-1.45</param>   <!-- highest physical position -->
+      <param name="max">-0.926</param>   <!-- highest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -277,7 +277,7 @@
   <!-- Joint 4: wrist_flex -->
   <joint name="wrist_flex">
     <command_interface name="position">
-      <param name="min">1.91</param>  <!-- highest physical position -->
+      <param name="min">2.70</param>  <!-- highest physical position -->
       <param name="max">0.297</param>  <!-- lowest physical position -->
     </command_interface>
     <state_interface name="position"/>
@@ -295,16 +295,14 @@
   </joint>
   
   <!-- Joint 6: pen_holder (gripper)  -->
-  <!-- TEMP-FOR-NEW-SERVO
   <joint name="pen_holder">
     <command_interface name="position">
-      <param name="min">1.5117</param>   <!-completely closed 
-      <param name="max">2.9329</param>   <!-completely open 
+      <param name="min">1.60</param>   <!-- completely closed  -->
+      <param name="max">0.19</param>   <!-- completely open  -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
   </joint>
-      -->
   
   <!-- ===== GPIO: Actual Dynamixel Motors ===== -->
   
@@ -358,7 +356,6 @@
   </gpio>
   
   <!-- Motor 6: XL330-M288 (pen_holder/gripper) -->
-  <!-- TEMP-FOR-NEW-SERVO
   <gpio name="dxl6">
     <param name="type">dxl</param>
     <param name="ID">6</param>
@@ -367,7 +364,6 @@
     <state_interface name="Present Velocity"/>
     <state_interface name="Present Current"/>
   </gpio>
-  -->
   
 </ros2_control>
 </robot>
