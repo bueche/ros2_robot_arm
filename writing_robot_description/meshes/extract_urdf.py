@@ -97,6 +97,7 @@ def format_axis(vector):
 # EXTRACTION FUNCTIONS
 # ============================================================================
 
+'''
 def extract_joint_data(parent_part, child_part, joint_name, joint_type, limits):
     """Extract joint definition from parent and child Parts"""
     
@@ -130,6 +131,50 @@ def extract_joint_data(parent_part, child_part, joint_name, joint_type, limits):
     
     urdf.append(f'  </joint>')
     
+    return '\n'.join(urdf)
+'''
+def extract_joint_data(parent_part, child_part, joint_name, joint_type, limits):
+    """Extract joint definition from parent and child Parts"""
+            
+    # Global position difference
+    global_pos_diff = child_part.Placement.Base - parent_part.Placement.Base
+    
+    # Transform position difference into parent's reference frame
+    # This is critical when parent is rotated!
+    pos_diff_parent_frame = parent_part.Placement.Rotation.inverted().multVec(global_pos_diff)
+
+    # Calculate rotation difference
+    rot_diff = child_part.Placement.Rotation.multiply( parent_part.Placement.Rotation.inverted())
+                                                    
+    # Convert to RPY
+    euler_deg = rot_diff.toEuler()
+    rpy_rad = euler_to_rpy(euler_deg)
+    
+    # Calculate joint axis in child's local frame
+    # Assume shaft points along Z in Part's natural orientation
+    shaft_local = App.Vector(0, 0, 1)
+    
+    # Transform to child's frame (accounting for child's rotation)
+    axis_child_frame = child_part.Placement.Rotation.inverted().multVec(child_part.Placement.Rotation.multVec(shaft_local))
+    
+    # Actually, axis should be in joint frame, which is rotated by rot_diff
+    # So transform the local Z axis by the rotation difference
+    axis_joint_frame = rot_diff.multVec(shaft_local)
+    
+    # Generate URDF
+    urdf = []
+    urdf.append(f'  <joint name="{joint_name}" type="{joint_type}">')
+    urdf.append(f'    <parent link="{parent_part.Label}"/>')
+    urdf.append(f'    <child link="{child_part.Label}"/>')
+    urdf.append(f'    <origin xyz="{format_xyz(pos_diff_parent_frame)}" rpy="{format_rpy(rpy_rad)}"/>')
+    urdf.append(f'    <axis xyz="{format_axis(shaft_local)}"/>')  # Usually just (0,0,1) in joint frame
+    
+    if joint_type == "revolute" or joint_type == "prismatic":
+        urdf.append(f'    <limit lower="{limits[0]}" upper="{limits[1]}" '
+        f'effort="{limits[2]}" velocity="{limits[3]}"/>')
+        
+    urdf.append(f'  </joint>')
+        
     return '\n'.join(urdf)
 
 def extract_link_data(part):
