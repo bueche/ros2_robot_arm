@@ -73,7 +73,7 @@
     <parent link="shoulder_link"/>
     <child link="upper_arm_link"/>
     <origin xyz="0.000000 0.002000 -0.001000" rpy="1.570796 1.570796 -1.570796"/>
-    <axis xyz="1.000000 0.000000 0.000000"/>
+    <axis xyz="-1.000000 0.000000 0.000000"/>
     <limit lower="-2.0" upper="2.0" effort="2.0" velocity="3.14"/>
   </joint>
 
