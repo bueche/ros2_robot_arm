@@ -6,7 +6,7 @@
   <!-- Base Link -->
   <link name="base_link">
     <visual name="Follower_Base_binary_visual">
-      <origin xyz="-0.068000 -0.114000 -0.018000" rpy="0 0 0"/>  <!-- Adjust xyz to position base -->
+      <origin xyz="-0.068000 -0.114000 -0.018000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
 	      <!-- <cylinder radius="0.05" length="0.02"/> -->
 	      <mesh filename="package://writing_robot_description/meshes/Follower_Base_binary.stl"  scale="0.001 0.001 0.001"/>
@@ -17,7 +17,7 @@
     </visual>
     <!-- Add XL430 body mesh here too, positioned at motor location -->
     <visual name="XL-430_id1_visual">
-      <origin xyz="0 0 0" rpy="0 0 0"/>  <!-- Adjust xyz to position motor -->
+      <origin xyz="0.000000 0.000000 0.000000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
 	<mesh filename="package://writing_robot_description/meshes/XL-430_new.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -38,14 +38,14 @@
   <joint name="shoulder_pan" type="revolute">
     <parent link="base_link"/>
     <child link="shoulder_link"/>
-    <origin xyz="0.000000 0.000000 0.059000" rpy="1.570796 0.000000 0.000000"/>
+    <origin xyz="0.001000 0.000000 0.021000" rpy="0.000000 0.000000 0.000000"/>
     <axis xyz="0.000000 -1.000000 0.000000"/>
     <limit lower="-3.14159" upper="3.14159" effort="2.0" velocity="3.14"/>
   </joint>
 
   <link name="shoulder_link">
     <visual name="fr12_s102_visual">
-      <origin xyz="0.000000 -0.021000 0.000000" rpy="1.570796 1.570796 0.000000"/>
+      <origin xyz="0.000000 0.000000 0.017000" rpy="3.141593 0.000000 1.570796"/>
       <geometry>
 	      <!-- <cylinder radius="0.025" length="0.04"/> -->
 	  <mesh filename="package://writing_robot_description/meshes/fr12_s102.stl" scale="0.001 0.001 0.001"/>
@@ -56,7 +56,7 @@
     </visual>
     <!-- Add XL430 body mesh #2 -->
     <visual name="XL-430_new_visual">
-      <origin xyz="0 0 0" rpy="0 0 0"/>  <!-- position motor horizontally-->
+      <origin xyz="0.000000 0.000000 0.038000" rpy="1.570796 0.000000 0.000000"/>
       <geometry>
 	<mesh filename="package://writing_robot_description/meshes/XL-430_new.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -71,14 +71,14 @@
   <joint name="shoulder_lift" type="revolute">
     <parent link="shoulder_link"/>
     <child link="upper_arm_link"/>
-    <origin xyz="0.000000 0.002000 -0.001000" rpy="1.570796 1.570796 -1.570796"/>
+    <origin xyz="-0.001000 0.000000 0.038000" rpy="0.000000 0.000000 0.000000"/>
     <axis xyz="1.000000 0.000000 0.000000"/>
     <limit lower="-2.0" upper="2.0" effort="2.0" velocity="3.14"/>
   </joint>
 
   <link name="upper_arm_link">
     <visual name="Follower_Shoulder_To_Elbow_binary_visual">
-       <origin xyz="-0.022000 0.013000 -0.117000" rpy="0.000000 0.000000 0.000000"/>
+       <origin xyz="-0.012000 0.022000 0.117000" rpy="3.141593 -0.000000 -1.570796"/>
       <geometry>
 	<!-- <cylinder radius="0.015" length="0.20"/> -->
 	<mesh filename="package://writing_robot_description/meshes/Follower_Shoulder_To_Elbow_binary.stl"  scale="0.001 0.001 0.001"/>
@@ -88,7 +88,7 @@
       </material>
     </visual>
     <visual name="XL330-ID-3_visual">
-      <origin xyz="-0.008000 -0.108000 0.014000" rpy="1.570796 0.000000 -1.570796"/>
+      <origin xyz="0.109000 0.008000 -0.014000" rpy="-1.570796 0.000000 0.000000"/>
       <geometry>
 	<mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -103,14 +103,14 @@
   <joint name="elbow_flex" type="revolute">
     <parent link="upper_arm_link"/>
     <child link="forearm_link"/>
-    <origin xyz="-0.000000 -0.108000 0.014000" rpy="0.000000 -0.000000 -0.000000"/>
+    <origin xyz="0.109000 0.000000 -0.014000" rpy="0.000000 0.000000 0.000000"/>
     <axis xyz="1.000000 0.000000 0.000000"/>
     <limit lower="-2.5" upper="2.5" effort="1.5" velocity="3.14"/>
   </joint>
 
   <link name="forearm_link">
     <visual name="XL330-ID4_visual">
-      <origin xyz="-0.009000 -0.101000 0.002000" rpy="-1.570796 1.570796 1.570796"/>
+      <origin xyz="0.101000 -0.008000 0.002000" rpy="1.570796 1.570796 0.000000"/>
       <geometry>
 	<mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -119,7 +119,7 @@
       </material>
     </visual>
     <visual name="Follower_Elbow_To_Wrist_Extension_binary_visual">
-      <origin xyz="-0.018000 -0.082000 -0.009000" rpy="0.000000 0.000000 0.000000"/>
+      <origin xyz="0.082000 -0.018000 -0.009000" rpy="0.000000 0.000000 1.570796"/>
       <geometry>
         <mesh filename="package://writing_robot_description/meshes/Follower_Elbow_To_Wrist_Extension_binary.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -137,14 +137,14 @@
   <joint name="wrist_flex" type="revolute">
     <parent link="forearm_link"/>
     <child link="wrist_link"/>
-    <origin xyz="-0.001000 -0.100000 0.002000" rpy="0.000000 -0.000000 -0.000000"/>
-    <axis xyz="-1.000000 0.000000 0.000000"/>
+    <origin xyz="0.101000 0.000000 0.002000" rpy="0.000000 0.000000 0.000000"/>
+    <axis xyz="1.000000 0.000000 0.000000"/>
     <limit lower="-2.0" upper="2.0" effort="1.5" velocity="3.14"/>
   </joint>
 
   <link name="wrist_link">
     <visual name="Follower_Elbow_To_Wrist_binary_visual">
-      <origin xyz="-0.017000 -0.223000 -0.064000" rpy="0.000000 0.000000 0.000000"/>
+      <origin xyz="0.222000 0.019000 0.064000" rpy="-3.141593 0.000000 -1.570796"/>
       <geometry>
 	<mesh filename="package://writing_robot_description/meshes/Follower_Elbow_To_Wrist_binary.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -153,7 +153,7 @@
       </material>
     </visual>
     <visual name="XL330-ID5_visual">
-      <origin xyz="-0.001000 -0.001000 -0.039000" rpy="-3.141593 0.000000 -1.570796"/>
+      <origin xyz="0.000000 0.003000 0.038000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
         <mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -171,7 +171,7 @@
   <joint name="wrist_roll" type="revolute">
     <parent link="wrist_link"/>
     <child link="hand_link"/>
-    <origin xyz="0.003000 -0.001000 -0.044000" rpy="3.141593 -0.000000 -1.570796"/>
+    <origin xyz="-0.001000 0.000000 0.039000" rpy="0.000000 0.000000 0.000000"/>
     <axis xyz="0.000000 0.000000 1.000000"/>
     <limit lower="-3.14159" upper="3.14159" effort="1.0" velocity="3.14"/>
   </joint>
@@ -206,14 +206,14 @@
   <joint name="pen_holder" type="revolute">
     <parent link="hand_link"/>
     <child link="pen_link"/>
-    <origin xyz="0.000000 -0.009000 0.015000" rpy="0.000000 -0.000000 -1.570796"/>
+    <origin xyz="-0.001000 -0.008000 0.015000" rpy="0.000000 0.000000 0.000000"/>
       <axis xyz="0.000000 1.000000 0.000000"/>
     <limit lower="-0.5" upper="0.5" effort="0.5" velocity="1.57"/>
   </joint>
 
   <link name="pen_link">
     <visual name="Follower_Gripper_Moving_Part_binary_visual">
-    <origin xyz="0.008000 -0.221000 0.056000" rpy="-6.283185 -1.570796 0.000000"/>
+      <origin xyz="-0.220000 -0.055000 -0.008000" rpy="0.000000 0.000000 -1.570796"/>
       <geometry>
         <mesh filename="package://writing_robot_description/meshes/Follower_Gripper_Moving_Part_binary.stl" scale="0.001 0.001 0.001"/>
       </geometry>
