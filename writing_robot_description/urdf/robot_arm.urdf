@@ -206,14 +206,14 @@
   <joint name="pen_holder" type="revolute">
     <parent link="hand_link"/>
     <child link="pen_link"/>
-    <origin xyz="-0.001000 -0.008000 0.015000" rpy="0.000000 0.000000 0.000000"/>
-      <axis xyz="-1.000000 0.000000 0.000000"/>
+    <origin xyz="0.000000 -0.007000 0.015000" rpy="0.000000 0.000000 0.000000"/>
+    <axis xyz="-1.000000 0.000000 0.000000"/>
     <limit lower="-0.5" upper="0.5" effort="0.5" velocity="1.57"/>
   </joint>
 
   <link name="pen_link">
     <visual name="Follower_Gripper_Moving_Part_binary_visual">
-      <origin xyz="-0.220000 -0.055000 -0.008000" rpy="0.000000 0.000000 -1.570796"/>
+      <origin xyz="-0.221000 -0.045000 0.034000" rpy="0.000000 -0.785399 -1.570797"/>
       <geometry>
         <mesh filename="package://writing_robot_description/meshes/Follower_Gripper_Moving_Part_binary.stl" scale="0.001 0.001 0.001"/>
       </geometry>
