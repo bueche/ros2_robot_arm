@@ -23,6 +23,7 @@ setup(
             'draw_square_sim = writing_robot_control.draw_square_sim:main',
             'koch_v11_draw_square = writing_robot_control.koch_v11_draw_square:main',
             'pose_sequence = writing_robot_control.pose_sequence:main',
+            'pose_test = writing_robot_control.pose_test:main',
        ],
     },
 )

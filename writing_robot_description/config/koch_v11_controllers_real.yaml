@@ -35,6 +35,9 @@ koch_v11_controller:
     allow_partial_joints_goal: false
     open_loop_control: false
     allow_integration_in_goal_trajectories: true
+
+    stop_trajectory_duration: 0.0  # Keep commanding position after trajectory ends
+    allow_nonzero_velocity_at_trajectory_end: true  # Smooth transitions
     
     # Constraints
     constraints:
