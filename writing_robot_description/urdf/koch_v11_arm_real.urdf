@@ -105,7 +105,7 @@
     <parent link="upper_arm_link"/>
     <child link="forearm_link"/>
     <origin xyz="0.109000 0.000000 -0.013000" rpy="3.14159 0.000000 0.000000"/>
-    <axis xyz="0.000000 1.000000 0.000000"/>
+    <axis xyz="0.000000 -1.000000 0.000000"/>
     <limit lower="-2.5" upper="2.5" effort="1.5" velocity="3.14"/>
   </joint>
 
@@ -237,8 +237,8 @@
 	<param name="baud_rate">1000000</param>
         <param name="number_of_joints">6</param>
 	<param name="number_of_transmissions">6</param> 
-	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
-	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
 	<!--
 	Temp
         <param name="number_of_joints">5</param>
@@ -276,8 +276,8 @@
   <!-- Joint 3: elbow_flex -->
   <joint name="elbow_flex">
     <command_interface name="position">
-      <param name="min">-1.650</param>  <!-- lowest physical position -->
-      <param name="max">-0.926</param>   <!-- highest physical position -->
+      <param name="min">0.926</param>   <!-- highest physical position -->
+      <param name="max">1.650</param>  <!-- lowest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
