@@ -18,10 +18,13 @@ import time
 import argparse
 import sys
 import threading
+import xml.etree.ElementTree as ET
+from ament_index_python.packages import get_package_share_directory
+import os
 
 
 class PoseTestNode(Node):
-    def __init__(self):
+    def __init__(self, urdf_path=None):
         super().__init__('pose_test_node')
         
         # Create publisher for joint trajectory
@@ -61,16 +64,22 @@ class PoseTestNode(Node):
             'pen_holder'
         ]
         
-        # Joint limits from URDF (ros2_control section)
-        # Format: {joint_name: {'min': value, 'max': value, 'id': servo_id}}
-        self.joint_limits = {
-            'shoulder_pan': {'min': 0.540, 'max': 2.044, 'id': 1},
-            'shoulder_lift': {'min': 2.486, 'max': 2.8857, 'id': 2},
-            'elbow_flex': {'min': -1.650, 'max': -0.926, 'id': 3},
-            'wrist_flex': {'min': 0.297, 'max': 2.70, 'id': 4},
-            'wrist_roll': {'min': -1.475, 'max': 1.448, 'id': 5},
-            'pen_holder': {'min': 0.19, 'max': 1.60, 'id': 6}
-        }
+        # Parse URDF to get joint limits dynamically
+        self.joint_limits = self.parse_urdf_limits(urdf_path)
+        
+        if not self.joint_limits:
+            self.get_logger().warn("Could not parse URDF limits, using fallback hardcoded limits")
+            self.joint_limits = self.get_fallback_limits()
+        else:
+            self.get_logger().info(f"Loaded joint limits from URDF: {urdf_path if urdf_path else 'default'}")
+        
+        # Display loaded limits
+        self.get_logger().info("Joint limits loaded:")
+        for joint_name in self.joint_names:
+            limits = self.joint_limits.get(joint_name, {})
+            self.get_logger().info(
+                f"  {joint_name}: [{limits.get('min', 'N/A'):.3f}, {limits.get('max', 'N/A'):.3f}] rad"
+            )
         
         # Safe raised position for servo testing
         # This keeps the arm elevated to prevent collisions during single-joint tests
@@ -78,7 +87,7 @@ class PoseTestNode(Node):
             1.292,   # shoulder_pan: centered
             2.688,   # shoulder_lift: raised up (near max)
             -1.063,  # elbow_flex: centered
-            1.499,   # wrist_flex: centered
+            2.499,   # wrist_flex: centered
             -0.014,  # wrist_roll: centered
             0.895    # pen_holder: half-open
         ]
@@ -100,7 +109,7 @@ class PoseTestNode(Node):
                 },
                 {
                     'name': 'Pose 2',
-                    'positions': [1.9874755650952616, 2.50, -1.000,
+                    'positions': [1.9874755650952616, 2.50, -1.00,
                                   1.5908711139472399, -1.408349834228516, 0.21],
                     'duration': 2
                 },
@@ -119,13 +128,93 @@ class PoseTestNode(Node):
                 {
                     'name': 'Pose 5',
                     'positions': [1.8125163261602346, 2.564534107547631, -1.6329528967269173,
-                                  2.440220964093796, -1.191594677186126, 1.5],
+                                  2.440220964093796, 1.191594677186126, 1.5],
                     'duration': 2
                 }
             ]
         }
         
         self.get_logger().info('Pose Test Node initialized')
+    
+    def parse_urdf_limits(self, urdf_path=None):
+        """Parse joint limits from URDF file.
+        
+        Reads limits from ros2_control section (software limits) which are
+        typically more conservative than hardware limits.
+        """
+        try:
+            # If no path provided, try to find the URDF in the package
+            if urdf_path is None:
+                try:
+                    pkg_share = get_package_share_directory('writing_robot_description')
+                    urdf_path = os.path.join(pkg_share, 'urdf', 'koch_v11_arm_real.urdf')
+                except:
+                    self.get_logger().warn("Could not locate URDF package, trying uploaded file path")
+                    urdf_path = '/mnt/user-data/uploads/koch_v11_arm_real.urdf'
+            
+            if not os.path.exists(urdf_path):
+                self.get_logger().warn(f"URDF file not found: {urdf_path}")
+                return None
+            
+            # Parse the URDF XML
+            tree = ET.parse(urdf_path)
+            root = tree.getroot()
+            
+            # Find the ros2_control section
+            ros2_control = root.find('.//ros2_control')
+            if ros2_control is None:
+                self.get_logger().warn("No ros2_control section found in URDF")
+                return None
+            
+            # Extract limits for each joint
+            joint_limits = {}
+            servo_id = 1  # Assume sequential IDs
+            
+            for joint in ros2_control.findall('.//joint'):
+                joint_name = joint.get('name')
+                if joint_name not in self.joint_names:
+                    continue
+                
+                # Find position command interface with min/max params
+                cmd_interface = joint.find(".//command_interface[@name='position']")
+                if cmd_interface is not None:
+                    min_param = cmd_interface.find(".//param[@name='min']")
+                    max_param = cmd_interface.find(".//param[@name='max']")
+                    
+                    if min_param is not None and max_param is not None:
+                        joint_limits[joint_name] = {
+                            'min': float(min_param.text),
+                            'max': float(max_param.text),
+                            'id': servo_id
+                        }
+                        servo_id += 1
+            
+            # Verify we got all joints
+            if len(joint_limits) != len(self.joint_names):
+                self.get_logger().warn(
+                    f"Only found {len(joint_limits)}/{len(self.joint_names)} joint limits in URDF"
+                )
+                return None
+            
+            return joint_limits
+            
+        except Exception as e:
+            self.get_logger().error(f"Error parsing URDF: {e}")
+            return None
+    
+    def get_fallback_limits(self):
+        """Fallback hardcoded limits if URDF parsing fails.
+        
+        These are the limits from your koch_v11_arm_real.urdf ros2_control section.
+        """
+        return {
+            'shoulder_pan': {'min': 0.540, 'max': 2.044, 'id': 1},
+            'shoulder_lift': {'min': 2.486, 'max': 2.8857, 'id': 2},
+            'elbow_flex': {'min': -1.200, 'max': -0.926, 'id': 3},
+            'wrist_flex': {'min': 0.297, 'max': 2.70, 'id': 4},
+            'wrist_roll': {'min': -1.475, 'max': 1.448, 'id': 5},
+            'pen_holder': {'min': 0.19, 'max': 1.60, 'id': 6}
+        }
     
     def joint_state_callback(self, msg):
         """Callback to store current joint positions."""
@@ -155,7 +244,11 @@ class PoseTestNode(Node):
         return True
     
     def validate_positions(self, positions, description=""):
-        """Validate that positions are within joint limits."""
+        """Validate that positions are within joint limits.
+        
+        Handles cases where min > max numerically (e.g., min=2.0, max=0.5)
+        which can occur depending on joint axis direction and servo mounting.
+        """
         violations = []
         warnings = []
         
@@ -163,20 +256,28 @@ class PoseTestNode(Node):
             limits = self.joint_limits[joint_name]
             pos = positions[i]
             
-            # Check if position is outside limits
-            if pos < limits['min'] or pos > limits['max']:
+            # Get the actual numeric range (handle min > max case)
+            # "min" and "max" are semantic (physical extremes)
+            # but numerically they might be reversed
+            lower_bound = min(limits['min'], limits['max'])
+            upper_bound = max(limits['min'], limits['max'])
+            
+            # Check if position is outside the valid range
+            if pos < lower_bound or pos > upper_bound:
                 violations.append(
-                    f"  ❌ {joint_name}: {pos:.3f} rad is OUTSIDE limits "
-                    f"[{limits['min']:.3f}, {limits['max']:.3f}]"
+                    f"  ❌ {joint_name}: {pos:.3f} rad is OUTSIDE valid range "
+                    f"[{lower_bound:.3f}, {upper_bound:.3f}] "
+                    f"(URDF: min={limits['min']:.3f}, max={limits['max']:.3f})"
                 )
             # Check if position is close to limits (within 5%)
             else:
-                range_size = limits['max'] - limits['min']
+                range_size = abs(limits['max'] - limits['min'])
                 margin = range_size * 0.05
-                if pos < limits['min'] + margin or pos > limits['max'] - margin:
+                
+                if pos < lower_bound + margin or pos > upper_bound - margin:
                     warnings.append(
                         f"  ⚠️  {joint_name}: {pos:.3f} rad is near limit "
-                        f"[{limits['min']:.3f}, {limits['max']:.3f}]"
+                        f"[{lower_bound:.3f}, {upper_bound:.3f}]"
                     )
         
         if violations:
@@ -624,6 +725,9 @@ Examples:
     parser.add_argument('--skip_validation', action='store_true',
                        help='Skip position validation (DANGEROUS - may damage servos!)')
     
+    parser.add_argument('--urdf', type=str, default=None,
+                       help='Path to URDF file (default: auto-detect from package)')
+    
     # Parse arguments (skip ROS args)
     parsed_args, unknown = parser.parse_known_args()
     
@@ -641,7 +745,7 @@ Examples:
     
     # Initialize ROS2
     rclpy.init(args=args)
-    node = PoseTestNode()
+    node = PoseTestNode(urdf_path=parsed_args.urdf)
     
     # Set tolerance if specified
     node.position_tolerance = parsed_args.tolerance
