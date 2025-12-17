@@ -3,10 +3,11 @@
 <!-- Based on working 4-DOF pattern, extended to 6 joints -->
 <robot name="koch_v11_writing_arm">
 
+
   <!-- Base Link -->
   <link name="base_link">
     <visual name="Follower_Base_binary_visual">
-      <origin xyz="-0.068000 -0.114000 -0.018000" rpy="0.000000 0.000000 0.000000"/>
+      <origin xyz="-0.067000 -0.101000 0.000000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
 	      <!-- <cylinder radius="0.05" length="0.02"/> -->
 	      <mesh filename="package://writing_robot_description/meshes/Follower_Base_binary.stl"  scale="0.001 0.001 0.001"/>
@@ -17,7 +18,7 @@
     </visual>
     <!-- Add XL430 body mesh here too, positioned at motor location -->
     <visual name="XL-430_id1_visual">
-      <origin xyz="0.000000 0.000000 0.000000" rpy="0.000000 0.000000 0.000000"/>
+      <origin xyz="0.000000 0.017000 0.021000" rpy="0.000000 0.000000 0.000000"/>
       <geometry>
 	<mesh filename="package://writing_robot_description/meshes/XL-430_new.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -38,8 +39,8 @@
   <joint name="shoulder_pan" type="revolute">
     <parent link="base_link"/>
     <child link="shoulder_link"/>
-    <origin xyz="0.001000 0.000000 0.021000" rpy="0.000000 0.000000 0.000000"/>
-    <axis xyz="0.000000 0.000000 1.000000"/>
+    <origin xyz="0.001000 0.017000 0.042000" rpy="0.000000 0.000000 0.000000"/>
+    <axis xyz="0.000000 0.000000 -1.000000"/>
     <limit lower="-3.14159" upper="3.14159" effort="2.0" velocity="3.14"/>
   </joint>
 
@@ -71,7 +72,7 @@
   <joint name="shoulder_lift" type="revolute">
     <parent link="shoulder_link"/>
     <child link="upper_arm_link"/>
-    <origin xyz="-0.001000 0.000000 0.038000" rpy="0.000000 0.000000 0.000000"/>
+    <origin xyz="-0.001000 0.000000 0.038000" rpy="3.14159  0.000000 0.000000"/>
     <axis xyz="0.000000 1.000000 0.000000"/>
     <limit lower="-2.0" upper="2.0" effort="2.0" velocity="3.14"/>
   </joint>
@@ -103,8 +104,8 @@
   <joint name="elbow_flex" type="revolute">
     <parent link="upper_arm_link"/>
     <child link="forearm_link"/>
-    <origin xyz="0.109000 0.000000 -0.014000" rpy="0.000000 0.000000 0.000000"/>
-    <axis xyz="0.000000 1.000000 0.000000"/>
+    <origin xyz="0.109000 0.000000 -0.013000" rpy="3.14159 0.000000 0.000000"/>
+    <axis xyz="0.000000 -1.000000 0.000000"/>
     <limit lower="-2.5" upper="2.5" effort="1.5" velocity="3.14"/>
   </joint>
 
@@ -137,7 +138,7 @@
   <joint name="wrist_flex" type="revolute">
     <parent link="forearm_link"/>
     <child link="wrist_link"/>
-    <origin xyz="0.101000 0.000000 0.002000" rpy="0.000000 0.000000 0.000000"/>
+    <origin xyz="0.101000 -0.001000 0.003000" rpy="0.000000 0.000000 0.000000"/>
     <axis xyz="0.000000 1.000000 0.000000"/>
     <limit lower="-2.0" upper="2.0" effort="1.5" velocity="3.14"/>
   </joint>
@@ -171,7 +172,7 @@
   <joint name="wrist_roll" type="revolute">
     <parent link="wrist_link"/>
     <child link="hand_link"/>
-    <origin xyz="-0.001000 0.000000 0.039000" rpy="0.000000 0.000000 0.000000"/>
+    <origin xyz="-0.001000 0.001000 0.043000" rpy="0.000000 0.000000 0.000000"/>
     <axis xyz="0.000000 0.000000 1.000000"/>
     <limit lower="-3.14159" upper="3.14159" effort="1.0" velocity="3.14"/>
   </joint>
@@ -206,7 +207,7 @@
   <joint name="pen_holder" type="revolute">
     <parent link="hand_link"/>
     <child link="pen_link"/>
-    <origin xyz="0.000000 -0.007000 0.015000" rpy="0.000000 0.000000 0.000000"/>
+    <origin xyz="0.000000 -0.007000 0.016000" rpy="0.785398 0.000000 0.000000"/>
     <axis xyz="-1.000000 0.000000 0.000000"/>
     <limit lower="-0.5" upper="0.5" effort="0.5" velocity="1.57"/>
   </joint>
@@ -224,23 +225,6 @@
     </inertial>
   </link>
 
-  <!-- Pen Tip (Fixed)
-  <joint name="pen_tip_joint" type="fixed">
-    <parent link="pen_link"/>
-    <child link="pen_tip"/>
-    <origin xyz="0.05 0 0" rpy="0 0 0"/>
-  </joint>
-
-  <link name="pen_tip">
-    <visual name="Follower_Gripper_Moving_Part_binary_visual">
-      <origin xyz="0.000000 0.000000 0.000000" rpy="0.000000 0.000000 0.000000"/>
-      <geometry>
-        <mesh filename="package://writing_robot_description/meshes/Follower_Gripper_Moving_Part_binary.stl" scale="0.001 0.001 0.001"/>
-      </geometry>
-    </visual>
-  </link>
-  -->
-
   <!-- ROS2 Control - Following working 4-DOF pattern -->
   <!-- ros2_control for Dynamixel Hardware -->
   <ros2_control name="koch_v11_system" type="system">
@@ -253,8 +237,8 @@
 	<param name="baud_rate">1000000</param>
         <param name="number_of_joints">6</param>
 	<param name="number_of_transmissions">6</param> 
-	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
-	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	<param name="transmission_to_joint_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
+	<param name="joint_to_transmission_matrix">1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1</param>
 	<!--
 	Temp
         <param name="number_of_joints">5</param>
@@ -292,8 +276,8 @@
   <!-- Joint 3: elbow_flex -->
   <joint name="elbow_flex">
     <command_interface name="position">
-      <param name="min">-1.200</param>  <!-- lowest physical position -->
-      <param name="max">-0.926</param>   <!-- highest physical position -->
+      <param name="min">0.926</param>   <!-- highest physical position -->
+      <param name="max">1.650</param>  <!-- lowest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
