@@ -172,7 +172,7 @@
   <joint name="wrist_roll" type="revolute">
     <parent link="wrist_link"/>
     <child link="hand_link"/>
-    <origin xyz="-0.001000 0.001000 0.043000" rpy="0.000000 0.000000 1.570796"/>
+    <origin xyz="-0.001000 0.001000 0.043000" rpy="0.000000 0.000000 -1.570796"/>
     <axis xyz="0.000000 0.000000 1.000000"/>
     <limit lower="-3.14159" upper="3.14159" effort="1.0" velocity="3.14"/>
   </joint>
