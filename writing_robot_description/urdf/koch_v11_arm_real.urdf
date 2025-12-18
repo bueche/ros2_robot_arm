@@ -30,8 +30,11 @@
       </geometry>
     </collision>
     <inertial>
-      <mass value="0.5"/>
-      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+      <origin xyz="0.002157 0.002598 0.014585" rpy="0 0 0"/>
+      <mass value="0.089861"/>
+      <inertia ixx="0.000069611" ixy="0.000000000" ixz="0.000000000"
+		           iyy="0.000068626" iyz="0.000000000"
+		           izz="0.000103037"/>
     </inertial>
   </link>
 
@@ -62,10 +65,13 @@
 	<mesh filename="package://writing_robot_description/meshes/XL-430_new.stl" scale="0.001 0.001 0.001"/>
       </geometry>
    </visual>
-    <inertial>
-      <mass value="0.3"/>
-      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
-    </inertial>
+   <inertial>
+     <origin xyz="-0.000000 0.000000 0.037821" rpy="0 0 0"/>
+     <mass value="0.061576"/>
+     <inertia ixx="0.000013539" ixy="0.000000000" ixz="0.000000000"
+	                  iyy="0.000013856" iyz="0.000000000"
+	                  izz="0.000006444"/>
+   </inertial>
   </link>
 
   <!-- Joint 2: Shoulder Lift (Vertical) - XL430 -->
@@ -94,10 +100,13 @@
 	<mesh filename="package://writing_robot_description/meshes/XL,XC-330.stl" scale="0.001 0.001 0.001"/>
       </geometry>
    </visual>
-    <inertial>
-      <mass value="0.2"/>
-      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
-    </inertial>
+   <inertial>
+      <origin xyz="0.050128 -0.023836 0.130136" rpy="0 0 0"/>
+      <mass value="0.071602"/>
+      <inertia ixx="0.001104557" ixy="0.000000000" ixz="0.000000000"
+		             iyy="0.001192723" iyz="0.000000000"
+		             izz="0.000265545"/>
+   </inertial>
   </link>
 
   <!-- Joint 3: Elbow Flex - XL330 -->
@@ -129,8 +138,11 @@
       </material>
     </visual>
     <inertial>
-      <mass value="0.15"/>
-      <inertia ixx="0.0005" ixy="0.0" ixz="0.0" iyy="0.0005" iyz="0.0" izz="0.0005"/>
+      <origin xyz="0.100026 0.011432 0.002300" rpy="0 0 0"/>
+      <mass value="0.088473"/>
+      <inertia ixx="0.000044543" ixy="0.000000000" ixz="0.000000000"
+		             iyy="0.000011283" iyz="0.000000000"
+		             izz="0.000046876"/>
     </inertial>
   </link>
 
@@ -163,8 +175,11 @@
       </material>
     </visual>
     <inertial>
-      <mass value="0.1"/>
-      <inertia ixx="0.0002" ixy="0.0" ixz="0.0" iyy="0.0002" iyz="0.0" izz="0.0002"/>
+      <origin xyz="0.039162 0.041751 0.050877" rpy="0 0 0"/>
+      <mass value="0.034634"/>
+      <inertia ixx="0.000300750" ixy="0.000000000" ixz="0.000000000"
+		             iyy="0.000307520" iyz="0.000000000"
+		             izz="0.000544612"/>
     </inertial>
   </link>
 
@@ -198,8 +213,11 @@
     </visual>
 
     <inertial>
-      <mass value="0.08"/>
-      <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
+      <origin xyz="0.005155 -0.026264 0.024550" rpy="0 0 0"/>
+      <mass value="0.045639"/>
+      <inertia ixx="0.000047474" ixy="0.000000000" ixz="0.000000000"
+		             iyy="0.000013317" iyz="0.000000000"
+		             izz="0.000039915"/>
     </inertial>
   </link>
 
@@ -220,8 +238,11 @@
       </geometry>
     </visual>
     <inertial>
-      <mass value="0.02"/>
-      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.00001"/>
+      <origin xyz="-0.251709 0.176376 0.042951" rpy="0 0 0"/>
+      <mass value="0.015925"/>
+      <inertia ixx="0.000001879" ixy="0.000000000" ixz="0.000000000"
+		             iyy="0.000003038" iyz="0.000000000"
+		             izz="0.000004269"/>
     </inertial>
   </link>
 
