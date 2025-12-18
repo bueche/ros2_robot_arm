@@ -23,13 +23,12 @@
 	<mesh filename="package://writing_robot_description/meshes/XL-430_new.stl" scale="0.001 0.001 0.001"/>
       </geometry>
    </visual>
-    <collision name="XL-430_id1_collision">
+   <collision name="XL-430_id1_collision">
       <geometry>
-	<!-- check this -->
-        <cylinder radius="0.05" length="0.02"/>
+	 <cylinder radius="0.05" length="0.02" />
       </geometry>
-    </collision>
-    <inertial>
+   </collision>
+   <inertial>
       <origin xyz="0.002157 0.002598 0.014585" rpy="0 0 0"/>
       <mass value="0.089861"/>
       <inertia ixx="0.000069611" ixy="0.000000000" ixz="0.000000000"
@@ -72,6 +71,18 @@
 	                  iyy="0.000013856" iyz="0.000000000"
 	                  izz="0.000006444"/>
    </inertial>
+   <collision name="fr12_s102_collision">
+      <origin xyz="-0.000000 0.000000 0.030750" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+        <box size="0.047000 0.038000 0.021500" />
+      </geometry>
+   </collision>
+   <collision name="XL-430_new_collision">
+      <origin xyz="0.000000 0.000000 0.038000" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+         <cylinder radius="0.019000" length="0.046000" />
+      </geometry>
+   </collision>
   </link>
 
   <!-- Joint 2: Shoulder Lift (Vertical) - XL430 -->
@@ -107,6 +118,18 @@
 		             iyy="0.001192723" iyz="0.000000000"
 		             izz="0.000265545"/>
    </inertial>
+   <collision name="Follower_Shoulder_To_Elbow_binary_collision">
+      <origin xyz="0.010050 -0.044044 0.233604" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+         <box size="0.054000 0.141912 0.036000" />
+      </geometry>
+    </collision>
+    <collision name="XL330-ID-3_collision">
+      <origin xyz="0.109000 0.008000 -0.014000" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+         <cylinder radius="0.017000" length="0.028000" />
+      </geometry>
+    </collision>
   </link>
 
   <!-- Joint 3: Elbow Flex - XL330 -->
@@ -144,6 +167,18 @@
 		             iyy="0.000011283" iyz="0.000000000"
 		             izz="0.000046876"/>
     </inertial>
+    <collision name="XL330-ID4_collision">
+      <origin xyz="0.101000 -0.008000 0.002000" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+        <cylinder radius="0.017000" length="0.028000" />
+      </geometry>
+    </collision>
+    <collision name="Follower_Elbow_To_Wrist_Extension_binary_collision">
+      <origin xyz="0.099550 0.027043 0.002550" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+         <box size="0.045000 0.100086 0.033000" />
+      </geometry>
+    </collision>
   </link>
 
   <!-- Joint 4: Wrist Flex - XL330 -->
@@ -181,6 +216,18 @@
 		             iyy="0.000307520" iyz="0.000000000"
 		             izz="0.000544612"/>
     </inertial>
+    <collision name="Follower_Elbow_To_Wrist_binary_collision">
+      <origin xyz="0.243000 0.241223 0.122867" rpy="0.000000 1.570800 0.000000" />
+      <geometry>
+        <cylinder radius="0.017487" length="0.052000" />
+      </geometry>
+    </collision>
+    <collision name="XL330-ID5_collision">
+      <origin xyz="0.000000 0.003000 0.038000" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+        <cylinder radius="0.017000" length="0.028000" />
+      </geometry>
+    </collision>
   </link>
 
   <!-- Joint 5: Wrist Roll - XL330 -->
@@ -219,6 +266,18 @@
 		             iyy="0.000013317" iyz="0.000000000"
 		             izz="0.000039915"/>
     </inertial>
+    <collision name="Follower_Gripper_Static_Part_binary">
+      <origin xyz="0.000065 -0.051484 0.052125" rpy="1.570800 0.000000 0.000000" />
+      <geometry>
+        <cylinder radius="0.021813" length="0.078868" />
+      </geometry>
+    </collision>
+    <collision name="XL330-ID6_collision">
+      <origin xyz="0.008000 -0.007000 0.015000" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+         <cylinder radius="0.017000" length="0.028000" />
+      </geometry>
+    </collision>
   </link>
 
   <!-- Joint 6: Pen Holder (Gripper) - XL330 -->
@@ -244,6 +303,12 @@
 		             iyy="0.000003038" iyz="0.000000000"
 		             izz="0.000004269"/>
     </inertial>
+    <collision name="Follower_Gripper_Moving_Part_binary_collision">
+      <origin xyz="-0.253009 0.176065 0.044500" rpy="0.000000 0.000000 0.000000" />
+      <geometry>
+        <box size="0.073917 0.045500 0.031000" />
+      </geometry>
+     </collision>
   </link>
 
   <!-- ROS2 Control - Following working 4-DOF pattern -->
