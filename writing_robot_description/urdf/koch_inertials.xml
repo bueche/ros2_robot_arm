@@ -1,0 +1,66 @@
+<!-- Generated inertial properties from STL meshes -->
+<!-- Material: pla+ (density: 1240 kg/m³) -->
+
+<!-- base_link inertial properties (from STL + servos) -->
+<inertial>
+  <origin xyz="0.002157 0.002598 0.014585" rpy="0 0 0"/>
+  <mass value="0.089861"/>
+  <inertia ixx="0.000069611" ixy="0.000000000" ixz="0.000000000"
+           iyy="0.000068626" iyz="0.000000000"
+           izz="0.000103037"/>
+</inertial>
+
+<!-- shoulder_link inertial properties (from STL + servos) -->
+<inertial>
+  <origin xyz="-0.000000 0.000000 0.037821" rpy="0 0 0"/>
+  <mass value="0.061576"/>
+  <inertia ixx="0.000013539" ixy="0.000000000" ixz="0.000000000"
+           iyy="0.000013856" iyz="0.000000000"
+           izz="0.000006444"/>
+</inertial>
+
+<!-- upper_arm_link inertial properties (from STL + servos) -->
+<inertial>
+  <origin xyz="0.050128 -0.023836 0.130136" rpy="0 0 0"/>
+  <mass value="0.071602"/>
+  <inertia ixx="0.001104557" ixy="0.000000000" ixz="0.000000000"
+           iyy="0.001192723" iyz="0.000000000"
+           izz="0.000265545"/>
+</inertial>
+
+<!-- forearm_link inertial properties (from STL + servos) -->
+<inertial>
+  <origin xyz="0.100026 0.011432 0.002300" rpy="0 0 0"/>
+  <mass value="0.088473"/>
+  <inertia ixx="0.000044543" ixy="0.000000000" ixz="0.000000000"
+           iyy="0.000011283" iyz="0.000000000"
+           izz="0.000046876"/>
+</inertial>
+
+<!-- wrist_link inertial properties (from STL + servos) -->
+<inertial>
+  <origin xyz="0.039162 0.041751 0.050877" rpy="0 0 0"/>
+  <mass value="0.034634"/>
+  <inertia ixx="0.000300750" ixy="0.000000000" ixz="0.000000000"
+           iyy="0.000307520" iyz="0.000000000"
+           izz="0.000544612"/>
+</inertial>
+
+<!-- hand_link inertial properties (from STL + servos) -->
+<inertial>
+  <origin xyz="0.005155 -0.026264 0.024550" rpy="0 0 0"/>
+  <mass value="0.045639"/>
+  <inertia ixx="0.000047474" ixy="0.000000000" ixz="0.000000000"
+           iyy="0.000013317" iyz="0.000000000"
+           izz="0.000039915"/>
+</inertial>
+
+<!-- pen_link inertial properties (from STL + servos) -->
+<inertial>
+  <origin xyz="-0.251709 0.176376 0.042951" rpy="0 0 0"/>
+  <mass value="0.015925"/>
+  <inertia ixx="0.000001879" ixy="0.000000000" ixz="0.000000000"
+           iyy="0.000003038" iyz="0.000000000"
+           izz="0.000004269"/>
+</inertial>
+

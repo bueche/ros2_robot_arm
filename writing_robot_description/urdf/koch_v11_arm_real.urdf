@@ -43,7 +43,7 @@
     <child link="shoulder_link"/>
     <origin xyz="0.001000 0.017000 0.042000" rpy="0.000000 0.000000 0.000000"/>
     <axis xyz="0.000000 0.000000 1.000000"/>
-    <limit lower="-3.14159" upper="3.14159" effort="2.0" velocity="3.14"/>
+    <limit lower="2.044" upper="0.540" effort="2.0" velocity="3.14"/>
   </joint>
 
   <link name="shoulder_link">
@@ -91,7 +91,7 @@
     <child link="upper_arm_link"/>
     <origin xyz="-0.001000 0.000000 0.038000" rpy="3.14159  1.570796 0.000000"/>
     <axis xyz="0.000000 -1.000000 0.000000"/>
-    <limit lower="-2.0" upper="2.0" effort="2.0" velocity="3.14"/>
+    <limit lower="2.8857" upper="2.486" effort="2.0" velocity="3.14"/>
   </joint>
 
   <link name="upper_arm_link">
@@ -138,7 +138,7 @@
     <child link="forearm_link"/>
     <origin xyz="0.109000 0.000000 -0.013000" rpy="3.14159 0.000000 0.000000"/>
     <axis xyz="0.000000 -1.000000 0.000000"/>
-    <limit lower="-2.5" upper="2.5" effort="1.5" velocity="3.14"/>
+    <limit lower="0.926" upper="1.650" effort="1.5" velocity="3.14"/>
   </joint>
 
   <link name="forearm_link">
@@ -187,7 +187,7 @@
     <child link="wrist_link"/>
     <origin xyz="0.101000 -0.001000 0.003000" rpy="0.000000 0.000000 0.000000"/>
     <axis xyz="0.000000 1.000000 0.000000"/>
-    <limit lower="-2.0" upper="2.0" effort="1.5" velocity="3.14"/>
+    <limit lower="2.70" upper="0.297" effort="1.5" velocity="3.14"/>
   </joint>
 
   <link name="wrist_link">
@@ -236,7 +236,7 @@
     <child link="hand_link"/>
     <origin xyz="-0.001000 0.001000 0.043000" rpy="0.000000 0.000000 -1.570796"/>
     <axis xyz="0.000000 0.000000 1.000000"/>
-    <limit lower="-3.14159" upper="3.14159" effort="1.0" velocity="3.14"/>
+    <limit lower="1.448" upper="-1.448" effort="1.0" velocity="3.14"/>
   </joint>
 
   <link name="hand_link">
@@ -286,7 +286,7 @@
     <child link="pen_link"/>
     <origin xyz="0.000000 -0.007000 0.016000" rpy="0.785398 0.000000 0.000000"/>
     <axis xyz="-1.000000 0.000000 0.000000"/>
-    <limit lower="-0.5" upper="0.5" effort="0.5" velocity="1.57"/>
+    <limit lower="1.60" upper="0.19" effort="0.5" velocity="1.57"/>
   </joint>
 
   <link name="pen_link">

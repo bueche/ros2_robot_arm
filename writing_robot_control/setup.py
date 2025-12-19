@@ -24,6 +24,7 @@ setup(
             'koch_v11_draw_square = writing_robot_control.koch_v11_draw_square:main',
             'pose_sequence = writing_robot_control.pose_sequence:main',
             'pose_test = writing_robot_control.pose_test:main',
+            'load_tester = writing_robot_control.load_tester:main',
        ],
     },
 )
