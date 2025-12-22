@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
 ROS2 Pose Testing Node with Validation and Servo Testing
+Version 14 - Updated with dual-topic telemetry (handles XL430/XL330 differences)
 
 Features:
 - ROS2 node publishing JointTrajectory messages
 - Reads joint limits from URDF parameter
 - Servo test mode (safe position + test min/max/middle per joint)
 - Full pose sequence testing
-- Telemetry from /joint_states topic (no direct servo access)
+- Dual-topic telemetry (joint_states + dxl_state)
+- Temperature, current, voltage monitoring
+- Thermal and overload detection
 - Validation with URDF limits
 
 Usage:
@@ -21,6 +24,7 @@ import rclpy
 from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from sensor_msgs.msg import JointState
+from dynamixel_interfaces.msg import DynamixelState
 from builtin_interfaces.msg import Duration
 import yaml
 import time
@@ -76,98 +80,358 @@ class URDFLimitsParser:
 
 
 class JointStateTelemetry:
-    """Read telemetry from ROS2 joint_states topic (no direct servo access)."""
+    """
+    Dual-topic telemetry reader for Dynamixel servos.
     
-    def __init__(self, node, joint_names):
+    Handles XL430 vs XL330 differences:
+    - XL430 (IDs 1, 2): Has Load (%), NO Current
+    - XL330 (IDs 3-6): Has Current (mA)
+    
+    Subscribes to:
+    - /joint_states for position, velocity, effort
+    - /dynamixel_hardware_interface/dxl_state for temperature, current, voltage
+    """
+    
+    # Servo types by ID
+    XL430_IDS = [1, 2]  # shoulder_pan, shoulder_lift
+    XL330_IDS = [3, 4, 5, 6]  # elbow, wrists, gripper
+    
+    def __init__(self, node, joint_names, servo_id_map):
+        """
+        Initialize telemetry reader.
+        
+        Args:
+            node: ROS2 node
+            joint_names: List of joint names
+            servo_id_map: Dict mapping joint name -> servo ID
+                         {'shoulder_pan': 1, 'shoulder_lift': 2, ...}
+        """
         self.node = node
         self.joint_names = joint_names
-        self.latest_states = None
+        self.servo_id_map = servo_id_map
         self.enabled = False
         
-        # Subscribe to joint_states
-        self.subscription = self.node.create_subscription(
-            JointState,
-            '/joint_states',
-            self._joint_state_callback,
-            10
+        self.latest_joint_states = None
+        self.latest_dxl_states = None
+        
+        # Subscribe to both topics
+        self.joint_state_sub = self.node.create_subscription(
+            JointState, '/joint_states',
+            self._joint_state_callback, 10
         )
         
-        self.node.get_logger().info("✓ Telemetry using /joint_states topic")
+        self.dxl_state_sub = self.node.create_subscription(
+            DynamixelState, '/dynamixel_hardware_interface/dxl_state',
+            self._dxl_state_callback, 10
+        )
         
-        # Wait a bit for first message (spin to allow callback)
-        start_time = time.time()
-        while (time.time() - start_time) < 0.5:
+        self.node.get_logger().info("✓ Telemetry initialized (dual-topic mode)")
+        self.node.get_logger().info("  - Subscribing to /joint_states")
+        self.node.get_logger().info("  - Subscribing to /dxl_state")
+        self.node.get_logger().info("  - XL430 servos (IDs 1,2): Load only")
+        self.node.get_logger().info("  - XL330 servos (IDs 3-6): Current + Load")
+        
+        self._wait_for_data()
+    
+    def _wait_for_data(self, timeout=2.0):
+        """Wait for first data."""
+        start = time.time()
+        while (time.time() - start) < timeout:
             rclpy.spin_once(self.node, timeout_sec=0.1)
-            if self.latest_states is not None:
-                break
+            if self.latest_joint_states is not None:
+                self.enabled = True
+                self.node.get_logger().info("✓ Telemetry active")
+                return
             time.sleep(0.01)
         
-        if self.latest_states is not None:
+        if self.latest_joint_states:
             self.enabled = True
-            self.node.get_logger().info("✓ Receiving joint states")
         else:
-            self.node.get_logger().warn("⚠️  No joint_states received yet")
-            self.node.get_logger().warn("   Telemetry will be available once robot publishes states")
+            self.node.get_logger().warn("⚠️  No telemetry data yet")
     
     def _joint_state_callback(self, msg):
-        """Store latest joint states."""
-        self.latest_states = msg
+        self.latest_joint_states = msg
         if not self.enabled:
             self.enabled = True
     
+    def _dxl_state_callback(self, msg):
+        self.latest_dxl_states = msg
+    
     def get_joint_telemetry(self, joint_name):
-        """Get telemetry for a specific joint from joint_states."""
-        if not self.enabled or self.latest_states is None:
+        """
+        Get telemetry for a joint.
+        
+        Returns dict with:
+        - For XL430 servos (IDs 1, 2):
+            position, velocity, effort, load_percent, temperature, voltage
+        - For XL330 servos (IDs 3-6):
+            position, velocity, effort, current_ma, load_percent, temperature, voltage
+        """
+        if not self.enabled or not self.latest_joint_states:
             return None
         
+        result = {'joint': joint_name}
+        servo_id = self.servo_id_map.get(joint_name)
+        
+        if servo_id:
+            result['servo_id'] = servo_id
+            result['servo_type'] = 'XL430' if servo_id in self.XL430_IDS else 'XL330'
+        
+        # Get standard joint state data
         try:
-            # Find joint index
-            if joint_name not in self.latest_states.name:
-                return None
-            
-            idx = self.latest_states.name.index(joint_name)
-            
-            # Extract data
-            result = {'joint': joint_name}
-            
-            # Position
-            if idx < len(self.latest_states.position):
-                result['position'] = self.latest_states.position[idx]
-            
-            # Velocity
-            if idx < len(self.latest_states.velocity):
-                result['velocity'] = self.latest_states.velocity[idx]
-            
-            # Effort (torque/current related)
-            if idx < len(self.latest_states.effort):
-                effort = self.latest_states.effort[idx]
-                result['effort'] = effort
+            if joint_name in self.latest_joint_states.name:
+                idx = self.latest_joint_states.name.index(joint_name)
                 
-                # Rough current estimate (effort is usually in Nm, but for display purposes)
-                # This is approximate - actual current would need servo-specific conversion
-                result['current_estimate_mA'] = abs(effort * 1000)  # Rough scaling
-            
-            return result
-            
+                if idx < len(self.latest_joint_states.position):
+                    result['position'] = self.latest_joint_states.position[idx]
+                
+                if idx < len(self.latest_joint_states.velocity):
+                    result['velocity'] = self.latest_joint_states.velocity[idx]
+                
+                # Keep effort for reference but don't use it as load
+                if idx < len(self.latest_joint_states.effort):
+                    effort = self.latest_joint_states.effort[idx]
+                    result['effort'] = effort  # Torque in Nm, NOT percentage
+                    
         except Exception as e:
-            self.node.get_logger().error(f"Error reading telemetry: {e}")
-            return None
+            self.node.get_logger().error(f"Error reading joint_states: {e}")
+        
+        # Get Dynamixel-specific data
+        if servo_id and self.latest_dxl_states:
+            try:
+                if servo_id in self.latest_dxl_states.id:
+                    idx = list(self.latest_dxl_states.id).index(servo_id)
+                    
+                    # Temperature (both servo types) - already in °C
+                    if hasattr(self.latest_dxl_states, 'temperature'):
+                        if idx < len(self.latest_dxl_states.temperature):
+                            result['temperature'] = \
+                                self.latest_dxl_states.temperature[idx]
+                    
+                    # Voltage (both servo types) - convert from 0.1V units to V
+                    if hasattr(self.latest_dxl_states, 'voltage'):
+                        if idx < len(self.latest_dxl_states.voltage):
+                            result['voltage'] = \
+                                self.latest_dxl_states.voltage[idx] / 10.0
+                    
+                    # Load (XL430 only) - convert from 0.1% units to %
+                    if servo_id in self.XL430_IDS:
+                        if hasattr(self.latest_dxl_states, 'present_load'):
+                            if idx < len(self.latest_dxl_states.present_load):
+                                result['load_percent'] = \
+                                    self.latest_dxl_states.present_load[idx] / 10.0
+                    
+                    # Current (XL330 only) - already in mA
+                    if servo_id in self.XL330_IDS:
+                        if hasattr(self.latest_dxl_states, 'present_current'):
+                            if idx < len(self.latest_dxl_states.present_current):
+                                result['current_ma'] = \
+                                    self.latest_dxl_states.present_current[idx]
+                    
+                    # Hardware error
+                    if idx < len(self.latest_dxl_states.dxl_hw_state):
+                        result['hw_error'] = \
+                            self.latest_dxl_states.dxl_hw_state[idx]
+                    
+            except Exception as e:
+                self.node.get_logger().error(f"Error reading dxl_state: {e}")
+        
+        return result if len(result) > 1 else None
     
     def get_all_joints_telemetry(self):
         """Get telemetry for all joints."""
-        if not self.enabled or self.latest_states is None:
-            return {}
-        
         results = {}
         for joint_name in self.joint_names:
             data = self.get_joint_telemetry(joint_name)
             if data:
                 results[joint_name] = data
-        
         return results
     
+    def print_telemetry(self, joint_name=None):
+        """Pretty print telemetry."""
+        if joint_name:
+            data = self.get_joint_telemetry(joint_name)
+            if data:
+                self._print_single(data)
+        else:
+            all_data = self.get_all_joints_telemetry()
+            if all_data:
+                self.node.get_logger().info("="*75)
+                self.node.get_logger().info("📊 SERVO TELEMETRY")
+                self.node.get_logger().info("="*75)
+                for _, data in all_data.items():
+                    self._print_single(data)
+                self.node.get_logger().info("="*75)
+    
+    def _print_single(self, data):
+        """Format single joint telemetry."""
+        line = f"{data['joint']:<15}"
+        
+        if 'servo_id' in data:
+            line += f" ID:{data['servo_id']}"
+        
+        if 'servo_type' in data:
+            line += f"({data['servo_type']:<5})"
+        
+        if 'position' in data:
+            line += f" Pos:{data['position']:>7.3f}rad"
+        
+        if 'load_percent' in data:
+            line += f" Load:{data['load_percent']:>5.1f}%"
+        
+        if 'current_ma' in data:
+            line += f" Curr:{data['current_ma']:>5.0f}mA"
+        
+        if 'voltage' in data:
+            line += f" Volt:{data['voltage']:>4.1f}V"
+        
+        if 'temperature' in data:
+            temp = data['temperature']
+            temp_str = f"Temp:{temp:>5.1f}°C"
+            if temp > 60:
+                temp_str += " 🔥"
+            elif temp > 50:
+                temp_str += " ⚠️"
+            line += f" {temp_str}"
+        
+        self.node.get_logger().info(line)
+    
+    def get_max_temperature(self):
+        """Get max temperature across all servos."""
+        all_data = self.get_all_joints_telemetry()
+        temps = [d['temperature'] for d in all_data.values() 
+                 if 'temperature' in d]
+        return max(temps) if temps else None
+    
+    def get_total_current(self):
+        """
+        Get total current draw (XL330 servos only).
+        XL430 servos don't measure current!
+        """
+        all_data = self.get_all_joints_telemetry()
+        currents = [d['current_ma'] for d in all_data.values() 
+                    if 'current_ma' in d]
+        return sum(currents) if currents else None
+    
+    def check_thermal_limits(self, warning_temp=55.0, critical_temp=65.0):
+        """Check thermal status."""
+        all_data = self.get_all_joints_telemetry()
+        
+        max_temp = 0.0
+        hot_joints = []
+        status = 'ok'
+        
+        for joint_name, data in all_data.items():
+            if 'temperature' in data:
+                temp = data['temperature']
+                max_temp = max(max_temp, temp)
+                
+                if temp >= critical_temp:
+                    status = 'critical'
+                    hot_joints.append((joint_name, temp))
+                elif temp >= warning_temp:
+                    if status != 'critical':
+                        status = 'warning'
+                    hot_joints.append((joint_name, temp))
+        
+        return {
+            'status': status,
+            'max_temp': max_temp,
+            'hot_joints': hot_joints
+        }
+    
+    def check_overload(self, xl430_warning=80.0, xl330_current_warning=400.0):
+        """
+        Check for overload conditions.
+        
+        Args:
+            xl430_warning: Load percentage threshold for XL430 servos
+            xl330_current_warning: Current (mA) threshold for XL330 servos
+        """
+        all_data = self.get_all_joints_telemetry()
+        overloaded = []
+        
+        for joint_name, data in all_data.items():
+            servo_id = data.get('servo_id')
+            
+            # Check XL430 load
+            if servo_id in self.XL430_IDS:
+                if 'load_percent' in data and abs(data['load_percent']) >= xl430_warning:
+                    overloaded.append((joint_name, 'Load', data['load_percent']))
+            
+            # Check XL330 current
+            elif servo_id in self.XL330_IDS:
+                if 'current_ma' in data and abs(data['current_ma']) >= xl330_current_warning:
+                    overloaded.append((joint_name, 'Current', data['current_ma']))
+        
+        return overloaded
+    
+    def print_summary(self):
+        """Print comprehensive summary."""
+        all_data = self.get_all_joints_telemetry()
+        
+        if not all_data:
+            self.node.get_logger().warn("No telemetry data available")
+            return
+        
+        self.node.get_logger().info("\n" + "="*75)
+        self.node.get_logger().info("📊 TELEMETRY SUMMARY")
+        self.node.get_logger().info("="*75)
+        
+        # XL430 Summary
+        xl430_loads = [d['load_percent'] for d in all_data.values()
+                       if d.get('servo_id') in self.XL430_IDS and 'load_percent' in d]
+        if xl430_loads:
+            self.node.get_logger().info(
+                f"XL430 (IDs 1-2): Avg Load: {sum(xl430_loads)/len(xl430_loads):.1f}%"
+            )
+        
+        # XL330 Summary
+        xl330_currents = [d['current_ma'] for d in all_data.values()
+                          if d.get('servo_id') in self.XL330_IDS and 'current_ma' in d]
+        if xl330_currents:
+            total = sum(xl330_currents)
+            avg = total / len(xl330_currents)
+            self.node.get_logger().info(
+                f"XL330 (IDs 3-6): Total Current: {total:.0f}mA, "
+                f"Avg: {avg:.0f}mA ({total*12/1000:.1f}W @ 12V)"
+            )
+        
+        # Temperature
+        max_temp = self.get_max_temperature()
+        if max_temp:
+            self.node.get_logger().info(f"Max Temperature: {max_temp:.1f}°C")
+        
+        # Voltage
+        voltages = [d['voltage'] for d in all_data.values() if 'voltage' in d]
+        if voltages:
+            min_volt = min(voltages)
+            max_volt = max(voltages)
+            avg_volt = sum(voltages) / len(voltages)
+            self.node.get_logger().info(
+                f"Voltage: {min_volt:.2f}V - {max_volt:.2f}V (avg {avg_volt:.2f}V)"
+            )
+            if min_volt < 4.5:
+                self.node.get_logger().warn(f"⚠️  LOW VOLTAGE: {min_volt:.2f}V")
+        
+        # Thermal check
+        thermal = self.check_thermal_limits()
+        if thermal['status'] != 'ok':
+            self.node.get_logger().warn(f"⚠️  Thermal Status: {thermal['status'].upper()}")
+            for joint, temp in thermal['hot_joints']:
+                self.node.get_logger().warn(f"   {joint}: {temp:.1f}°C")
+        
+        # Overload check
+        overloaded = self.check_overload()
+        if overloaded:
+            self.node.get_logger().warn("⚠️  Overloaded servos:")
+            for joint, metric, value in overloaded:
+                self.node.get_logger().warn(f"   {joint}: {metric} = {value:.1f}")
+        
+        self.node.get_logger().info("="*75)
+    
     def close(self):
-        """Cleanup (nothing to do for topic-based telemetry)."""
+        """Cleanup."""
         pass
 
 
@@ -179,7 +443,7 @@ class PoseTestNode(Node):
         
         # Declare parameters
         self.declare_parameter('poses_file', '')
-        self.declare_parameter('program', '')  # calibration, sweep, stress
+        self.declare_parameter('program', '')  # calibration, sweep, stress, default
         self.declare_parameter('servo_test', False)
         self.declare_parameter('servo_test_joint', '')  # Specific joint to test
         self.declare_parameter('safe_position_first', True)
@@ -199,35 +463,36 @@ class PoseTestNode(Node):
         self.enable_telemetry = self.get_parameter('telemetry').value
         self.delay = self.get_parameter('delay').value
         self.movement_time = self.get_parameter('movement_time').value
-        self.urdf_file = self.get_parameter('urdf_file').value
+        urdf_file = self.get_parameter('urdf_file').value
         
-        # Publisher
-        self.publisher = self.create_publisher(
-            JointTrajectory,
-            '/koch_v11_controller/joint_trajectory',
-            10
-        )
-        
-        # Subscriber for joint states (optional feedback)
-        self.joint_state_sub = self.create_subscription(
-            JointState,
-            '/joint_states',
-            self.joint_state_callback,
-            10
-        )
-        self.current_joint_states = None
-        
-        # Joint names (6-DOF Koch arm)
+        # Joint names (Koch v1.1 - 6 DOF)
         self.joint_names = [
             'shoulder_pan',
-            'shoulder_lift',
+            'shoulder_lift', 
             'elbow_flex',
             'wrist_flex',
             'wrist_roll',
             'pen_holder'
         ]
         
-        # Safe position for servo testing
+        # Servo ID mapping for telemetry
+        self.servo_id_map = {
+            'shoulder_pan': 1,   # XL430-W250
+            'shoulder_lift': 2,  # XL430-W250
+            'elbow_flex': 3,     # XL330-M288
+            'wrist_flex': 4,     # XL330-M288
+            'wrist_roll': 5,     # XL330-M288
+            'pen_holder': 6      # XL330-M077
+        }
+        
+        # Create publisher
+        self.publisher = self.create_publisher(
+            JointTrajectory,
+            '/koch_v11_controller/joint_trajectory',
+            10
+        )
+        
+        # Safe starting position
         self.safe_position = {
             'shoulder_pan': 1.292,
             'shoulder_lift': 2.688,
@@ -236,234 +501,149 @@ class PoseTestNode(Node):
             'wrist_roll': -0.014,
             'pen_holder': 0.895
         }
+        self.safe_position = {
+            'shoulder_pan': 0.0,
+            'shoulder_lift': 2.7,    # Near vertical (safe)
+            'elbow_flex': 1.2,       # Moderately bent
+            'wrist_flex': 1.5,       # Neutral
+            'wrist_roll': 0.0,       # Centered
+            'pen_holder': 0.9        # Slightly open
+        }
         
         # Load URDF limits
-        self.joint_limits = {}
-        self.velocity_limits = {}
-        self.load_urdf_limits()
+        self.get_logger().info('Loading URDF limits...')
+        urdf_content = self.get_urdf_content(urdf_file)
+        if urdf_content:
+            self.urdf_parser = URDFLimitsParser(urdf_content)
+            self.joint_limits = self.urdf_parser.get_joint_limits()
+            self.velocity_limits = self.urdf_parser.get_velocity_limits()
+            self.get_logger().info(f'✓ Loaded limits for {len(self.joint_limits)} joints')
+        else:
+            self.get_logger().error('Failed to load URDF - validation disabled')
+            self.joint_limits = {}
+            self.velocity_limits = {}
+            self.validate = False
         
-        # Telemetry (uses /joint_states topic, not direct servo access)
+        # Initialize telemetry with servo ID mapping
         self.telemetry = None
         if self.enable_telemetry:
-            self.telemetry = JointStateTelemetry(self, self.joint_names)
+            self.get_logger().info('Initializing telemetry...')
+            try:
+                self.telemetry = JointStateTelemetry(
+                    self, 
+                    self.joint_names,
+                    self.servo_id_map  # Pass servo ID mapping
+                )
+            except Exception as e:
+                self.get_logger().error(f'Telemetry init failed: {e}')
+                self.telemetry = None
         
         # Statistics
         self.stats = {
             'total_poses': 0,
             'validation_errors': 0,
-            'validation_warnings': 0,
+            'validation_warnings': 0
         }
         
-        self.get_logger().info('Pose Test Node initialized')
-    
-    def load_urdf_limits(self):
-        """Load joint limits from robot_description parameter or file."""
-        urdf_content = None
-        
-        # Option 1: Load from urdf_file parameter (file path)
-        if self.urdf_file:
-            try:
-                self.get_logger().info(f'Loading URDF from file: {self.urdf_file}')
-                with open(self.urdf_file, 'r') as f:
-                    urdf_content = f.read()
-                self.get_logger().info('✓ URDF loaded from file')
-            except FileNotFoundError:
-                self.get_logger().error(f'URDF file not found: {self.urdf_file}')
-            except Exception as e:
-                self.get_logger().error(f'Error reading URDF file: {e}')
-        
-        # Option 2: Get from robot_description parameter (parameter server)
-        if not urdf_content:
-            try:
-                urdf_content = self.get_parameter_or(
-                    'robot_description',
-                    rclpy.Parameter('robot_description', 
-                                   rclpy.Parameter.Type.STRING, 
-                                   '')
-                ).value
-                
-                if urdf_content:
-                    self.get_logger().info('✓ URDF loaded from robot_description parameter')
-                else:
-                    self.get_logger().warn('robot_description parameter is empty')
-            except Exception as e:
-                self.get_logger().warn(f'Could not read robot_description parameter: {e}')
-        
-        # Parse URDF if we got content
-        if urdf_content:
-            parser = URDFLimitsParser(urdf_content)
-            self.joint_limits = parser.get_joint_limits()
-            self.velocity_limits = parser.get_velocity_limits()
-            
-            if self.joint_limits:
-                self.get_logger().info(f'✓ Loaded limits from URDF: {len(self.joint_limits)} joints')
-                self.print_limits()
-            else:
-                self.get_logger().warn('No joint limits found in URDF')
-                self.use_default_limits()
-        else:
-            self.get_logger().warn('No URDF content available')
-            self.use_default_limits()
-    
-    def use_default_limits(self):
-        """Fallback to default limits."""
-        self.get_logger().warn('⚠️  Using default limits (not from URDF!)')
-        
-        # Default limits with proper min/max calculation
-        defaults = {
-            'shoulder_pan': {'lower': -3.14, 'upper': 3.14},
-            'shoulder_lift': {'lower': -1.57, 'upper': 3.14},
-            'elbow_flex': {'lower': -3.14, 'upper': 3.14},
-            'wrist_flex': {'lower': -3.14, 'upper': 3.14},
-            'wrist_roll': {'lower': -3.14, 'upper': 3.14},
-            'pen_holder': {'lower': 0.0, 'upper': 3.0},
-        }
-        
-        for joint_name, vals in defaults.items():
-            self.joint_limits[joint_name] = {
-                'min': min(vals['lower'], vals['upper']),
-                'max': max(vals['lower'], vals['upper']),
-                'lower': vals['lower'],
-                'upper': vals['upper']
-            }
-        
-        self.velocity_limits = {
-            'shoulder_pan': 2.0, 'shoulder_lift': 2.0, 'elbow_flex': 2.5,
-            'wrist_flex': 2.5, 'wrist_roll': 2.5, 'pen_holder': 3.0,
-        }
-    
-    def print_limits(self):
-        """Print loaded joint limits."""
         self.get_logger().info('='*60)
-        self.get_logger().info('JOINT LIMITS (from URDF)')
+        self.get_logger().info('POSE TEST NODE INITIALIZED')
         self.get_logger().info('='*60)
-        
-        for joint_name in self.joint_names:
-            if joint_name in self.joint_limits:
-                limits = self.joint_limits[joint_name]
-                
-                # Show actual range (min to max)
-                actual_min = limits['min']
-                actual_max = limits['max']
-                min_deg = np.degrees(actual_min)
-                max_deg = np.degrees(actual_max)
-                
-                # Show URDF lower/upper values
-                lower_deg = np.degrees(limits['lower'])
-                upper_deg = np.degrees(limits['upper'])
-                
-                self.get_logger().info(
-                    f"{joint_name:<15} Range: {actual_min:>6.3f} to {actual_max:>6.3f} rad "
-                    f"({min_deg:>6.1f}° to {max_deg:>6.1f}°)"
-                )
-                self.get_logger().info(
-                    f"{'':15} URDF: lower={limits['lower']:>6.3f} ({lower_deg:>6.1f}°), "
-                    f"upper={limits['upper']:>6.3f} ({upper_deg:>6.1f}°)"
-                )
+        self.get_logger().info(f'Joints: {len(self.joint_names)}')
+        self.get_logger().info(f'Validation: {self.validate}')
+        self.get_logger().info(f'Telemetry: {self.enable_telemetry}')
+        self.get_logger().info(f'Movement time: {self.movement_time}s')
+        self.get_logger().info(f'Delay between poses: {self.delay}s')
+        self.get_logger().info('='*60)
     
-    def joint_state_callback(self, msg):
-        """Store current joint states."""
-        self.current_joint_states = msg
-    
-    def validate_position(self, joint_name, position):
-        """Validate single joint position."""
-        if joint_name not in self.joint_limits:
-            return True, f"Unknown joint (not in URDF)"
+    def get_urdf_content(self, urdf_file=''):
+        """Get URDF content from parameter server or file."""
+        # Try from file first
+        if urdf_file:
+            try:
+                with open(urdf_file, 'r') as f:
+                    return f.read()
+            except Exception as e:
+                self.get_logger().error(f'Error reading URDF file {urdf_file}: {e}')
         
-        limits = self.joint_limits[joint_name]
+        # Try from parameter server
+        try:
+            urdf_param = self.get_parameter('robot_description')
+            return urdf_param.value
+        except Exception:
+            self.get_logger().warn('robot_description parameter not found')
         
-        # CRITICAL: lower/upper in URDF are directional, not min/max!
-        # The actual range is [min(lower, upper), max(lower, upper)]
-        actual_min = min(limits['min'], limits['max'])
-        actual_max = max(limits['min'], limits['max'])
+        # Try to declare and get it
+        try:
+            self.declare_parameter('robot_description', '')
+            urdf_param = self.get_parameter('robot_description')
+            if urdf_param.value:
+                return urdf_param.value
+        except Exception as e:
+            self.get_logger().error(f'Could not get URDF: {e}')
         
-        if position < actual_min:
-            return False, f"Outside range: {position:.3f} < {actual_min:.3f}"
-        if position > actual_max:
-            return False, f"Outside range: {position:.3f} > {actual_max:.3f}"
-        
-        # Near limit warning (5% margin from either end)
-        total_range = actual_max - actual_min
-        if total_range > 0:
-            dist_from_min = position - actual_min
-            dist_from_max = actual_max - position
-            
-            if dist_from_min < 0.05 * total_range or dist_from_max < 0.05 * total_range:
-                return True, f"Near limit (within 5% of boundary)"
-        
-        return True, "OK"
-    
-    def validate_pose(self, pose_name, positions):
-        """Validate complete pose."""
-        errors = []
-        warnings = []
-        
-        for joint_name, position in positions.items():
-            valid, message = self.validate_position(joint_name, position)
-            
-            if not valid:
-                errors.append(f"{joint_name}: {message}")
-                self.stats['validation_errors'] += 1
-            elif message != "OK":
-                warnings.append(f"{joint_name}: {message}")
-                self.stats['validation_warnings'] += 1
-        
-        if errors or warnings:
-            self.get_logger().info(f"\n📋 Validating: {pose_name}")
-            
-        if errors:
-            self.get_logger().error(f"  ❌ ERRORS ({len(errors)}):")
-            for error in errors:
-                self.get_logger().error(f"     {error}")
-        
-        if warnings:
-            self.get_logger().warn(f"  ⚠️  WARNINGS ({len(warnings)}):")
-            for warning in warnings:
-                self.get_logger().warn(f"     {warning}")
-        
-        if not errors and not warnings:
-            self.get_logger().info(f"  ✓ {pose_name} valid")
-        
-        return len(errors) == 0
-    
-    def create_trajectory_msg(self, positions, duration_sec):
-        """Create JointTrajectory message."""
-        msg = JointTrajectory()
-        msg.joint_names = self.joint_names
-        
-        # Build position array in correct order
-        position_array = []
-        for joint_name in self.joint_names:
-            position_array.append(positions.get(joint_name, 0.0))
-        
-        point = JointTrajectoryPoint()
-        point.positions = position_array
-        point.time_from_start = Duration(sec=int(duration_sec), 
-                                        nanosec=int((duration_sec % 1) * 1e9))
-        
-        msg.points = [point]
-        return msg
-    
-    def send_pose(self, pose_name, positions, duration):
-        """Send pose to robot."""
-        msg = self.create_trajectory_msg(positions, duration)
-        self.publisher.publish(msg)
-        self.get_logger().info(f"  ⏳ Moving to {pose_name}")
+        return None
     
     def spin_for_duration(self, duration):
-        """Spin the node for a duration to allow callbacks to execute."""
-        start_time = time.time()
-        while (time.time() - start_time) < duration:
-            rclpy.spin_once(self, timeout_sec=0.1)
-            time.sleep(0.01)  # Small sleep to prevent CPU spinning
+        """Spin node for specified duration (allows callbacks to process)."""
+        start = time.time()
+        while (time.time() - start) < duration:
+            rclpy.spin_once(self, timeout_sec=0.01)
+            time.sleep(0.01)
+    
+    def validate_pose(self, pose_name, positions):
+        """Validate pose against URDF limits."""
+        if not self.validate or not self.joint_limits:
+            return True
+        
+        valid = True
+        
+        for joint_name, position in positions.items():
+            if joint_name not in self.joint_limits:
+                self.get_logger().warn(
+                    f'  ⚠️  {joint_name}: No limits found in URDF'
+                )
+                self.stats['validation_warnings'] += 1
+                continue
+            
+            limits = self.joint_limits[joint_name]
+            min_pos = limits['min']
+            max_pos = limits['max']
+            
+            if position < min_pos or position > max_pos:
+                self.get_logger().error(
+                    f'  ❌ {joint_name}: {position:.3f} rad OUT OF RANGE '
+                    f'[{min_pos:.3f}, {max_pos:.3f}]'
+                )
+                self.stats['validation_errors'] += 1
+                valid = False
+            else:
+                self.get_logger().info(
+                    f'  ✓ {joint_name}: {position:.3f} rad '
+                    f'(within [{min_pos:.3f}, {max_pos:.3f}])'
+                )
+        
+        return valid
+    
+    def send_pose(self, pose_name, positions, duration=2.0):
+        """Send pose to joint trajectory controller."""
+        msg = JointTrajectory()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.joint_names = self.joint_names
+        
+        point = JointTrajectoryPoint()
+        point.positions = [positions.get(j, 0.0) for j in self.joint_names]
+        point.time_from_start = Duration(sec=int(duration), nanosec=int((duration % 1) * 1e9))
+        
+        msg.points = [point]
+        
+        self.publisher.publish(msg)
+        self.get_logger().info(f'→ Sent: {pose_name}')
     
     def move_to_safe_position(self):
-        """Move to safe position for servo testing."""
+        """Move to safe starting position."""
         self.get_logger().info('\n' + '='*60)
         self.get_logger().info('MOVING TO SAFE POSITION')
         self.get_logger().info('='*60)
-        self.get_logger().info('Safe position: Shoulder up 90°, all else neutral')
-        self.get_logger().info('This keeps arm away from base for safe testing')
         
         if self.validate:
             valid = self.validate_pose('safe_position', self.safe_position)
@@ -474,7 +654,7 @@ class PoseTestNode(Node):
         self.send_pose('safe_position', self.safe_position, self.movement_time)
         self.spin_for_duration(self.movement_time + 1.0)
         
-        self.get_logger().info('✓ Safe position reached')
+        self.get_logger().info('✓ At safe position\n')
         return True
     
     def servo_test_single_joint(self, joint_name):
@@ -484,7 +664,7 @@ class PoseTestNode(Node):
             return False
         
         if joint_name not in self.joint_limits:
-            self.get_logger().error(f'No limits found for {joint_name}')
+            self.get_logger().error(f'No limits for {joint_name}')
             return False
         
         limits = self.joint_limits[joint_name]
@@ -493,28 +673,25 @@ class PoseTestNode(Node):
         mid_pos = (min_pos + max_pos) / 2.0
         
         self.get_logger().info('\n' + '='*60)
-        self.get_logger().info(f'SERVO TEST: {joint_name}')
+        self.get_logger().info(f'SERVO TEST: {joint_name.upper()}')
         self.get_logger().info('='*60)
-        self.get_logger().info(f'Range: {min_pos:.3f} to {max_pos:.3f} rad')
-        self.get_logger().info(f'       {np.degrees(min_pos):.1f}° to {np.degrees(max_pos):.1f}°')
-        self.get_logger().info(f'Middle: {mid_pos:.3f} rad ({np.degrees(mid_pos):.1f}°)')
+        self.get_logger().info(f'Range: [{min_pos:.3f}, {max_pos:.3f}] rad')
+        self.get_logger().info(f'Middle: {mid_pos:.3f} rad')
         self.get_logger().info('='*60)
         
-        # Test sequence: middle -> min -> middle -> max -> middle
-        test_sequence = [
+        # Test positions: min, middle, max
+        test_positions = [
+            ('min', min_pos),
             ('middle', mid_pos),
-            ('minimum', min_pos),
-            ('middle', mid_pos),
-            ('maximum', max_pos),
-            ('middle', mid_pos),
+            ('max', max_pos),
         ]
         
-        for test_name, position in test_sequence:
+        for test_name, test_value in test_positions:
             # Create pose with safe position + test joint
             test_pose = self.safe_position.copy()
-            test_pose[joint_name] = position
+            test_pose[joint_name] = test_value
             
-            self.get_logger().info(f'\n[{joint_name}] → {test_name}: {position:.3f} rad ({np.degrees(position):.1f}°)')
+            self.get_logger().info(f'\nTesting {test_name}: {test_value:.3f} rad')
             
             if self.validate:
                 valid = self.validate_pose(f'{joint_name}_{test_name}', test_pose)
@@ -531,17 +708,39 @@ class PoseTestNode(Node):
             if self.telemetry and self.telemetry.enabled:
                 data = self.telemetry.get_joint_telemetry(joint_name)
                 if data:
-                    telemetry_str = f"  📊 {joint_name}: "
-                    if 'position' in data:
-                        telemetry_str += f"Pos: {data['position']:.3f}rad "
-                    if 'effort' in data:
-                        telemetry_str += f"Effort: {data['effort']:.3f}Nm "
-                    if 'current_estimate_mA' in data:
-                        telemetry_str += f"Current: ~{data['current_estimate_mA']:.0f}mA"
-                    self.get_logger().info(telemetry_str)
+                    self._print_joint_telemetry(data)
         
         self.get_logger().info(f'\n✓ Servo test complete for {joint_name}')
         return True
+    
+    def _print_joint_telemetry(self, data):
+        """Print telemetry for a single joint (helper method)."""
+        telemetry_str = f"  📊 {data['joint']:<15} "
+        
+        if 'servo_type' in data:
+            telemetry_str += f"[{data['servo_type']}] "
+        
+        if 'position' in data:
+            telemetry_str += f"Pos:{data['position']:>7.3f}rad "
+        
+        if 'load_percent' in data:
+            telemetry_str += f"Load:{data['load_percent']:>6.2f}% "
+        
+        if 'current_ma' in data:
+            telemetry_str += f"Curr:{data['current_ma']:>5.0f}mA "
+        
+        if 'voltage' in data:
+            telemetry_str += f"Volt:{data['voltage']:>4.1f}V "
+        
+        if 'temperature' in data:
+            temp = data['temperature']
+            telemetry_str += f"Temp:{temp:>5.1f}°C"
+            if temp > 60:
+                telemetry_str += " 🔥"
+            elif temp > 50:
+                telemetry_str += " ⚠️"
+        
+        self.get_logger().info(telemetry_str)
     
     def servo_test_all_joints(self):
         """Test all joints sequentially."""
@@ -557,6 +756,11 @@ class PoseTestNode(Node):
         self.get_logger().info('\n' + '='*60)
         self.get_logger().info('✓ All servo tests complete')
         self.get_logger().info('='*60)
+        
+        # Print telemetry summary if enabled
+        if self.telemetry and self.telemetry.enabled:
+            self.telemetry.print_summary()
+        
         return True
     
     def load_poses_from_file(self, filename):
@@ -608,6 +812,7 @@ class PoseTestNode(Node):
         self.get_logger().info('='*60)
         self.get_logger().info(f'Total poses: {len(poses)}')
         self.get_logger().info(f'Validation: {self.validate}')
+        self.get_logger().info(f'Telemetry: {self.enable_telemetry}')
         self.get_logger().info('='*60)
         
         for idx, pose in enumerate(poses, 1):
@@ -631,23 +836,38 @@ class PoseTestNode(Node):
             # Wait for movement + delay (spin to allow callbacks)
             self.spin_for_duration(self.movement_time + self.delay)
             
-            # Read telemetry if available (BUG FIX: was missing!)
+            # Read telemetry if available
             if self.telemetry and self.telemetry.enabled:
                 all_data = self.telemetry.get_all_joints_telemetry()
                 if all_data:
                     self.get_logger().info("  📊 Joint States:")
                     for joint_name, data in all_data.items():
                         if joint_name in positions_dict:  # Only show joints that moved
-                            telemetry_str = f"    {joint_name:<15} "
-                            if 'position' in data:
-                                telemetry_str += f"Pos: {data['position']:>6.3f}rad "
-                            if 'effort' in data:
-                                telemetry_str += f"Effort: {data['effort']:>6.3f}Nm"
-                            self.get_logger().info(telemetry_str)
+                            self._print_joint_telemetry(data)
+                    
+                    # Check thermal status
+                    thermal = self.telemetry.check_thermal_limits()
+                    if thermal['status'] == 'critical':
+                        self.get_logger().error(
+                            f"  🔥 CRITICAL TEMPERATURE: {thermal['max_temp']:.1f}°C"
+                        )
+                        for joint, temp in thermal['hot_joints']:
+                            self.get_logger().error(f"     {joint}: {temp:.1f}°C")
+                        self.get_logger().error("  ABORTING FOR SAFETY!")
+                        return False
+                    elif thermal['status'] == 'warning':
+                        self.get_logger().warn(
+                            f"  ⚠️  High temperature: {thermal['max_temp']:.1f}°C"
+                        )
             
             self.stats['total_poses'] += 1
         
         self.print_summary()
+        
+        # Print final telemetry summary if enabled
+        if self.telemetry and self.telemetry.enabled:
+            self.telemetry.print_summary()
+        
         return True
     
     def print_summary(self):
