@@ -1,0 +1,101 @@
+# Pose sequence generated from sampled joint_states
+
+poses:
+  - name: pose 1 - poised to work
+    positions:
+      shoulder_pan: 1.557751118588178
+      shoulder_lift: 2.87915379159746
+      elbow_flex: 2.1240665498778704
+      wrist_flex: 2.2790742966536395
+      wrist_roll: 1.1817422278944798
+      pen_holder: 1.5899804520762093
+
+  - name: pose 2 - reach to grab
+    positions:
+      shoulder_pan: 1.2830344188568639
+      shoulder_lift: 2.314373090473864
+      elbow_flex: 1.3198679428431852
+      wrist_flex: 2.2790742966536395
+      wrist_roll: 1.8708360724719102
+      pen_holder: 0.9822273063019052
+
+  - name: pose 3 - grab
+    positions:
+      shoulder_pan: 1.3290763238397656
+      shoulder_lift: 2.3224833118710307
+      elbow_flex: 1.0052482587933562
+      wrist_flex: 2.2790742966536395
+      wrist_roll: 1.7664744211773329
+      pen_holder: 1.500675055398144
+
+  - name: pose 4 - lift and center
+    positions:
+      shoulder_pan: 1.5761678805813386
+      shoulder_lift: 2.575277218710308
+      elbow_flex: 1.8984612154616514
+      wrist_flex: 2.2790742966536395
+      wrist_roll: 1.7664744211773329
+      pen_holder: 1.520675055398144
+
+  - name: pose 5 - raise and get ready to place
+    positions:
+      shoulder_pan: 1.5961193727405962
+      shoulder_lift: 2.79474363246214
+      elbow_flex: 0.9699494649731314
+      wrist_flex: 1.4727763861016122
+      wrist_roll: 1.7618702306790426
+      pen_holder: 1.520675055398144
+
+  - name: pose 6 - place high
+    positions:
+      shoulder_pan: 1.5976541029066929
+      shoulder_lift: 2.655083187347338
+      elbow_flex: 0.8057333372007817
+      wrist_flex: 1.4727763861016122
+      wrist_roll: 1.7618702306790426
+      pen_holder: 0.6553297809233024
+
+  - name: pose 7 - reach to grab again
+    positions:
+      shoulder_pan: 1.2830344188568639
+      shoulder_lift: 2.314373090473864
+      elbow_flex: 1.3198679428431852
+      wrist_flex: 2.326650931802638
+      wrist_roll: 1.8708360724719102
+      pen_holder: 0.9822273063019052
+
+  - name: pose 8 - grab
+    positions:
+      shoulder_pan: 1.3290763238397656
+      shoulder_lift: 2.314373090473864
+      elbow_flex: 1.0052482587933562
+      wrist_flex: 2.036586930410357
+      wrist_roll: 1.7664744211773329
+      pen_holder: 1.520675055398144
+
+  - name: pose 9 - place low
+    positions:
+      shoulder_pan: 1.9245516282852957
+      shoulder_lift: 2.4033874401074744
+      elbow_flex: 1.3520972763312165
+      wrist_flex: 2.326650931802638
+      wrist_roll: 1.7373145480214949
+      pen_holder: 1.520675055398144
+
+  - name: pose 10 - release
+    positions:
+      shoulder_pan: 1.872370802638007
+      shoulder_lift: 2.4033874401074744
+      elbow_flex: 1.2661523870297997
+      wrist_flex: 2.326650931802638
+      wrist_roll: 1.7373145480214949
+      pen_holder: 0.5816627329506595
+
+  - name: pose 11 - poised to work
+    positions:
+      shoulder_pan: 1.557751118588178
+      shoulder_lift: 2.87915379159746
+      elbow_flex: 2.1240665498778704
+      wrist_flex: 2.2790742966536395
+      wrist_roll: 1.1817422278944798
+      pen_holder: 1.5899804520762093

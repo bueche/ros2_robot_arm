@@ -59,7 +59,7 @@ TORQUE_DISABLE = 0
 
 # Port
 DEVICENAME = '/dev/ttyUSB0'
-BAUDRATE = 57600
+BAUDRATE = 1000000
 
 # Global for clean shutdown
 running = True

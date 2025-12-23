@@ -91,7 +91,7 @@
     <child link="upper_arm_link"/>
     <origin xyz="-0.001000 0.000000 0.038000" rpy="3.14159  1.570796 0.000000"/>
     <axis xyz="0.000000 -1.000000 0.000000"/>
-    <limit lower="2.8857" upper="2.486" effort="2.0" velocity="3.14"/>
+    <limit lower="2.8857" upper="2.2000" effort="2.0" velocity="3.14"/>
   </joint>
 
   <link name="upper_arm_link">
@@ -138,7 +138,7 @@
     <child link="forearm_link"/>
     <origin xyz="0.109000 0.000000 -0.013000" rpy="3.14159 0.000000 0.000000"/>
     <axis xyz="0.000000 -1.000000 0.000000"/>
-    <limit lower="0.926" upper="1.650" effort="1.5" velocity="3.14"/>
+    <limit lower="0.726" upper="2.250" effort="1.5" velocity="3.14"/>
   </joint>
 
   <link name="forearm_link">
@@ -236,7 +236,7 @@
     <child link="hand_link"/>
     <origin xyz="-0.001000 0.001000 0.043000" rpy="0.000000 0.000000 -1.570796"/>
     <axis xyz="0.000000 0.000000 1.000000"/>
-    <limit lower="1.448" upper="-1.448" effort="1.0" velocity="3.14"/>
+    <limit lower="1.900" upper="-1.448" effort="1.0" velocity="3.14"/>
   </joint>
 
   <link name="hand_link">
@@ -354,7 +354,7 @@
   <joint name="shoulder_lift">
     <command_interface name="position">
       <param name="min">2.8857</param>  <!-- highest physical position -->
-      <param name="max">2.486</param>   <!-- lowest physical position -->
+      <param name="max">2.2000</param>   <!-- lowest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -364,8 +364,8 @@
   <!-- Joint 3: elbow_flex -->
   <joint name="elbow_flex">
     <command_interface name="position">
-      <param name="min">0.926</param>   <!-- highest physical position -->
-      <param name="max">1.650</param>  <!-- lowest physical position -->
+      <param name="min">0.726</param>   <!-- highest physical position -->
+      <param name="max">2.250</param>  <!-- lowest physical position -->
     </command_interface>
     <state_interface name="position"/>
     <state_interface name="velocity"/>
@@ -386,7 +386,7 @@
   <!-- Joint 5: wrist_roll -->
   <joint name="wrist_roll">
     <command_interface name="position">
-      <param name="min">1.448</param>  <!-- jacks on same side -->
+      <param name="min">1.900</param>  <!-- jacks on same side -->
       <param name="max">-1.475</param>   <!-- jacks on opposite side (180° rotation) -->
     </command_interface>
     <state_interface name="position"/>

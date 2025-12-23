@@ -502,7 +502,7 @@ class PoseTestNode(Node):
             'pen_holder': 0.895
         }
         self.safe_position = {
-            'shoulder_pan': 0.0,
+            'shoulder_pan': 1.55,
             'shoulder_lift': 2.7,    # Near vertical (safe)
             'elbow_flex': 1.2,       # Moderately bent
             'wrist_flex': 1.5,       # Neutral
@@ -767,7 +767,16 @@ class PoseTestNode(Node):
         """Load poses from YAML file."""
         try:
             with open(filename, 'r') as f:
-                return yaml.safe_load(f)
+                data = yaml.safe_load(f)
+                # Extract the 'poses' list from the YAML structure
+                if isinstance(data, dict) and 'poses' in data:
+                    return data['poses']
+                elif isinstance(data, list):
+                    # Already a list of poses (old format)
+                    return data
+                else:
+                    self.get_logger().error(f'Invalid YAML structure in {filename}')
+                    return None
         except Exception as e:
             self.get_logger().error(f'Error loading {filename}: {e}')
             return None
