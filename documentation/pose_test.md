@@ -311,3 +311,38 @@ Testing max: 2.700 rad
 [INFO] [1766531338.172027221] [pose_test_node]: → Sent: wrist_flex_max
 [INFO] [1766531342.179639436] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.612rad Curr:   86mA Volt: 4.9V Temp: 21.0°C
 ```
+
+The following is an example of a validation failure.
+```bash
+-rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf
+[INFO] [1766531037.347260479] [pose_test_node]: Loading URDF limits...
+[INFO] [1766531037.349198675] [pose_test_node]: ✓ Loaded limits for 6 joints
+[INFO] [1766531037.349771233] [pose_test_node]: Initializing telemetry...
+[INFO] [1766531037.355808116] [pose_test_node]: ✓ Telemetry initialized (dual-topic mode)
+[INFO] [1766531037.356440601] [pose_test_node]:   - Subscribing to /joint_states
+[INFO] [1766531037.357091586] [pose_test_node]:   - Subscribing to /dxl_state
+[INFO] [1766531037.357585626] [pose_test_node]:   - XL430 servos (IDs 1,2): Load only
+[INFO] [1766531037.358076906] [pose_test_node]:   - XL330 servos (IDs 3-6): Current + Load
+[INFO] [1766531037.359465599] [pose_test_node]: ✓ Telemetry active
+[INFO] [1766531037.360016731] [pose_test_node]: ============================================================
+[INFO] [1766531037.360535678] [pose_test_node]: POSE TEST NODE INITIALIZED
+[INFO] [1766531037.361041459] [pose_test_node]: ============================================================
+[INFO] [1766531037.361554943] [pose_test_node]: Joints: 6
+[INFO] [1766531037.362056982] [pose_test_node]: Validation: True
+[INFO] [1766531037.362611115] [pose_test_node]: Telemetry: True
+[INFO] [1766531037.363494194] [pose_test_node]: Movement time: 2.0s
+[INFO] [1766531037.364100401] [pose_test_node]: Delay between poses: 2.0s
+[INFO] [1766531037.364603588] [pose_test_node]: ============================================================
+[INFO] [1766531037.365098665] [pose_test_node]: Waiting for joint trajectory controller...
+[INFO] [1766531039.370914793] [pose_test_node]: 
+============================================================
+[INFO] [1766531039.371708519] [pose_test_node]: MOVING TO SAFE POSITION
+[INFO] [1766531039.372430208] [pose_test_node]: ============================================================
+[ERROR] [1766531039.373292064] [pose_test_node]:   ❌ shoulder_pan: 0.000 rad OUT OF RANGE [0.540, 2.044]
+[INFO] [1766531039.374141939] [pose_test_node]:   ✓ shoulder_lift: 2.700 rad (within [2.200, 2.886])
+[INFO] [1766531039.374865295] [pose_test_node]:   ✓ elbow_flex: 1.200 rad (within [0.726, 2.250])
+[INFO] [1766531039.375566687] [pose_test_node]:   ✓ wrist_flex: 1.500 rad (within [0.297, 2.700])
+[INFO] [1766531039.376257506] [pose_test_node]:   ✓ wrist_roll: 0.000 rad (within [-1.448, 1.900])
+[INFO] [1766531039.376932694] [pose_test_node]:   ✓ pen_holder: 0.900 rad (within [0.190, 1.600])
+[ERROR] [1766531039.377608124] [pose_test_node]: Safe position validation failed!
+```
