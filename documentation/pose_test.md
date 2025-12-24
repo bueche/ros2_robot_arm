@@ -6,10 +6,31 @@ This utility does a number of tests that include:
 3. measure various properties of the robot in the current pose (servo temperature, current, voltage, etc)
 4. validate poses wrt to the bounds defined in the urdf file
 
+## Table of contents
+- [Parameters](#parameters)
+- [Pose Sequence Example](#pose-sequence-example)
+- [Servo Range of motion test example](#servo-range-of-motion-test-example)
+- [Example of a validation error](#example-of-a-validation-error)
+- [FAQ](#faq)
+
+
+## Parameters
 
 The parameters are:
-TBD
+- poses_file: The argument should be the file path to a yaml formatted set of poses. See [example pose sequence yaml file](https://github.com/bueche/ros2_robot_arm/blob/main/writing_robot_description/config/delivery_poses.yaml) for more detail.
+- program: This can have an argument value of calibration, sweep, stress, or default. Each represents a sequence of poses.
+- servo_test: (default: False) if true then a servo range-of-motion test is run. Must be accompanied by the `servo_test_joint` parameter (see next).
+- servo_test_joint: Specific joint to test and can have a value of shoulder_pan, shoulder_lift, elbow_flex, elbow_flex, wrist_roll, and pen_holder.
+- safe_position_first: (default: True) should the arm position itself first in the safe pose?
+- validate: (default: True) should the program check to ensure that the next pose is safe or not (within the bounds specified in the urdf)
+- telemetry: (default: False) should the servo stats be sampled after each pose? the stats include temperature, current, voltage, etc.
+- delay: (default: 2.0) The time in seconds to delay between each pose.
+- movement_time: (default: 2.0) how much time should the arm have to complete the transition from the current pose to the next pose.
+- urdf_file: Load URDF from file. (TODO: should have a default file to load)
 
+  
+
+## Pose Sequence Example
 An example run through a sequence of poses is as follows:
 ```bash
 rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/delivery_poses.yaml -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf -p delay:=1.0 -p movement_time:=1.0
@@ -237,6 +258,7 @@ rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p poses_fi
 [INFO] [1766531829.417080626] [pose_test_node]: ===========================================================================
 ```
 
+## Servo Range of motion test example
 The following is a servo range of motion test example.
 ```bash
 -rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf
@@ -311,7 +333,7 @@ Testing max: 2.700 rad
 [INFO] [1766531338.172027221] [pose_test_node]: → Sent: wrist_flex_max
 [INFO] [1766531342.179639436] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.612rad Curr:   86mA Volt: 4.9V Temp: 21.0°C
 ```
-
+## Example of a validation error
 The following is an example of a validation failure.
 ```bash
 -rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf
@@ -346,3 +368,6 @@ The following is an example of a validation failure.
 [INFO] [1766531039.376932694] [pose_test_node]:   ✓ pen_holder: 0.900 rad (within [0.190, 1.600])
 [ERROR] [1766531039.377608124] [pose_test_node]: Safe position validation failed!
 ```
+
+## FAQ
+TBD
