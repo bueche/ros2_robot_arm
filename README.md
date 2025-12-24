@@ -6,4 +6,7 @@ This includes:
  - Testing and tuning of the physical robot and its digital twin
  - Refinement of ROS2-based software to support various actions of the robotic arm
 
-
+<p align="center">
+  <img src="./images/real_robot.jpg" alt="Real Robot Arm" width="400">
+  <img src="./images/digital_twin.jpg" alt="The digital twin" width="400">
+</p>
