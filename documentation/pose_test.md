@@ -236,3 +236,78 @@ rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p poses_fi
 [INFO] [1766531829.416432826] [pose_test_node]: Voltage: 5.20V - 12.20V (avg 7.53V)
 [INFO] [1766531829.417080626] [pose_test_node]: ===========================================================================
 ```
+
+The following is a servo range of motion test example.
+```bash
+-rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf
+
+[INFO] [1766531325.081504237] [pose_test_node]: Loading URDF limits...
+[INFO] [1766531325.083479988] [pose_test_node]: ✓ Loaded limits for 6 joints
+[INFO] [1766531325.084081010] [pose_test_node]: Initializing telemetry...
+[INFO] [1766531325.090024356] [pose_test_node]: ✓ Telemetry initialized (dual-topic mode)
+[INFO] [1766531325.090631452] [pose_test_node]:   - Subscribing to /joint_states
+[INFO] [1766531325.091240066] [pose_test_node]:   - Subscribing to /dxl_state
+[INFO] [1766531325.091755143] [pose_test_node]:   - XL430 servos (IDs 1,2): Load only
+[INFO] [1766531325.092275071] [pose_test_node]:   - XL330 servos (IDs 3-6): Current + Load
+[INFO] [1766531325.105151491] [pose_test_node]: ✓ Telemetry active
+[INFO] [1766531325.105910902] [pose_test_node]: ============================================================
+[INFO] [1766531325.106616813] [pose_test_node]: POSE TEST NODE INITIALIZED
+[INFO] [1766531325.107315298] [pose_test_node]: ============================================================
+[INFO] [1766531325.108024598] [pose_test_node]: Joints: 6
+[INFO] [1766531325.108750046] [pose_test_node]: Validation: True
+[INFO] [1766531325.109473532] [pose_test_node]: Telemetry: True
+[INFO] [1766531325.110177591] [pose_test_node]: Movement time: 2.0s
+[INFO] [1766531325.110860243] [pose_test_node]: Delay between poses: 2.0s
+[INFO] [1766531325.111544598] [pose_test_node]: ============================================================
+[INFO] [1766531325.112241694] [pose_test_node]: Waiting for joint trajectory controller...
+[INFO] [1766531327.123563036] [pose_test_node]: 
+============================================================
+[INFO] [1766531327.124607134] [pose_test_node]: MOVING TO SAFE POSITION
+[INFO] [1766531327.125423008] [pose_test_node]: ============================================================
+[INFO] [1766531327.126191994] [pose_test_node]:   ✓ shoulder_pan: 1.550 rad (within [0.540, 2.044])
+[INFO] [1766531327.126972331] [pose_test_node]:   ✓ shoulder_lift: 2.700 rad (within [2.200, 2.886])
+[INFO] [1766531327.127706465] [pose_test_node]:   ✓ elbow_flex: 1.200 rad (within [0.726, 2.250])
+[INFO] [1766531327.128444117] [pose_test_node]:   ✓ wrist_flex: 1.500 rad (within [0.297, 2.700])
+[INFO] [1766531327.129200602] [pose_test_node]:   ✓ wrist_roll: 0.000 rad (within [-1.448, 1.900])
+[INFO] [1766531327.130002199] [pose_test_node]:   ✓ pen_holder: 0.900 rad (within [0.190, 1.600])
+[INFO] [1766531327.131207668] [pose_test_node]: → Sent: safe_position
+[INFO] [1766531330.132835276] [pose_test_node]: ✓ At safe position
+
+[INFO] [1766531330.133694188] [pose_test_node]: 
+============================================================
+[INFO] [1766531330.134473488] [pose_test_node]: SERVO TEST: WRIST_FLEX
+[INFO] [1766531330.135232844] [pose_test_node]: ============================================================
+[INFO] [1766531330.135980792] [pose_test_node]: Range: [0.297, 2.700] rad
+[INFO] [1766531330.136705111] [pose_test_node]: Middle: 1.499 rad
+[INFO] [1766531330.137446967] [pose_test_node]: ============================================================
+[INFO] [1766531330.138216249] [pose_test_node]: 
+Testing min: 0.297 rad
+[INFO] [1766531330.139037327] [pose_test_node]:   ✓ shoulder_pan: 1.550 rad (within [0.540, 2.044])
+[INFO] [1766531330.139855109] [pose_test_node]:   ✓ shoulder_lift: 2.700 rad (within [2.200, 2.886])
+[INFO] [1766531330.140645280] [pose_test_node]:   ✓ elbow_flex: 1.200 rad (within [0.726, 2.250])
+[INFO] [1766531330.141326765] [pose_test_node]:   ✓ wrist_flex: 0.297 rad (within [0.297, 2.700])
+[INFO] [1766531330.141962824] [pose_test_node]:   ✓ wrist_roll: 0.000 rad (within [-1.448, 1.900])
+[INFO] [1766531330.142758143] [pose_test_node]:   ✓ pen_holder: 0.900 rad (within [0.190, 1.600])
+[INFO] [1766531330.143763870] [pose_test_node]: → Sent: wrist_flex_min
+[INFO] [1766531334.154675695] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  0.330rad Curr:  -48mA Volt: 5.0V Temp: 21.0°C
+[INFO] [1766531334.155527422] [pose_test_node]: 
+Testing middle: 1.499 rad
+[INFO] [1766531334.156312389] [pose_test_node]:   ✓ shoulder_pan: 1.550 rad (within [0.540, 2.044])
+[INFO] [1766531334.157141208] [pose_test_node]:   ✓ shoulder_lift: 2.700 rad (within [2.200, 2.886])
+[INFO] [1766531334.157887601] [pose_test_node]:   ✓ elbow_flex: 1.200 rad (within [0.726, 2.250])
+[INFO] [1766531334.158647290] [pose_test_node]:   ✓ wrist_flex: 1.499 rad (within [0.297, 2.700])
+[INFO] [1766531334.159401924] [pose_test_node]:   ✓ wrist_roll: 0.000 rad (within [-1.448, 1.900])
+[INFO] [1766531334.160153317] [pose_test_node]:   ✓ pen_holder: 0.900 rad (within [0.190, 1.600])
+[INFO] [1766531334.161309452] [pose_test_node]: → Sent: wrist_flex_middle
+[INFO] [1766531338.165583169] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  1.446rad Curr:   67mA Volt: 5.0V Temp: 21.0°C
+[INFO] [1766531338.166378673] [pose_test_node]: 
+Testing max: 2.700 rad
+[INFO] [1766531338.167133306] [pose_test_node]:   ✓ shoulder_pan: 1.550 rad (within [0.540, 2.044])
+[INFO] [1766531338.167864699] [pose_test_node]:   ✓ shoulder_lift: 2.700 rad (within [2.200, 2.886])
+[INFO] [1766531338.168604759] [pose_test_node]:   ✓ elbow_flex: 1.200 rad (within [0.726, 2.250])
+[INFO] [1766531338.169381763] [pose_test_node]:   ✓ wrist_flex: 2.700 rad (within [0.297, 2.700])
+[INFO] [1766531338.170127007] [pose_test_node]:   ✓ wrist_roll: 0.000 rad (within [-1.448, 1.900])
+[INFO] [1766531338.170851530] [pose_test_node]:   ✓ pen_holder: 0.900 rad (within [0.190, 1.600])
+[INFO] [1766531338.172027221] [pose_test_node]: → Sent: wrist_flex_max
+[INFO] [1766531342.179639436] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.612rad Curr:   86mA Volt: 4.9V Temp: 21.0°C
+```
