@@ -1,6 +1,6 @@
 # Running the Pose Test utility
 
-This utility does a number of tests that include:
+This ros2 utility does a number of tests that include:
 1. running through a sequence of pre-defined poses
 2. perform range of motion tests of defined joints in the robot system
 3. measure various properties of the robot in the current pose (servo temperature, current, voltage, etc)
@@ -17,16 +17,16 @@ This utility does a number of tests that include:
 ## Parameters
 
 The parameters are:
-- poses_file: The argument should be the file path to a yaml formatted set of poses. See [example pose sequence yaml file](https://github.com/bueche/ros2_robot_arm/blob/main/writing_robot_description/config/delivery_poses.yaml) for more detail.
-- program: This can have an argument value of calibration, sweep, stress, or default. Each represents a sequence of poses.
-- servo_test: (default: False) if true then a servo range-of-motion test is run. Must be accompanied by the `servo_test_joint` parameter (see next).
-- servo_test_joint: Specific joint to test and can have a value of shoulder_pan, shoulder_lift, elbow_flex, elbow_flex, wrist_roll, and pen_holder.
-- safe_position_first: (default: True) should the arm position itself first in the safe pose?
-- validate: (default: True) should the program check to ensure that the next pose is safe or not (within the bounds specified in the urdf)
-- telemetry: (default: False) should the servo stats be sampled after each pose? the stats include temperature, current, voltage, etc.
-- delay: (default: 2.0) The time in seconds to delay between each pose.
-- movement_time: (default: 2.0) how much time should the arm have to complete the transition from the current pose to the next pose.
-- urdf_file: Load URDF from file. (TODO: should have a default file to load)
+- `poses_file`: The argument should be the file path to a yaml formatted set of poses. See [example pose sequence yaml file](https://github.com/bueche/ros2_robot_arm/blob/main/writing_robot_description/config/delivery_poses.yaml) for more detail.
+- `program`: This can have an argument value of calibration, sweep, stress, or default. Each represents a sequence of poses.
+- `servo_test`: (default: False) if true then a servo range-of-motion test is run. Must be accompanied by the `servo_test_joint` parameter (see next).
+- `servo_test_joint`: Specific joint to test and can have a value of shoulder_pan, shoulder_lift, elbow_flex, elbow_flex, wrist_roll, and pen_holder.
+- `safe_position_first`: (default: `True`) should the arm position itself first in the safe pose?
+- `validate`: (default: `True`) should the program check to ensure that the next pose is safe or not (within the bounds specified in the urdf)
+- `telemetry`: (default: `False`) should the servo stats be sampled after each pose? the stats include temperature, current, voltage, etc.
+- `delay`: (default: `2.0`) The time in seconds to delay between each pose.
+- `movement_time`: (default: `2.0`) how much time should the arm have to complete the transition from the current pose to the next pose.
+- `urdf_file`: Load URDF from file. (TODO: should have a default file to load)
 
   
 
@@ -337,6 +337,7 @@ Testing max: 2.700 rad
 The following is an example of a validation failure.
 ```bash
 -rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf
+
 [INFO] [1766531037.347260479] [pose_test_node]: Loading URDF limits...
 [INFO] [1766531037.349198675] [pose_test_node]: ✓ Loaded limits for 6 joints
 [INFO] [1766531037.349771233] [pose_test_node]: Initializing telemetry...
