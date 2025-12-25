@@ -1,7 +1,7 @@
 # Ros2 Robot Arm Study Using Koch v1.1 Follower
 ## ---> under construction 🚧 <----
 ## Summary
-The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 physical design powered by ROS2. This effort is meant to learn and explore both the software and hardware used in robotic arm development. 
+The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/) and its powered by ROS2. This effort is meant to learn and explore both the software and hardware used in robotic arm development. 
 
 This includes:
  - Fabrication and/or purchase, modification, and assembly of robotic parts (brackets, Dynamixel servos, and related circuit boards)
@@ -24,5 +24,11 @@ The documentation for this repository covers the following:
 - [Running the display only version of the Digital twin](./documentation/display_launch.md): Its possible to run only an rviz display only flavor of the robot.
 - [Viewing the Freecad Model and running the Freecad data extraction scripts](./documentation/freecad.md): to help populate the URDF file.
 
-Additional information is (to be) published as Medium articles:
+## Medium articles:
 - TBD 🚧 
+
+## FAQ
+### What is a leader-follower robotic arm?
+A leader-follower robotic arm system consists of two robotic manipulators where one arm (the leader) is manually controlled by a human operator, and the second arm (the follower) replicates those movements in real-time. It's essentially a form of bilateral teleoperation. In this project we are primarily focused on the follower arm.
+### Why is this project focused on the follower?
+In general leader arms are meant more for human manipulation as they define the poses that the follower will replicate. That limited scope for the leader means that its likely that the arm is under powered and/or has a design that is for human manipulation vs. automation. In this project we use the follower as the leader (to predefine poses and collect the measurements) albiet in a less automatic fashion. We also want to study the follower's load and physical characeteristics (e.g., temperature) as it repeatedly performs the activity.
