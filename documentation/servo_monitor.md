@@ -2,6 +2,15 @@
 
 The servo monitor software should not be run with the ros2 controlled robot. This is a stand alone piece of software that brings up the robot and takes measurements in it current pose.
 
+## Table of Contents
+- [Parameters](#parameters)
+- [Example run](#example)
+
+## Parameters
+TBD
+
+## Example 
+
 ```bash
 ubuntu@bueche-rpi5:~/robot_ws$ python3 src/writing_robot_control/writing_robot_control/servo_monitor.py --interval 10 --duration 120
 
