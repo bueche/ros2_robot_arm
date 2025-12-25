@@ -8,7 +8,7 @@ The load tester analysis tool will examine a sequence of transitions and make pr
 - [Example servo motor what-if](#example-servo-motor-what-if)
 
 
-Parameters:
+## Parameters:
 TBD
 
 ## Example run with shorter pose duration
