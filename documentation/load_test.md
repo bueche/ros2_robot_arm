@@ -2,9 +2,16 @@
 
 The load tester analysis tool will examine a sequence of transitions and make projections as to the load safety of that move based on the physical characteristics of the robot, its speed of movement, and starting/ending poses. These are projections (that still need a bit of validation ... this work is in progress).
 
+## Table of contents
+- [Parameters](#parameters)
+- [Example run with shorter pose duration](#example-run-with-shorter-pose-duration)
+- [Example servo motor what-if](#example-servo-motor-what-if)
+
+
 Parameters:
 TBD
 
+## Example run with shorter pose duration
 Example run in which the speed of movement is increased, and hence putting more potential strain on the servos. Again, any projection (at the moment) has not been verified with samples.
 ```bash
 -rpi5:~/robot_ws$ ros2 run writing_robot_control load_tester --analyze-sequence src/writing_robot_description/config/default_poses.yaml    --movement-time 0.5 --csv-output movement.tst.csv
@@ -622,3 +629,6 @@ PEN_HOLDER
 [INFO] [1766198124.256201577] [load_tester]:  4. pose 3          → pose 4           ⚠️ elbow_flex       61.7%
 [INFO] [1766198124.256705690] [load_tester]:  5. pose 4          → pose 5           ✓ elbow_flex       29.8%
 ```
+
+## Example servo motor what-if
+TBD
