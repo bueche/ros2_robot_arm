@@ -2,6 +2,11 @@
 
 Once the software and hardware envionment has been setup with the one-time setup items, then a few additional commands are needed to bring up the physical robot and its digital twin in Rviz2.
 
+## Table of Contents
+- [Ensure that the USB port can be accessed](ensure-that-the-uSB-port-can-be-accessed)
+- [Launch the robot via ros2](launch-the-robot-via-ros2)
+
+  
 ## Ensure that the USB port can be accessed
 The code assumes the port is `/dev/ttyUSB0`. On a Raspberry Pi5 on Ubuntu the device is either `/dev/ttyACM0` or `/dev/ttyACM0`.
 If the there is no ttyUSB0 then create a soft link to it.
@@ -45,7 +50,7 @@ crw------- 1 root   root      3, 167 Nov 10 14:27 /dev/ttyz7
 
 ```
 
-## Launch the robot via ros2.
+## Launch the robot via ros2
 ```bash
 rpi5:~/$ 
 rpi5:~/$ pwd
