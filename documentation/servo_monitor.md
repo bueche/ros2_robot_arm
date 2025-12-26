@@ -1,14 +1,27 @@
 # Running the Servo Monitor utility
 
-The servo monitor software should not be run with the ros2 controlled robot. This is a stand alone piece of software that brings up the robot and takes measurements in it current pose.
+The servo monitor software should not be run with the ros2 controlled robot. This is a stand alone piece of software that brings up the robot and takes measurements of it current pose and then monitors the temp, current (or load), voltage of holding this pose over time.
+
+Useful for:
+  - Catching thermal issues (temperature rising over time)
+  - Voltage sag detection (voltage dropping under load)
+  - Intermittent communication failures
+  - Degradation patterns
 
 ## Table of Contents
 - [Parameters](#parameters)
+- [Usage](#usage)
 - [Example run](#example)
 
 ## Parameters
 TBD
 
+## Usage examples
+```
+  python3 servo_monitor.py --interval 5 --duration 300
+  python3 servo_monitor.py --interval 10 --csv monitor.csv
+```
+    
 ## Example 
 
 ```bash
