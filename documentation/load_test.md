@@ -1,16 +1,87 @@
 # Running the pose load test analysis utility
 
-The load tester analysis tool will examine a sequence of transitions and make projections as to the load safety of that move based on the physical characteristics of the robot, its speed of movement, and starting/ending poses. These are projections (that still need a bit of validation ... this work is in progress).
+The load tester analysis tool will examine a sequence of transitions and make torque projections as to the load safety of that move based on the physical characteristics of the robot, its speed of movement, and starting/ending poses. 
+
+- Basic load testing (torque predictions)
+- Trajectory analysis (dynamic torque including acceleration, friction, back-EMF)
+- Full pose-based analysis with forward kinematics (ACCURATE moment arms)
+- YAML pose sequence analysis (test entire sequences from [pose_test.py](./documentation/pose_test.md)
+- What-if analysis (test different servos and pose transition timings)
+- Servo telemetry (temp/current/voltage - if dynamixel_sdk available)
+- Comparison matrix (compare all servo options)
+
+These are projections and the supporting analysis are a work in progress (that still need a bit of validation).
 
 ## Table of contents
 - [Parameters](#parameters)
+- [Some example invocations](#some-example-invocations)
 - [Example run with shorter pose duration](#example-run-with-shorter-pose-duration)
 - [Example servo motor what-if](#example-servo-motor-what-if)
+- [FAQ](#faq)
 
 
 ## Parameters:
-TBD
-
+- `--joint`: Joint to analyze
+- `--static`: Static hold test
+- `--payload`: Payload capacity test
+- `--diagnostics`: Full diagnostics with telemetry
+- `--what-if`, SERVO-TYPE to swap out in model for existing one in specified joint (e.g., XL330-M077, XL330-M288, XM430-W350)
+- `--compare-servos`: (default: True) compare all servo options
+- `--full_analysis`: Complete analysis
+- `--position`: Test at specific position (radians)
+- `--previous-position`,  Previous position for trajectory analysis (radians)
+- `--movement-time`: (default: 2.0) Movement time for trajectory analysis
+- `--analyze-transition`: Analyze full pose transition (use with --pose-from and --pose-to)')
+- `--pose-from`: Starting pose as comma-separated angles in radians (e.g., "0.0,1.57,0.0,0.0,0.0,0.0")
+- `--pose-to`: Ending pose as comma-separated angles
+- `--analyze-sequence`: Analyze complete pose sequence from YAML file
+- `--csv-output`: Append analysis results to CSV file for Excel graphing')
+    
+## Some example invocations
+```
+# Basic tests
+  ros2 run writing_robot_control load_tester --full_analysis
+  ros2 run writing_robot_control load_tester --joint shoulder_lift --static
+  ros2 run writing_robot_control load_tester --joint shoulder_lift --payload
+  
+  # Trajectory analysis (single joint)
+  ros2 run writing_robot_control load_tester --joint shoulder_lift --static \\
+    --previous-position 0.0 --movement-time 2.0
+  
+  # Full pose transition analysis
+  ros2 run writing_robot_control load_tester --analyze-transition \\
+    --pose-from "0.0,1.57,0.0,0.0,0.0,0.0" \\
+    --pose-to "0.0,1.57,1.57,0.0,0.0,0.0" \\
+    --movement-time 2.0
+  
+  # YAML sequence analysis
+  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+    --movement-time 2.0
+  
+  # CSV output for Excel graphing (NEW!)
+  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+    --movement-time 2.0 --csv-output results.csv
+  
+  # Compare different movement times (appends to same CSV)
+  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+    --movement-time 2.0 --csv-output comparison.csv
+  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+    --movement-time 1.0 --csv-output comparison.csv
+  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+    --movement-time 0.5 --csv-output comparison.csv
+  
+  # What-if scenarios
+  ros2 run writing_robot_control load_tester --joint shoulder_lift --what-if XL330-M077
+  ros2 run writing_robot_control load_tester --joint shoulder_lift --what-if XL330-M288
+  ros2 run writing_robot_control load_tester --joint shoulder_lift --what-if XM430-W350
+  
+  # Diagnostics with telemetry
+  ros2 run writing_robot_control load_tester --joint shoulder_lift --diagnostics
+  
+  # Compare all options
+  ros2 run writing_robot_control load_tester --compare-servos
+        """
+```
 ## Example run with shorter pose duration
 Example run in which the speed of movement is increased, and hence putting more potential strain on the servos. Again, any projection (at the moment) has not been verified with samples.
 ```bash
@@ -632,3 +703,6 @@ PEN_HOLDER
 
 ## Example servo motor what-if
 TBD
+
+## FAQ
+
