@@ -8,6 +8,9 @@ Useful for:
   - Intermittent communication failures
   - Degradation patterns
 
+**Important**: This is not a ROS2 program (although packaged in the same directory as other ros2 utilities). The ros2 physical robot must be taken down
+to use this utility (otherwise errors will result).
+
 ## Table of Contents
 - [Parameters](#parameters)
 - [Usage](#usage)
