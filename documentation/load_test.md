@@ -10,7 +10,7 @@ The load tester analysis tool will examine a sequence of transitions and make to
 - Servo telemetry (temp/current/voltage - if dynamixel_sdk available)
 - Comparison matrix (compare all servo options)
 
-These are projections and the supporting analysis are a work in progress (that still need a bit of validation).
+These are projections and the supporting analysis are a work in progress (that still need a bit of validation). 🚧 
 
 ## Table of contents
 - [Parameters](#parameters)
