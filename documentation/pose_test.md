@@ -17,17 +17,18 @@ This ros2 utility does a number of tests that include:
 ## Parameters
 
 The parameters are:
-- `poses_file`: The argument should be the file path to a yaml formatted set of poses. See [example pose sequence yaml file](https://github.com/bueche/ros2_robot_arm/blob/main/writing_robot_description/config/delivery_poses.yaml) for more detail.
-- `program`: This can have an argument value of calibration, sweep, stress, or default. Each represents a sequence of poses.
-- `servo_test`: (default: False) if true then a servo range-of-motion test is run. Must be accompanied by the `servo_test_joint` parameter (see next).
-- `servo_test_joint`: Specific joint to test and can have a value of shoulder_pan, shoulder_lift, elbow_flex, elbow_flex, wrist_roll, and pen_holder.
-- `safe_position_first`: (default: `True`) should the arm position itself first in the safe pose?
-- `validate`: (default: `True`) should the program check to ensure that the next pose is safe or not (within the bounds specified in the urdf)
-- `telemetry`: (default: `False`) should the servo stats be sampled after each pose? the stats include temperature, current, voltage, etc.
-- `delay`: (default: `2.0`) The time in seconds to delay between each pose.
-- `movement_time`: (default: `2.0`) how much time should the arm have to complete the transition from the current pose to the next pose.
-- `urdf_file`: Load URDF from file. (TODO: should have a default file to load)
-
+| parameter name | default | description |
+|----------------|---------|-------------|
+|`poses_file`| |The argument should be the file path to a yaml formatted set of poses. See [example pose sequence yaml file](https://github.com/bueche/ros2_robot_arm/blob/main/writing_robot_description/config/delivery_poses.yaml) for more detail.|
+| `program`|| This can have an argument value of calibration, sweep, stress, or default. Each represents a sequence of poses.|
+| `servo_test`| False| if true then a servo range-of-motion test is run. Must be accompanied by the `servo_test_joint` parameter (see next).|
+| `servo_test_joint`|| Specific joint to test and can have a value of shoulder_pan, shoulder_lift, elbow_flex, elbow_flex, wrist_roll, and pen_holder.|
+| `safe_position_first`| `True`| should the arm position itself first in the safe pose?|
+| `validate`| `True`| should the program check to ensure that the next pose is safe or not (within the bounds specified in the urdf)|
+| `telemetry`| `False`| should the servo stats be sampled after each pose? the stats include temperature, current, voltage, etc.|
+| `delay`|`2.0`| The time in seconds to delay between each pose.|
+| `movement_time`| `2.0`| how much time should the arm have to complete the transition from the current pose to the next pose.|
+| `urdf_file`| |Load URDF from file. (TODO: should have a default file to load)|
   
 
 ## Pose Sequence Example
