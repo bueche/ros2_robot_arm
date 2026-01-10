@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ROS2 Pose Testing Node with Validation and Servo Testing
-Version 14 - Updated with dual-topic telemetry (handles XL430/XL330 differences)
+Version 17 - Updated with optional power monitoring
 
 Features:
 - ROS2 node publishing JointTrajectory messages
@@ -12,12 +12,14 @@ Features:
 - Temperature, current, voltage monitoring
 - Thermal and overload detection
 - Validation with URDF limits
+- **NEW**: Optional power monitoring with INA219 sensors (v17)
 
 Usage:
   ros2 run writing_robot_control pose_test --ros-args -p poses_file:=poses.yaml
   ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true
   ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true -p telemetry:=true
   ros2 run writing_robot_control pose_test --ros-args -p servo_test_joint:=shoulder_lift
+  ros2 run writing_robot_control pose_test --ros-args -p program:=default -p power_monitoring:=true
 """
 
 import rclpy
@@ -31,6 +33,14 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import numpy as np
+
+# Optional power monitoring imports
+try:
+    from koch_v1_1_msgs.msg import PowerTelemetry, PoseEvent
+    from std_msgs.msg import Header
+    POWER_MONITORING_AVAILABLE = True
+except ImportError:
+    POWER_MONITORING_AVAILABLE = False
 
 
 class URDFLimitsParser:
@@ -77,6 +87,117 @@ class URDFLimitsParser:
     
     def get_velocity_limits(self):
         return self.velocity_limits
+
+
+class PowerMonitor:
+    """Optional power monitoring integration."""
+    
+    def __init__(self, node):
+        self.node = node
+        self.enabled = False
+        self.power_samples = []
+        self.tracking_active = False
+        
+        if not POWER_MONITORING_AVAILABLE:
+            self.node.get_logger().info('Power monitoring messages not available')
+            return
+        
+        try:
+            # Publisher for pose events
+            self.pose_event_pub = self.node.create_publisher(
+                PoseEvent, 'pose_events', 10
+            )
+            
+            # Subscriber for power telemetry
+            self.power_sub = self.node.create_subscription(
+                PowerTelemetry, 'power_telemetry',
+                self._power_callback, 10
+            )
+            
+            self.enabled = True
+            self.node.get_logger().info('✓ Power monitoring enabled')
+            
+        except Exception as e:
+            self.node.get_logger().warn(f'Power monitoring disabled: {e}')
+    
+    def _power_callback(self, msg):
+        """Collect power samples during pose transitions."""
+        if self.tracking_active:
+            self.power_samples.append({
+                'timestamp': time.time(),
+                'bus_12v': msg.bus_12v_voltage,
+                'current_12v': msg.current_12v,
+                'power_12v': msg.power_12v,
+                'bus_5v': msg.bus_5v_voltage,
+                'current_5v': msg.current_5v,
+                'power_5v': msg.power_5v,
+                'total_power': msg.total_power
+            })
+    
+    def start_tracking(self, pose_name, pose_number):
+        """Start power tracking and publish pose start event."""
+        if not self.enabled:
+            return
+        
+        self.power_samples = []
+        self.tracking_active = True
+        
+        # Publish pose start event
+        msg = PoseEvent()
+        msg.header = Header()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.pose_name = pose_name
+        msg.pose_number = pose_number
+        msg.event_type = 'start'
+        self.pose_event_pub.publish(msg)
+    
+    def stop_tracking(self, pose_name, pose_number):
+        """Stop power tracking and publish pose end event."""
+        if not self.enabled:
+            return
+        
+        self.tracking_active = False
+        
+        # Publish pose end event
+        msg = PoseEvent()
+        msg.header = Header()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.pose_name = pose_name
+        msg.pose_number = pose_number
+        msg.event_type = 'end'
+        self.pose_event_pub.publish(msg)
+    
+    def analyze_and_report(self, pose_name, servo_telemetry):
+        """Analyze power draw and compare with servo telemetry."""
+        if not self.enabled or len(self.power_samples) == 0:
+            return
+        
+        # Find peak values
+        peak_5v_current = max(s['current_5v'] for s in self.power_samples)
+        peak_12v_current = max(s['current_12v'] for s in self.power_samples)
+        peak_5v_voltage = max(s['bus_5v'] for s in self.power_samples)
+        min_5v_voltage = min(s['bus_5v'] for s in self.power_samples)
+        peak_total_power = max(s['total_power'] for s in self.power_samples)
+        
+        # Sum up currents from XL330s (5V servos) if we have servo data
+        xl330_current_sum_A = 0
+        if servo_telemetry:
+            for joint_name, data in servo_telemetry.items():
+                if data.get('servo_type') == 'XL330' and 'current_ma' in data:
+                    xl330_current_sum_A += abs(data['current_ma']) / 1000.0
+        
+        # Report
+        self.node.get_logger().info(f'  ⚡ Power Analysis for "{pose_name}":')
+        self.node.get_logger().info(f'     Peak 5V current (INA219):    {peak_5v_current:.3f}A')
+        if xl330_current_sum_A > 0:
+            self.node.get_logger().info(f'     Servo current sum (XL330s):  {xl330_current_sum_A:.3f}A')
+            discrepancy = abs(peak_5v_current - xl330_current_sum_A)
+            self.node.get_logger().info(f'     Difference:                  {discrepancy:.3f}A')
+            if discrepancy > 0.05:  # More than 50mA difference
+                self.node.get_logger().warn(f'     ⚠ Significant current discrepancy!')
+        self.node.get_logger().info(f'     5V voltage: {min_5v_voltage:.2f}V (min) / {peak_5v_voltage:.2f}V (max)')
+        self.node.get_logger().info(f'     Peak 12V current:            {peak_12v_current:.3f}A')
+        self.node.get_logger().info(f'     Peak total power:            {peak_total_power:.2f}W')
 
 
 class JointStateTelemetry:
@@ -452,6 +573,7 @@ class PoseTestNode(Node):
         self.declare_parameter('delay', 2.0)
         self.declare_parameter('movement_time', 2.0)
         self.declare_parameter('urdf_file', '')  # NEW: Load URDF from file
+        self.declare_parameter('power_monitoring', False)  # NEW: Power monitoring
         
         # Get parameters
         self.poses_file = self.get_parameter('poses_file').value
@@ -464,6 +586,7 @@ class PoseTestNode(Node):
         self.delay = self.get_parameter('delay').value
         self.movement_time = self.get_parameter('movement_time').value
         urdf_file = self.get_parameter('urdf_file').value
+        self.power_monitoring_requested = self.get_parameter('power_monitoring').value
         
         # Joint names (Koch v1.1 - 6 DOF)
         self.joint_names = [
@@ -538,6 +661,11 @@ class PoseTestNode(Node):
                 self.get_logger().error(f'Telemetry init failed: {e}')
                 self.telemetry = None
         
+        # Power monitoring (optional)
+        self.power_monitor = None
+        if self.power_monitoring_requested:
+            self.power_monitor = PowerMonitor(self)
+        
         # Statistics
         self.stats = {
             'total_poses': 0,
@@ -551,6 +679,8 @@ class PoseTestNode(Node):
         self.get_logger().info(f'Joints: {len(self.joint_names)}')
         self.get_logger().info(f'Validation: {self.validate}')
         self.get_logger().info(f'Telemetry: {self.enable_telemetry}')
+        if self.power_monitor and self.power_monitor.enabled:
+            self.get_logger().info(f'Power Monitoring: Enabled')
         self.get_logger().info(f'Movement time: {self.movement_time}s')
         self.get_logger().info(f'Delay between poses: {self.delay}s')
         self.get_logger().info('='*60)
@@ -840,12 +970,21 @@ class PoseTestNode(Node):
                     self.get_logger().error('Validation failed - aborting sequence')
                     return False
             
+            # Start power tracking
+            if self.power_monitor:
+                self.power_monitor.start_tracking(pose_name, idx)
+            
             self.send_pose(pose_name, positions, self.movement_time)
             
             # Wait for movement + delay (spin to allow callbacks)
             self.spin_for_duration(self.movement_time + self.delay)
             
+            # Stop power tracking
+            if self.power_monitor:
+                self.power_monitor.stop_tracking(pose_name, idx)
+            
             # Read telemetry if available
+            all_data = None
             if self.telemetry and self.telemetry.enabled:
                 all_data = self.telemetry.get_all_joints_telemetry()
                 if all_data:
@@ -868,6 +1007,10 @@ class PoseTestNode(Node):
                         self.get_logger().warn(
                             f"  ⚠️  High temperature: {thermal['max_temp']:.1f}°C"
                         )
+            
+            # Analyze power draw
+            if self.power_monitor:
+                self.power_monitor.analyze_and_report(pose_name, all_data)
             
             self.stats['total_poses'] += 1
         

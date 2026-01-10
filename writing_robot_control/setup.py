@@ -25,6 +25,7 @@ setup(
             'pose_sequence = writing_robot_control.pose_sequence:main',
             'pose_test = writing_robot_control.pose_test:main',
             'load_tester = writing_robot_control.load_tester:main',
+            'power_monitor_node = writing_robot_control.power_monitor_node:main',
        ],
     },
 )
