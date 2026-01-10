@@ -23,6 +23,10 @@ The documentation for this repository covers the following:
 - [Running the pose load_test analysis tool](./documentation/load_test.md): Making projections on limits of the robot joints based on pose transitions.
 - [Running the display only version of the Digital twin](./documentation/display_launch.md): Its possible to run only an rviz display only flavor of the robot.
 - [Viewing the Freecad Model and running the Freecad data extraction scripts](./documentation/freecad.md): to help populate the URDF file.
+- [Power monitoring using INA219 sensors](./documentation/power_monitoring.md): The utilities include a ros2 node that taps into [INA219 sensors](https://www.amazon.com/dp/B0CRY7R4ZD) that have been added to measure voltage and current draw on the 5v and 12v set of servos. This provides insights into the servo dynamics and the corresponding power needs.
+<p align="center">
+  <img src="./images/current_v_pose.001.jpeg" alt="current sensor data" width="900">
+</p>
 
 ## Medium articles:
 - TBD 🚧 
