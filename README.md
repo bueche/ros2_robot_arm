@@ -12,6 +12,7 @@ This includes:
 <p align="center">
   <img src="./images/real_robot.jpg" alt="Real Robot Arm" width="400">
   <img src="./images/digital_twin.jpg" alt="The digital twin" width="400">
+  <img src="./images/freecad.robot.representation.jpg" alt="The freecad digital twin" width="400">
 </p>
 
 The documentation for this repository covers the following:
