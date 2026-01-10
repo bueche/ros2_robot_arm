@@ -42,6 +42,7 @@ try:
 except ImportError:
     POWER_MONITORING_AVAILABLE = False
 
+print(f"POWER_MONITORING_AVAILABLEF: {POWER_MONITORING_AVAILABLE}")
 
 class URDFLimitsParser:
     """Parse joint limits from URDF."""

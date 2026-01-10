@@ -12,6 +12,7 @@ find_package(rosidl_default_generators REQUIRED)  # ← ADD THIS LINE
 
 rosidl_generate_interfaces(${PROJECT_NAME}
 	  "msg/PowerTelemetry.msg"
+	  "msg/PoseEvent.msg"
 	    DEPENDENCIES std_msgs
 	    )
 

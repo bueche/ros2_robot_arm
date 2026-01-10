@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from koch_v1_1_msgs.msg import PowerTelemetry
+from koch_v1_1_msgs.msg import PowerTelemetry, PoseEvent
 import csv
 from datetime import datetime
 
@@ -23,18 +23,41 @@ class PowerLogger(Node):
             'timestamp', 
             'bus_12v', 'current_12v', 'power_12v',
             'bus_5v', 'current_5v', 'power_5v',
-            'total_power'
+            'total_power',
+            'pose_event', 'pose_name', 'pose_number'
         ])
         
+        # Current pose tracking
+        self.current_pose = ''
+        self.current_pose_num = 0
+        
         # Subscribe to telemetry
-        self.sub = self.create_subscription(
+        self.power_sub = self.create_subscription(
             PowerTelemetry,
             'power_telemetry',
             self.telemetry_callback,
             10
         )
         
+        # Subscribe to pose events
+        self.pose_event_sub = self.create_subscription(
+            PoseEvent,
+            'pose_events',
+            self.pose_event_callback,
+            10
+        )
+        
         self.get_logger().info(f'Logging to: {self.filename}')
+    
+    def pose_event_callback(self, msg):
+        """Track current pose from events"""
+        if msg.event_type == 'start':
+            self.current_pose = msg.pose_name
+            self.current_pose_num = msg.pose_number
+            self.get_logger().info(f'→ Pose started: {msg.pose_name}')
+        elif msg.event_type == 'end':
+            self.get_logger().info(f'← Pose ended: {msg.pose_name}')
+            # Keep pose name for a bit after end
     
     def telemetry_callback(self, msg):
         # Get timestamp in seconds
@@ -48,7 +71,10 @@ class PowerLogger(Node):
             msg.bus_5v_voltage,
             msg.current_5v,
             msg.power_5v,
-            msg.total_power
+            msg.total_power,
+            'active' if self.current_pose else '',
+            self.current_pose,
+            self.current_pose_num
         ])
         
         # Flush periodically
@@ -56,7 +82,7 @@ class PowerLogger(Node):
     
     def destroy_node(self):
         self.csvfile.close()
-        self.get_logger().info('Log file closed')
+        self.get_logger().info(f'Log file closed: {self.filename}')
         super().destroy_node()
 
 def main():
