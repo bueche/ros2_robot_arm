@@ -14,7 +14,7 @@ class PowerMonitorNode(Node):
         # Parameters
         self.declare_parameter('serial_port', '/dev/ttyIna219') # assumed to be soft link to usb device
         self.declare_parameter('baud_rate', 115200)
-        self.declare_parameter('publish_rate', 10.0)  # Hz
+        self.declare_parameter('publish_rate', 20.0)  # Hz
         
         port = self.get_parameter('serial_port').value
         baud = self.get_parameter('baud_rate').value

@@ -97,6 +97,7 @@ class PowerMonitor:
         self.node = node
         self.enabled = False
         self.power_samples = []
+        self.final_samples = []  # Last few samples for holding current comparison
         self.tracking_active = False
         
         if not POWER_MONITORING_AVAILABLE:
@@ -157,6 +158,12 @@ class PowerMonitor:
         if not self.enabled:
             return
         
+        # Capture last 4 samples for holding current comparison
+        if len(self.power_samples) >= 4:
+            self.final_samples = self.power_samples[-4:]
+        else:
+            self.final_samples = self.power_samples.copy()
+        
         self.tracking_active = False
         
         # Publish pose end event
@@ -191,14 +198,42 @@ class PowerMonitor:
         self.node.get_logger().info(f'  ⚡ Power Analysis for "{pose_name}":')
         self.node.get_logger().info(f'     Peak 5V current (INA219):    {peak_5v_current:.3f}A')
         if xl330_current_sum_A > 0:
-            self.node.get_logger().info(f'     Servo current sum (XL330s):  {xl330_current_sum_A:.3f}A')
-            discrepancy = abs(peak_5v_current - xl330_current_sum_A)
-            self.node.get_logger().info(f'     Difference:                  {discrepancy:.3f}A')
-            if discrepancy > 0.05:  # More than 50mA difference
-                self.node.get_logger().warn(f'     ⚠ Significant current discrepancy!')
+            self.node.get_logger().info(f'     Motor current sum (XL330s):  {xl330_current_sum_A:.3f}A')
+            benefit = xl330_current_sum_A - peak_5v_current
+            if benefit > 0.05:  # Controller saving >50mA
+                percent = (benefit / xl330_current_sum_A) * 100
+                self.node.get_logger().info(f'     Controller benefit:          {benefit:.3f}A ({percent:.0f}% reduction)')
+            elif benefit < -0.05:  # Supply using >50mA more than expected
+                self.node.get_logger().warn(f'     ⚠ Supply higher than motor sum by {abs(benefit):.3f}A!')
         self.node.get_logger().info(f'     5V voltage: {min_5v_voltage:.2f}V (min) / {peak_5v_voltage:.2f}V (max)')
         self.node.get_logger().info(f'     Peak 12V current:            {peak_12v_current:.3f}A')
         self.node.get_logger().info(f'     Peak total power:            {peak_total_power:.2f}W')
+        
+        # Compare final holding currents (INA219 vs Servo)
+        if len(self.final_samples) > 0 and servo_telemetry:
+            # Average the last few INA219 samples
+            avg_final_5v = sum(s['current_5v'] for s in self.final_samples) / len(self.final_samples)
+            avg_final_12v = sum(s['current_12v'] for s in self.final_samples) / len(self.final_samples)
+            
+            # Sum servo holding currents
+            xl330_holding_sum_A = 0
+            for joint_name, data in servo_telemetry.items():
+                if data.get('servo_type') == 'XL330' and 'current_ma' in data:
+                    xl330_holding_sum_A += abs(data['current_ma']) / 1000.0
+            
+            if xl330_holding_sum_A > 0:
+                self.node.get_logger().info(f'     Holding current comparison:')
+                self.node.get_logger().info(f'       Supply current (INA219):     {avg_final_5v:.3f}A')
+                self.node.get_logger().info(f'       Motor current sum (XL330s):  {xl330_holding_sum_A:.3f}A')
+                benefit = xl330_holding_sum_A - avg_final_5v
+                if benefit > 0.05:  # Controller saving >50mA
+                    percent = (benefit / xl330_holding_sum_A) * 100
+                    self.node.get_logger().info(f'       Controller benefit:          {benefit:.3f}A ({percent:.0f}% efficiency)')
+                elif benefit < -0.05:  # Supply using >50mA more than expected
+                    self.node.get_logger().warn(f'       ⚠ Supply higher than motor sum by {abs(benefit):.3f}A!')
+                else:
+                    self.node.get_logger().info(f'       ✓ Supply matches motor sum')
+
 
 
 class JointStateTelemetry:
