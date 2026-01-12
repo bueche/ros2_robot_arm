@@ -198,13 +198,7 @@ class PowerMonitor:
         self.node.get_logger().info(f'  ⚡ Power Analysis for "{pose_name}":')
         self.node.get_logger().info(f'     Peak 5V current (INA219):    {peak_5v_current:.3f}A')
         if xl330_current_sum_A > 0:
-            self.node.get_logger().info(f'     Motor current sum (XL330s):  {xl330_current_sum_A:.3f}A')
-            benefit = xl330_current_sum_A - peak_5v_current
-            if benefit > 0.05:  # Controller saving >50mA
-                percent = (benefit / xl330_current_sum_A) * 100
-                self.node.get_logger().info(f'     Controller benefit:          {benefit:.3f}A ({percent:.0f}% reduction)')
-            elif benefit < -0.05:  # Supply using >50mA more than expected
-                self.node.get_logger().warn(f'     ⚠ Supply higher than motor sum by {abs(benefit):.3f}A!')
+            self.node.get_logger().info(f'     Motor current sum (XL330s):  {xl330_current_sum_A:.3f}A (at end)')
         self.node.get_logger().info(f'     5V voltage: {min_5v_voltage:.2f}V (min) / {peak_5v_voltage:.2f}V (max)')
         self.node.get_logger().info(f'     Peak 12V current:            {peak_12v_current:.3f}A')
         self.node.get_logger().info(f'     Peak total power:            {peak_total_power:.2f}W')
