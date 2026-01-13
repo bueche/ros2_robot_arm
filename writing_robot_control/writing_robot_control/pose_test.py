@@ -175,7 +175,7 @@ class PowerMonitor:
         msg.event_type = 'end'
         self.pose_event_pub.publish(msg)
     
-    def analyze_and_report(self, pose_name, servo_telemetry):
+    def analyze_and_report(self, pose_name, servo_telemetry, peak_telemetry=None):
         """Analyze power draw and compare with servo telemetry."""
         if not self.enabled or len(self.power_samples) == 0:
             return
@@ -187,18 +187,31 @@ class PowerMonitor:
         min_5v_voltage = min(s['bus_5v'] for s in self.power_samples)
         peak_total_power = max(s['total_power'] for s in self.power_samples)
         
-        # Sum up currents from XL330s (5V servos) if we have servo data
-        xl330_current_sum_A = 0
+        # Sum up peak currents from XL330s (5V servos) if we have peak data
+        xl330_peak_sum_A = 0
+        if peak_telemetry:
+            for joint_name, data in peak_telemetry.items():
+                if data.get('servo_type') == 'XL330' and 'current_ma' in data:
+                    xl330_peak_sum_A += abs(data['current_ma']) / 1000.0
+        
+        # Sum up holding currents from XL330s (5V servos) if we have servo data
+        xl330_holding_sum_A = 0
         if servo_telemetry:
             for joint_name, data in servo_telemetry.items():
                 if data.get('servo_type') == 'XL330' and 'current_ma' in data:
-                    xl330_current_sum_A += abs(data['current_ma']) / 1000.0
+                    xl330_holding_sum_A += abs(data['current_ma']) / 1000.0
         
-        # Report
+        # Report peak comparison
         self.node.get_logger().info(f'  ⚡ Power Analysis for "{pose_name}":')
         self.node.get_logger().info(f'     Peak 5V current (INA219):    {peak_5v_current:.3f}A')
-        if xl330_current_sum_A > 0:
-            self.node.get_logger().info(f'     Motor current sum (XL330s):  {xl330_current_sum_A:.3f}A (at end)')
+        if xl330_peak_sum_A > 0:
+            self.node.get_logger().info(f'     Peak motor sum (XL330s):     {xl330_peak_sum_A:.3f}A')
+            benefit = xl330_peak_sum_A - peak_5v_current
+            if benefit > 0.05:  # Controller saving >50mA
+                percent = (benefit / xl330_peak_sum_A) * 100
+                self.node.get_logger().info(f'     Controller benefit:          {benefit:.3f}A ({percent:.0f}% reduction)')
+            elif benefit < -0.05:  # Supply using >50mA more than expected
+                self.node.get_logger().warn(f'     ⚠ Supply higher than motor sum by {abs(benefit):.3f}A!')
         self.node.get_logger().info(f'     5V voltage: {min_5v_voltage:.2f}V (min) / {peak_5v_voltage:.2f}V (max)')
         self.node.get_logger().info(f'     Peak 12V current:            {peak_12v_current:.3f}A')
         self.node.get_logger().info(f'     Peak total power:            {peak_total_power:.2f}W')
@@ -208,12 +221,6 @@ class PowerMonitor:
             # Average the last few INA219 samples
             avg_final_5v = sum(s['current_5v'] for s in self.final_samples) / len(self.final_samples)
             avg_final_12v = sum(s['current_12v'] for s in self.final_samples) / len(self.final_samples)
-            
-            # Sum servo holding currents
-            xl330_holding_sum_A = 0
-            for joint_name, data in servo_telemetry.items():
-                if data.get('servo_type') == 'XL330' and 'current_ma' in data:
-                    xl330_holding_sum_A += abs(data['current_ma']) / 1000.0
             
             if xl330_holding_sum_A > 0:
                 self.node.get_logger().info(f'     Holding current comparison:')
@@ -265,6 +272,10 @@ class JointStateTelemetry:
         self.latest_joint_states = None
         self.latest_dxl_states = None
         
+        # Peak tracking during poses
+        self.track_peaks = False
+        self.peak_telemetry = {}
+        
         # Subscribe to both topics
         self.joint_state_sub = self.node.create_subscription(
             JointState, '/joint_states',
@@ -307,6 +318,63 @@ class JointStateTelemetry:
     
     def _dxl_state_callback(self, msg):
         self.latest_dxl_states = msg
+        
+        # Track peaks if enabled
+        if self.track_peaks:
+            self._update_peaks(msg)
+    
+    def _update_peaks(self, dxl_msg):
+        """Update peak values from dynamixel state."""
+        for servo_id in dxl_msg.id:
+            idx = list(dxl_msg.id).index(servo_id)
+            
+            # Find joint name
+            joint_name = None
+            for name, sid in self.servo_id_map.items():
+                if sid == servo_id:
+                    joint_name = name
+                    break
+            
+            if not joint_name:
+                continue
+            
+            # Initialize peak tracking for this joint
+            if joint_name not in self.peak_telemetry:
+                self.peak_telemetry[joint_name] = {
+                    'servo_id': servo_id,
+                    'servo_type': 'XL430' if servo_id in self.XL430_IDS else 'XL330'
+                }
+            
+            # Track peak current (XL330 only)
+            if servo_id in self.XL330_IDS:
+                if hasattr(dxl_msg, 'present_current') and idx < len(dxl_msg.present_current):
+                    current = dxl_msg.present_current[idx]
+                    if 'current_ma' not in self.peak_telemetry[joint_name]:
+                        self.peak_telemetry[joint_name]['current_ma'] = current
+                    else:
+                        # Track highest absolute value
+                        if abs(current) > abs(self.peak_telemetry[joint_name]['current_ma']):
+                            self.peak_telemetry[joint_name]['current_ma'] = current
+            
+            # Track peak load (XL430 only)
+            if servo_id in self.XL430_IDS:
+                if hasattr(dxl_msg, 'present_load') and idx < len(dxl_msg.present_load):
+                    load = dxl_msg.present_load[idx] / 10.0  # Convert to %
+                    if 'load_percent' not in self.peak_telemetry[joint_name]:
+                        self.peak_telemetry[joint_name]['load_percent'] = load
+                    else:
+                        # Track highest absolute value
+                        if abs(load) > abs(self.peak_telemetry[joint_name]['load_percent']):
+                            self.peak_telemetry[joint_name]['load_percent'] = load
+    
+    def start_peak_tracking(self):
+        """Start tracking peak values."""
+        self.track_peaks = True
+        self.peak_telemetry = {}
+    
+    def get_peak_telemetry(self):
+        """Get peak telemetry collected during tracking."""
+        return self.peak_telemetry.copy()
     
     def get_joint_telemetry(self, joint_name):
         """
@@ -1004,6 +1072,10 @@ class PoseTestNode(Node):
             if self.power_monitor:
                 self.power_monitor.start_tracking(pose_name, idx)
             
+            # Start peak servo tracking
+            if self.telemetry and self.telemetry.enabled:
+                self.telemetry.start_peak_tracking()
+            
             self.send_pose(pose_name, positions, self.movement_time)
             
             # Wait for movement + delay (spin to allow callbacks)
@@ -1015,8 +1087,10 @@ class PoseTestNode(Node):
             
             # Read telemetry if available
             all_data = None
+            peak_data = None
             if self.telemetry and self.telemetry.enabled:
                 all_data = self.telemetry.get_all_joints_telemetry()
+                peak_data = self.telemetry.get_peak_telemetry()
                 if all_data:
                     self.get_logger().info("  📊 Joint States:")
                     for joint_name, data in all_data.items():
@@ -1040,7 +1114,7 @@ class PoseTestNode(Node):
             
             # Analyze power draw
             if self.power_monitor:
-                self.power_monitor.analyze_and_report(pose_name, all_data)
+                self.power_monitor.analyze_and_report(pose_name, all_data, peak_data)
             
             self.stats['total_poses'] += 1
         
