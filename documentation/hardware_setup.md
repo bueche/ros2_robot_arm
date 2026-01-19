@@ -11,11 +11,11 @@ This section describes the hardware setup including a detailed electrical layout
 ## Hardware Overview
 The Kock v1.1 follower arm is a 6-degrees of robotic arm with the links illustrated as illustrated below. It is powered by four Dynamixel [XL330](https://en.robotis.com/shop_en/item.php?it_id=902-0163-000)'s and two Dynamixel [XL430](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/) servos. The controlling hardware is a combination of an [OpenRB 150](https://emanual.robotis.com/docs/en/parts/controller/openrb-150/) and a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/). The two types of servos operate at different voltages so in addition to a [Robotis U2D2](https://en.robotis.com/shop_en/item.php?it_id=902-0145-001) we also are leveraging a Buck converter to step down the 12V to 5v+ for the XL330s. This project also includes sensors to measure the input electrical current. To that end, we are using IN219 current sensors.
 <p align="center">
-  <img src="../images/robot_links.jpg" alt="arm anotated" width="900">
+  <img src="../images/robot_links.jpg" alt="arm anotated" width="600">
 </p>
 The joints of the robot are shown in the following diagram.
 <p align="center">
-  <img src="../images/robot_joints.jpg" alt="arm anotated joins" width="900">
+  <img src="../images/robot_joints.jpg" alt="arm anotated joins" width="600">
 </p>
 
 ## Bill of Materials
