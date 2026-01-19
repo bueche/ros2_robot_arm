@@ -22,7 +22,8 @@ The joints of the robot are shown in the following diagram.
 TBD
 
 ## 3D Print of Hardware
-TBD
+There are a number of ways to print the various custom pieces of the robot arm. We have both printed pieces via a local 3D print and used the [Craftcloud](https://craftcloud3d.com/) service. The meshes used in this print are located [here](../writing_robot_description/meshes). These are derived as binary representatinos of the ones located in the original [koch v1.1](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL) version.
+
 
 ## Electrical Notes
 
