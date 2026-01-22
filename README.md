@@ -18,12 +18,12 @@ This includes:
 The documentation for this repository covers the following:
 - [Software Setup](./documentation/software_setup.md): how to create the docker envrionment and any additional setup commands. 
 - [Hardware Setup](./documentation/hardware_setup.md): Although the setup of the koch_v11 physical robot (leader and follower arms) is partially documented ([Arm assembly by Jen Moss](https://www.youtube.com/watch?v=8nQIg9BwwTk)), those instructions lacked details on some of the required electrical setup. In addition, we are using different controller boards (e.g., Dynamixel OpenRB 150).
-- [Launching the Physical Robot and its digital twin](./documentation/launching_physical.md) Steps involved in bringing up the physical robot and the digital twin.
+- [Notes on creating the digital twin](./documentation/digital_twin.md): A series of notes that cover the problems and solutions for creating the digital twin.
+- [Launching the Physical Robot and its Digital Twin](./documentation/launching_physical.md) Steps involved in bringing up the physical robot and the digital twin.
 - [Running the pose_test utility](./documentation/pose_test.md): The pose test utility will iterate through a series of predefined poses and take measurements of the physical robot during this time.
 - [Running the servo_monitor tool](./documentation/servo_monitor.md): The servo monitor tool holds the robot in a pose and measures the temp, current, and voltage as this pose is held.
 - [Running the pose load_test analysis tool](./documentation/load_test.md): Making projections on limits of the robot joints based on pose transitions.
 - [Running the display only version of the Digital twin](./documentation/display_launch.md): Its possible to run only an rviz display only flavor of the robot.
-- [Viewing the Freecad Model and running the Freecad data extraction scripts](./documentation/freecad.md): to help populate the URDF file.
 - [Power monitoring using INA219 sensors](./documentation/power_monitoring.md): The utilities include a ros2 node that taps into [INA219 sensors](https://www.amazon.com/dp/B0CRY7R4ZD) that have been added to measure voltage and current draw on the 5v and 12v set of servos. This provides insights into the servo dynamics and the corresponding power needs.
 <p align="center">
   <img src="./images/current_v_pose.001.jpeg" alt="current sensor data" width="900">
