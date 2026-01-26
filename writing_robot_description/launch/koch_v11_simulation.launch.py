@@ -64,6 +64,7 @@ def generate_launch_description():
     )
     
     # Drawing Visualizer - shows pen trail and writing surface
+    '''
     drawing_visualizer = Node(
         package='writing_robot_description',
         executable='drawing_visualizer',
@@ -78,6 +79,7 @@ def generate_launch_description():
             'surface_rotation_axis': 'z_axis',
         }]
     )
+    '''
     
     # RViz (optional - uncomment to enable)
     '''
@@ -99,6 +101,6 @@ def generate_launch_description():
         controller_manager,
         joint_state_broadcaster_spawner,
         koch_v11_controller_spawner,
-        drawing_visualizer,
+        # drawing_visualizer
         # rviz,
     ])
