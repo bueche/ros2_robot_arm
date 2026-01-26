@@ -73,6 +73,8 @@ The original Koch v1.1 follower arm STL files are available in ASCII format. How
 **📦 Binary STL files are available at:**  
 [github.com/bueche/ros2_robot_arm/.../meshes](https://github.com/bueche/ros2_robot_arm/tree/main/writing_robot_description/meshes)
 
+These files, however, need further processing in the CAD tool (orientation and placement) to support the correct kinematic behavior. 
+
 ### What is the high-level algorithm for aligning parts in CAD?
 
 Before diving into the algorithm, it's helpful to establish terminology mapping between FreeCAD and URDF:
