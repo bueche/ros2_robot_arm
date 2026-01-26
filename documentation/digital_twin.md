@@ -30,12 +30,12 @@ For example, a basic translation of the Koch v1.1 follower arm's links and joint
 **This guide documents the process of creating a high-fidelity digital twin** that looks and moves like the physical robot, using the actual 3D-printed STL meshes in the URDF definition.
 For example, although our robot arm looks as follows, most developers work with a digital representation that is looks vastly different:
 <p align="center">
-  <img src="./images/real_robot.jpg" alt="Real Robot Arm" width="400">
-  <img src="./images/poor_digital_twin.jpg" alt="The  poor digital twin" width="400">
+  <img src="../images/real_robot.jpg" alt="Real Robot Arm" width="400">
+  <img src="../images/poor_digital_twin.jpg" alt="The  poor digital twin" width="400">
 </p>
 and our goal is to create something that represents reality more faithfully.
 <p align="center">
-  <img src="./images/digital_twin.jpg" alt="The digital twin" width="400">
+  <img src="../images/digital_twin.jpg" alt="The digital twin" width="400">
 </p>
 
 ## Scope and Limitations
