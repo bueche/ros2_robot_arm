@@ -58,7 +58,7 @@ class PowerMonitorNode(Node):
                 
                 # Parse CSV: t_us,bus12_v,shunt12_mv,current12_A,power12_W,bus5_v,shunt5_mv,current5_A,power5_W
                 parts = line.split(',')
-                if len(parts) != 9:
+                if len(parts) < 10:
                     return
                 
                 try:
@@ -78,6 +78,18 @@ class PowerMonitorNode(Node):
                     msg.current_5v = float(parts[7])
                     msg.power_5v = float(parts[8])
                     
+                    if len(parts) >= 12:
+                        msg.bus_5v_voltage_226 = float(parts[9])
+                        msg.shunt_5v_voltage_226 = float(parts[10])
+                        msg.current_5v_226 = float(parts[11])
+                        msg.power_5v_226 = float(parts[12])
+                    else:
+                        msg.bus_5v_voltage_226 = float(0)
+                        msg.shunt_5v_voltage_226 = float(0)
+                        msg.current_5v_226 = float(0)
+                        msg.power_5v_226 = float(0)
+                    
+                    msg.total_power = msg.power_12v + msg.power_5v
                     msg.total_power = msg.power_12v + msg.power_5v
                     
                     self.power_pub.publish(msg)

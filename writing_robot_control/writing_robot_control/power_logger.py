@@ -33,6 +33,7 @@ class PowerLoggerEnhanced(Node):
             'timestamp', 
             'bus_12v', 'current_12v', 'power_12v',
             'bus_5v', 'current_5v', 'power_5v',
+            'bus_5v_226', 'current_5v_226', 'power_5v_226',
             'total_power',
             'pose_event', 'pose_name', 'pose_number',
             # Servo currents (XL330s only report current)
@@ -176,6 +177,9 @@ class PowerLoggerEnhanced(Node):
             msg.bus_5v_voltage,
             msg.current_5v,
             msg.power_5v,
+            msg.bus_5v_voltage_226, # from INA226 sensors if present
+            msg.current_5v_226, # from INA226 sensors if present
+            msg.power_5v_226, # from INA226 sensors if present
             msg.total_power,
             'active' if self.pose_active else '',
             self.current_pose,
