@@ -115,6 +115,20 @@ void printStats() {
   Serial.println("# ");
 }
 
+uint16_t readCalibrationRegister() {
+  Wire1.beginTransmission(0x44);
+  Wire1.write(0x05);  // Calibration register
+  Wire1.endTransmission(false);
+  
+  Wire1.requestFrom(0x44, (uint8_t)2);
+  if (Wire1.available() == 2) {
+    uint8_t msb = Wire1.read();
+    uint8_t lsb = Wire1.read();
+    return (msb << 8) | lsb;
+  }
+  return 0xFFFF;
+}
+
 void handleSerialCommands() {
   while (Serial.available()) {
     String line = Serial.readStringUntil('\n');
@@ -245,11 +259,54 @@ void setup() {
       Serial.println("# still failing ina226_5v.begin()");
     }
   }
-
+  
   // Rob Tillaart library requires explicit calibration!
   // Set shunt resistor value and max expected current
-  ina226_5v.setMaxCurrentShunt(2.0, 0.1);  // 2A max, 0.1 ohm shunt
+  int result = ina226_5v.setMaxCurrentShunt(0.800, 0.1);  // 0.819A max, 0.1 ohm shunt
+  Serial.print("setMaxCurrentShunt() returned: ");
+  Serial.println(result);
+  // Check for error codes
+  if (result == INA226_ERR_NONE) {
+    Serial.println("No errors");
+  } else if (result == INA226_ERR_SHUNTVOLTAGE_HIGH) {
+    Serial.println("ERROR: Shunt voltage too high!");
+  } else if (result == INA226_ERR_MAXCURRENT_LOW) {
+    Serial.println("ERROR: Max current too low!");
+  } else if (result == INA226_ERR_SHUNT_LOW) {
+    Serial.println("ERROR: Shunt resistance too low!");
+  } else if (result == INA226_ERR_NORMALIZE_FAILED) {
+    Serial.println("ERROR: Normalization failed!");
+  }
+  // NOW READ THE CALIBRATION REGISTER TO SEE IF IT WAS SET
+  if (!ina226_5v.isCalibrated()) {
+    Serial.println("ERROR: INA226 is NOT calibrated!");
+    Serial.println("isCalibrated() returned false");
+  } else {
+    Serial.println("SUCCESS: INA226 is calibrated");
+    Serial.print("Current LSB: ");
+    Serial.print(ina226_5v.getCurrentLSB_uA(), 6);
+    Serial.println(" uA");
+    Serial.print("Shunt: ");
+    Serial.print(ina226_5v.getShunt(), 4);
+    Serial.println(" Ω");
+    Serial.print("Max Current: ");
+    Serial.print(ina226_5v.getMaxCurrent(), 4);
+    Serial.println(" A");
+  }
+  ina226_5v.setModeShuntBusContinuous();
+
   
+  uint16_t calibValue = readCalibrationRegister();
+  Serial.print("Calibration register after setMaxCurrentShunt: 0x");
+  Serial.println(calibValue, HEX);
+
+  if (calibValue == 0) {
+    Serial.println("ERROR: Calibration register is still zero!");
+    Serial.println("The setMaxCurrentShunt method did not work!");
+  } else {
+    Serial.println("SUCCESS: Calibration register was set!");
+  }
+
   // Set averaging and conversion times for better accuracy
   // INA226_1_SAMPLE, INA226_4_SAMPLES, INA226_16_SAMPLES, etc.
   ina226_5v.setAverage(INA226_16_SAMPLES);  // Average 16 samples
@@ -260,6 +317,50 @@ void setup() {
   // Set shunt voltage conversion time (1100µs)  
   ina226_5v.setShuntVoltageConversionTime(INA226_1100_us);
   
+  Serial.println("\n=== Bus Voltage Debug ===");
+
+  // Read raw register directly
+  uint16_t busRawReg = ina226_5v.getRegister(0x02);  // Bus voltage register
+  Serial.print("Raw bus voltage register: 0x");
+  Serial.print(busRawReg, HEX);
+  Serial.print(" (");
+  Serial.print(busRawReg);
+  Serial.println(")");
+
+  // INA226 bus voltage LSB = 1.25mV per bit
+  float busVoltageFromRaw = busRawReg * 0.00125;  // 1.25mV per LSB
+  Serial.print("Bus voltage from raw register: ");
+  Serial.print(busVoltageFromRaw, 6);
+  Serial.println(" V");
+
+  // Now read via library
+  float busVoltageLib = ina226_5v.getBusVoltage();
+  Serial.print("Bus voltage from library: ");
+  Serial.print(busVoltageLib, 6);
+  Serial.println(" V");
+
+  // Check if there's a scaling issue
+  if (abs(busVoltageFromRaw - busVoltageLib) > 0.01) {
+    Serial.println("⚠ WARNING: Library bus voltage doesn't match raw register!");
+    Serial.println("   There may be a bus voltage scaling issue.");
+  }
+  // Check the configuration register
+  uint16_t configReg = ina226_5v.getRegister(0x00);
+  Serial.print("Config register: 0x");
+  Serial.println(configReg, HEX);
+
+  // Check the mode bits (should be 0x7 for continuous)
+  uint8_t mode = configReg & 0x07;
+  Serial.print("Operating mode: 0x");
+  Serial.print(mode, HEX);
+  if (mode == 0x07) {
+    Serial.println(" ✓ (Continuous shunt and bus)");
+  } else if (mode == 0x00) {
+    Serial.println(" ✗ (POWER DOWN!)");
+  } else {
+    Serial.println(" ? (Unexpected mode)");
+  }
+
   Serial.println("# ✓ INA226 (5V) initialized at 0x44 on Bus 1");
   Serial.println("#   Shunt: 0.1Ω (R100 confirmed)");
   Serial.println("#   Max current: 2A");
