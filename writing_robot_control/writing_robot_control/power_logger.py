@@ -38,7 +38,11 @@ class PowerLoggerEnhanced(Node):
             'pose_event', 'pose_name', 'pose_number',
             # Servo currents (XL330s only report current)
             'elbow_current_ma', 'wrist_flex_current_ma', 
-            'wrist_roll_current_ma', 'gripper_current_ma'
+            'wrist_roll_current_ma', 'gripper_current_ma',
+            'shoulder_pan_load', 'shoulder_lift_load',
+            'shoulder_pan_temp', 'shoulder_lift_temp',
+            'elbow_temp', 'wrist_flex_temp', 
+            'wrist_roll_temp', 'gripper_temp',
         ])
         
         # Current pose tracking
@@ -55,6 +59,8 @@ class PowerLoggerEnhanced(Node):
         
         # Servo ID mapping for XL330s (IDs 3-6 have current)
         self.servo_id_map = {
+            'shoulder_pan': 1,
+            'shoulder_lift': 2,
             'elbow_flex': 3,
             'wrist_flex': 4,
             'wrist_roll': 5,
@@ -103,6 +109,18 @@ class PowerLoggerEnhanced(Node):
             'wrist_roll': 0,
             'pen_holder': 0
         }
+        self.peak_servo_temperatures = {
+            'shoulder_pan': 0,
+            'shoulder_lift': 0,
+            'elbow_flex': 0,
+            'wrist_flex': 0,
+            'wrist_roll': 0,
+            'pen_holder': 0
+        }
+        self.peak_servo_loads = {
+            'shoulder_pan': 0,
+            'shoulder_lift': 0
+        }
     
     def pose_event_callback(self, msg):
         """Track current pose and peak currents."""
@@ -129,7 +147,7 @@ class PowerLoggerEnhanced(Node):
         self.latest_dxl_state = msg
     
     def get_servo_currents(self):
-        """Extract current values from servo telemetry."""
+        """Extract current values from servo telemetry. Returned only for XL330s """
         currents = {
             'elbow_flex': 0,
             'wrist_flex': 0,
@@ -139,15 +157,17 @@ class PowerLoggerEnhanced(Node):
         
         if not self.latest_dxl_state:
             return currents
-        
+
         # Parse DynamixelState message
         for i, servo_id in enumerate(self.latest_dxl_state.id):
             # Find joint name for this servo ID
             joint_name = None
             for name, sid in self.servo_id_map.items():
-                if sid == servo_id:
+                if sid == servo_id and name in currents.keys():
                     joint_name = name
                     break
+            if joint_name is None:
+                continue
             
             if joint_name and hasattr(self.latest_dxl_state, 'present_current'):
                 if i < len(self.latest_dxl_state.present_current):
@@ -161,6 +181,74 @@ class PowerLoggerEnhanced(Node):
         
         return currents
     
+    def get_servo_temperatures(self):
+        """Extract temperature values from servo telemetry."""
+        temperatures = {
+            'shoulder_pan': 0,
+            'shoulder_lift': 0,
+            'elbow_flex': 0,
+            'wrist_flex': 0,
+            'wrist_roll': 0,
+            'pen_holder': 0
+        }
+        
+        if not self.latest_dxl_state:
+            return temperatures
+        
+        # Parse DynamixelState message
+        for i, servo_id in enumerate(self.latest_dxl_state.id):
+            # Find joint name for this servo ID
+            joint_name = None
+            for name, sid in self.servo_id_map.items():
+                if sid == servo_id:
+                    joint_name = name
+                    break
+            
+            if joint_name and hasattr(self.latest_dxl_state, 'temperature'):
+                if i < len(self.latest_dxl_state.temperature):
+                    # DynamixelState.temperature is in degrees centigrade
+                    temperatures[joint_name] = self.latest_dxl_state.temperature[i]
+                    
+                    # Track peak during active pose
+                    if self.pose_active:
+                        if abs(temperatures[joint_name]) > abs(self.peak_servo_temperatures[joint_name]):
+                            self.peak_servo_temperatures[joint_name] = temperatures[joint_name]
+        
+        return temperatures
+
+    def get_servo_loads(self):
+        """Extract load values from servo telemetry. This is returned for XL430's instead of current"""
+        loads = {
+            'shoulder_pan': 0,
+            'shoulder_lift': 0,
+        }
+        
+        if not self.latest_dxl_state:
+            return loads
+        
+        # Parse DynamixelState message
+        for i, servo_id in enumerate(self.latest_dxl_state.id):
+            # Find joint name for this servo ID
+            joint_name = None
+            for name, sid in self.servo_id_map.items():
+                if sid == servo_id and name in loads.keys():
+                    joint_name = name
+                    break
+            if joint_name is None:
+                    continue
+            
+            if joint_name and hasattr(self.latest_dxl_state, 'present_load'):
+                if i < len(self.latest_dxl_state.present_load):
+                    # DynamixelState.present_load is in percentage
+                    loads[joint_name] = self.latest_dxl_state.present_load[i] / 10.0 # Convert to %
+                    
+                    # Track peak during active pose
+                    if self.pose_active:
+                        if abs(loads[joint_name]) > abs(self.peak_servo_loads[joint_name]):
+                            self.peak_servo_loads[joint_name] = loads[joint_name]
+        
+        return loads
+
     def telemetry_callback(self, msg):
         """Log power data with servo currents."""
         # Get timestamp in seconds
@@ -168,6 +256,8 @@ class PowerLoggerEnhanced(Node):
         
         # Get current servo readings
         servo_currents = self.get_servo_currents()
+        servo_temperatures = self.get_servo_temperatures()
+        servo_loads = self.get_servo_loads()
         
         self.writer.writerow([
             ts,
@@ -187,7 +277,15 @@ class PowerLoggerEnhanced(Node):
             servo_currents['elbow_flex'],
             servo_currents['wrist_flex'],
             servo_currents['wrist_roll'],
-            servo_currents['pen_holder']
+            servo_currents['pen_holder'],
+            servo_loads['shoulder_pan'],
+            servo_loads['shoulder_lift'],
+            servo_temperatures['shoulder_pan'],
+            servo_temperatures['shoulder_lift'],
+            servo_temperatures['elbow_flex'],
+            servo_temperatures['wrist_flex'],
+            servo_temperatures['wrist_roll'],
+            servo_temperatures['pen_holder'],
         ])
         
         # Flush periodically

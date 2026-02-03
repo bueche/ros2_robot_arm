@@ -233,7 +233,7 @@ class PowerMonitor:
                 elif benefit < -0.05:  # Supply using >50mA more than expected
                     self.node.get_logger().warn(f'       ⚠ Supply higher than motor sum by {abs(benefit):.3f}A!')
                 else:
-                    self.node.get_logger().info(f'       ✓ Supply matches motor sum')
+                    self.node.get_logger().info(f'       ✓ Supply within 50mA of  motor sum')
 
 
 
