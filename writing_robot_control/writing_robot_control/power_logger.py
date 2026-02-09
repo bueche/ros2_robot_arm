@@ -204,10 +204,10 @@ class PowerLoggerEnhanced(Node):
                     joint_name = name
                     break
             
-            if joint_name and hasattr(self.latest_dxl_state, 'temperature'):
-                if i < len(self.latest_dxl_state.temperature):
+            if joint_name and hasattr(self.latest_dxl_state, 'present_temperature'):
+                if i < len(self.latest_dxl_state.present_temperature):
                     # DynamixelState.temperature is in degrees centigrade
-                    temperatures[joint_name] = self.latest_dxl_state.temperature[i]
+                    temperatures[joint_name] = self.latest_dxl_state.present_temperature[i]
                     
                     # Track peak during active pose
                     if self.pose_active:

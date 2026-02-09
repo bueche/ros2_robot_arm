@@ -422,16 +422,16 @@ class JointStateTelemetry:
                     idx = list(self.latest_dxl_states.id).index(servo_id)
                     
                     # Temperature (both servo types) - already in °C
-                    if hasattr(self.latest_dxl_states, 'temperature'):
-                        if idx < len(self.latest_dxl_states.temperature):
+                    if hasattr(self.latest_dxl_states, 'present_temperature'):
+                        if idx < len(self.latest_dxl_states.present_temperature):
                             result['temperature'] = \
-                                self.latest_dxl_states.temperature[idx]
+                                self.latest_dxl_states.present_temperature[idx]
                     
                     # Voltage (both servo types) - convert from 0.1V units to V
-                    if hasattr(self.latest_dxl_states, 'voltage'):
-                        if idx < len(self.latest_dxl_states.voltage):
+                    if hasattr(self.latest_dxl_states, 'present_input_voltage'):
+                        if idx < len(self.latest_dxl_states.present_input_voltage):
                             result['voltage'] = \
-                                self.latest_dxl_states.voltage[idx] / 10.0
+                                self.latest_dxl_states.present_input_voltage[idx] / 10.0
                     
                     # Load (XL430 only) - convert from 0.1% units to %
                     if servo_id in self.XL430_IDS:
