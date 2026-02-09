@@ -27,8 +27,8 @@ For example, a basic translation of the Koch v1.1 follower arm's links and joint
 - ✅ Communicate designs to stakeholders
 - ✅ Develop intuition about robot behavior
 
-**This guide documents the process of creating a high-fidelity digital twin** that looks and moves like the physical robot, using the actual 3D-printed STL meshes in the URDF definition.
-For example, although our robot arm looks as follows, most developers work with a digital representation that is looks vastly different:
+**These notes document the process of creating a high-fidelity digital twin** that looks and moves like the physical robot, using the actual 3D-printed STL meshes in the URDF definition.
+For example, although our robot arm looks as shown on the left, most developers work with a digital representation that is looks vastly different as seen on the right below:
 <p align="center">
   <img src="../images/real_robot.jpg" alt="Real Robot Arm" width="400">
   <img src="../images/poor_digital_twin.jpg" alt="The  poor digital twin" width="400">
@@ -40,7 +40,7 @@ and our goal is to create something that represents reality more faithfully.
 
 ## Scope and Limitations
 
-A high-fidelity digital twin, as defined here, focuses on accurate **visual representation and kinematic behavior**. It does not currently include:
+A high-fidelity digital twin, as defined in these notes, focuses on accurate **visual representation and kinematic behavior**. This is a somewhat modest definition as it does *not* currently include:
 
 - ❌ Torque limits and dynamics modeling
 - ❌ Current draw characteristics  
@@ -48,7 +48,7 @@ A high-fidelity digital twin, as defined here, focuses on accurate **visual repr
 - ❌ Compliance and flexibility in links
 - ❌ Backlash and mechanical tolerances
 
-These additional physical properties could be incorporated in future iterations for more comprehensive simulation fidelity.
+These additional physical properties should be incorporated in future iterations for more comprehensive simulation fidelity.
 
 ---
 
@@ -64,13 +64,16 @@ Each link in a URDF has an implicit reference frame. For correct kinematic behav
 2. **The link's orientation must align with its connected joints** to avoid unexpected rotations
 3. **Visual meshes must be positioned relative to this frame** to render correctly
 
-The STL files exported from CAD software have arbitrary origins based on how they were modeled. Without proper alignment in a CAD assembly first, the robot will appear disjointed or rotate incorrectly when joints move.
+We will go into these steps in more detail below, but essentially the STL files exported from CAD software have arbitrary origins based on how they were modeled. Without proper alignment in a CAD assembly first, the robot will appear disjointed or rotate incorrectly when joints move. This is illustrated below as although the pieces of a link look visually connected properly the translation of the joints into the URDF causes them to be placed and rotated incorrectly.
+<p align="center">
+  <img src="../images/example.misaligned.twin.jpg" alt="The misaligned digital twin" width="400">
+</p>
 
 ### Where can I get the STL files for this exercise?
 
-The original Koch v1.1 follower arm STL files are available in ASCII format. However, FreeCAD and most modern CAD tools prefer the more compact STL binary format.
+The servo STL files can be obtained from the Robotis website. The other pieces of the original Koch v1.1 follower arm STL files are available in ASCII format [here](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL). However, FreeCAD and most modern CAD tools prefer the more compact STL binary format.
 
-**📦 Binary STL files are available at:**  
+**📦 Binary STL files for the servos and other parts are available in this repository at:**  
 [github.com/bueche/ros2_robot_arm/.../meshes](https://github.com/bueche/ros2_robot_arm/tree/main/writing_robot_description/meshes)
 
 These files, however, need further processing in the CAD tool (orientation and placement) to support the correct kinematic behavior. 
@@ -84,27 +87,57 @@ Before diving into the algorithm, it's helpful to establish terminology mapping 
 | **Part** | **Link** | Except for the end effector (pen_link), each link consists of a 3D-printed bracket plus an attached servo motor |
 | **Assembly** | **Robot definition** | The complete set of links and joints defining the robot |
 
-> **💡 Important conceptual note:** A link rotates about the joint that *connects it to its parent*, not about its own attached servo. The servo attached to a link will be the rotation point for the *child* link.
+> **💡 Important conceptual note:** A link rotates about the joint that *connects it to its parent*, not about its own attached servo. The servo attached to a link will be the rotation point for the *child* link. This is illustrated below. 
+<p align="center">
+  <img src="../images/summary_of_placement.jpg" alt="summary of placing and orienting a part in freecad" width="600">
+</p>
 
 #### Step-by-Step Process in FreeCAD:
 
-**1. Create a new Part** to define each link
+**1. Create a new Part** to define each link. 
+   - Each part will be in its own Freecad assembly initially and then later combined by copying the part from one assemply into the assembly that will represent the entire robot. In its own assembly its axis of rotation is defined and as is its default orientation.
+   - So for example, with this robot, there would be assemplies like "scratch shouldler part", "scratch upper_arm_part", etc. 
+   - These are not defined in isolation, however, as we will show later, the parts need to be oriented so that when they are combined into the robot assembly they require no additional rotation. 
 
 **2. Import the bracket/structural component**
-   - **For base_link:** Translate so the base is flush with the floor (z = 0)
-   - **For other links:** 
-     - Rotate the bracket so its attachment point aligns with the parent link's servo shaft axis
-     - Center the part so the rotation axis passes through the coordinate origin
-     - Orient so zero rotation in the joint frame means zero rotation of the mesh
+   - Now if we take our example from above the initial import is instructive. Note in the figure below that the part is "far" away from the xyz origin. This is not problematic for 3D printing, but is for digital twin construction. We need to move and rotate it so that the axis of rotation (where it connects with its parent link) is at the center and is oriented so that when combined later in Freecad to its parent the shoulder link, it won't require any additional rotation. 
+     
+  <p align="center">
+  <img src="../images/initial_import_upper_arm.jpg" alt="initial import" width="500">
+    <img src="../images/rotation_point_illustrated.jpg" alt="initial import" width="500">
+</p>
+
+   - But let's not do that positioning and rotation just yet, as importing its companion servo to this part is instructive.
 
 **3. Import and attach the servo motor**
+   - So when we import the servo for this part (ros2 link) it shows up as below. Notice it is placed at the coordinate center, which in this case, is not where we want it to be.
+   - 
+    <p align="center">
+  <img src="../images/illustration_imported_servo.jpg" alt="initial import of servo" width="600"> 
+</p>
+
+
+   - So move the servo away from the origin.
+   - Position the upper arm piece as noted in step 2.
+   - Now, to correctly position it so that it attaches to the parent without rotation, one must have an idea of how the parent is oriented. We show this below as well as the correctly oriented part that will later be combined with the parent shoulder link.
+   
+  <p align="center">
+  <img src="../images/shoulder_link_example.jpg" alt="shoulder link oriented" width="500">
+    <img src="../images/upper_arm_oriented.jpg" alt="upper arm oriented " width="500">
+</p>
+
    - Position and orient the servo to match its physical mounting on the bracket
-   - The servo's output shaft should point in the direction the child link will rotate
+   - The servo's output shaft should point in the direction the child link will rotate. The best way to visualize this is to note the color coded axis in the picture. 
 
 **4. Add the Part to the Assembly**
    - Copy the completed Part into the assembly containing previously defined links
    - If aligned correctly in step 2, you should only need to **translate** (not rotate) to position it
    - The attachment point should align with the parent link's servo shaft
+   - The fitted upper arm link is shown with its parent (the shoulder link) and its parent (the base link) below.
+
+<p align="center">
+  <img src="../images/fitted_shoulder_link.jpg" alt="fitted upper arm to link shoulder" width="600"> 
+</p>
 
 **5. Repeat for all links** in the kinematic chain
 
@@ -140,12 +173,12 @@ Two Python scripts are provided for extracting URDF data from a FreeCAD assembly
 
 #### Key technical details in the extraction scripts:
 
-##### `extract_joints.py` critical features:
-- ✨ Transforms global coordinate differences into the parent link's reference frame (essential for correct URDF behavior)
-- ✨ Computes relative rotations between parent and child links
-- ✨ Extracts joint axis directions in global frame (typically aligned with servo shaft)
-- ✨ Converts FreeCAD's mm to URDF's meters
-- ✨ Converts FreeCAD Euler angles (Yaw, Pitch, Roll) to ROS RPY convention (Roll, Pitch, Yaw)
+##### `extract_joints.py`  features:
+- Transforms global coordinate differences into the parent link's reference frame (essential for correct URDF behavior)
+- Computes relative rotations between parent and child links
+- Extracts joint axis directions in global frame (typically aligned with servo shaft)
+- Converts FreeCAD's mm to URDF's meters
+- Converts FreeCAD Euler angles (Yaw, Pitch, Roll) to ROS RPY convention (Roll, Pitch, Yaw)
 
 Example output:
 ```xml
@@ -160,10 +193,10 @@ Example output:
 ```
 
 ##### `extract_links.py` critical features:
-- ✨ Iterates through all mesh objects in each Part
-- ✨ Extracts individual mesh placements relative to the Part origin
-- ✨ Generates visual elements with proper transforms
-- ✨ Includes placeholder material definitions
+- Iterates through all mesh objects in each Part
+- Extracts individual mesh placements relative to the Part origin
+- Generates visual elements with proper transforms
+- Includes placeholder material definitions
 
 Example output:
 ```xml
@@ -218,10 +251,9 @@ Consider extending the digital twin with:
 
 Creating a high-fidelity digital twin transforms the robot visualization experience, making it dramatically easier to:
 
-- 🎯 Understand robot configurations intuitively
-- 🐛 Debug kinematic issues
-- ✅ Validate trajectory plans
-- 📊 Present your work professionally
+- Understand robot configurations intuitively
+- Debug kinematic issues
+- Validate trajectory plans
 
 The process requires careful CAD assembly work upfront but pays dividends in improved simulation fidelity and reduced debugging time. The provided extraction scripts automate the tedious coordinate transformation work, making URDF generation more reliable and repeatable.
 
