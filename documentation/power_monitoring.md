@@ -2,6 +2,12 @@
 
 This project also includes utilities to measure and correlate the power draw of servos with the sequence of poses as they enfold. Two INA219 current sensors have been added to the setup (see hardware) and the utilities and software enhanced to report and analyze  this in a ros2 environment. The code also supports having INA226 sensors in addition to the INA219 ones (both sensors at the same time). The results between the two sensors are close enough so in general this is not really needed.
 
+The particular example illustrated is defined by [this pose sequence](../src/writing_robot_description/config/delivery_poses.yaml) and is illustrated in the story board below (which was an rviz2 reproduction of the actual physical robot movements). 
+
+<p align="center">
+  <img src="../images/story_board_for_example_pose_test.jpg" alt="story board for example pose test" width="900">
+</p>
+
 <p align="center">
   <img src="../images/current_v_pose.001.jpeg" alt="current sensor data" width="900">
 </p>
