@@ -44,341 +44,341 @@ The particular example illustrated is defined by [this pose sequence](../src/wri
 Ouptut from the Pose Test utility is given below.
 
 ```bash
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/delivery_poses.yaml -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf -p power_monitoring:=true
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/delivery_poses.yaml -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf -p power_monitoring:=true -p delay:=2.0
 POWER_MONITORING_AVAILABLEF: True
-[INFO] [1768185812.878629696] [pose_test_node]: Loading URDF limits...
-[INFO] [1768185812.880739114] [pose_test_node]: ✓ Loaded limits for 6 joints
-[INFO] [1768185812.881362043] [pose_test_node]: Initializing telemetry...
-[INFO] [1768185812.893764124] [pose_test_node]: ✓ Telemetry initialized (dual-topic mode)
-[INFO] [1768185812.894397923] [pose_test_node]:   - Subscribing to /joint_states
-[INFO] [1768185812.894981260] [pose_test_node]:   - Subscribing to /dxl_state
-[INFO] [1768185812.895531633] [pose_test_node]:   - XL430 servos (IDs 1,2): Load only
-[INFO] [1768185812.896093525] [pose_test_node]:   - XL330 servos (IDs 3-6): Current + Load
-[INFO] [1768185812.902823040] [pose_test_node]: ✓ Telemetry active
-[INFO] [1768185812.907117099] [pose_test_node]: ✓ Power monitoring enabled
-[INFO] [1768185812.907755750] [pose_test_node]: ============================================================
-[INFO] [1768185812.908277160] [pose_test_node]: POSE TEST NODE INITIALIZED
-[INFO] [1768185812.908843811] [pose_test_node]: ============================================================
-[INFO] [1768185812.909380295] [pose_test_node]: Joints: 6
-[INFO] [1768185812.909956280] [pose_test_node]: Validation: True
-[INFO] [1768185812.910545023] [pose_test_node]: Telemetry: True
-[INFO] [1768185812.911091285] [pose_test_node]: Power Monitoring: Enabled
-[INFO] [1768185812.911670066] [pose_test_node]: Movement time: 2.0s
-[INFO] [1768185812.912324958] [pose_test_node]: Delay between poses: 2.0s
-[INFO] [1768185812.912926406] [pose_test_node]: ============================================================
-[INFO] [1768185812.913602280] [pose_test_node]: Waiting for joint trajectory controller...
-[INFO] [1768185814.936714057] [pose_test_node]: ✓ Loaded 11 poses from src/writing_robot_description/config/delivery_poses.yaml
-[INFO] [1768185814.937424301] [pose_test_node]: 
+[INFO] [1770595611.286299681] [pose_test_node]: Loading URDF limits...
+[INFO] [1770595611.288279858] [pose_test_node]: ✓ Loaded limits for 6 joints
+[INFO] [1770595611.288832713] [pose_test_node]: Initializing telemetry...
+[INFO] [1770595611.294631206] [pose_test_node]: ✓ Telemetry initialized (dual-topic mode)
+[INFO] [1770595611.295322302] [pose_test_node]:   - Subscribing to /joint_states
+[INFO] [1770595611.295852787] [pose_test_node]:   - Subscribing to /dxl_state
+[INFO] [1770595611.296357660] [pose_test_node]:   - XL430 servos (IDs 1,2): Load only
+[INFO] [1770595611.296849459] [pose_test_node]:   - XL330 servos (IDs 3-6): Current + Load
+[INFO] [1770595612.885336866] [pose_test_node]: ✓ Telemetry active
+[INFO] [1770595612.891349954] [pose_test_node]: ✓ Power monitoring enabled
+[INFO] [1770595612.892337792] [pose_test_node]: ============================================================
+[INFO] [1770595612.892954888] [pose_test_node]: POSE TEST NODE INITIALIZED
+[INFO] [1770595612.893496724] [pose_test_node]: ============================================================
+[INFO] [1770595612.894010523] [pose_test_node]: Joints: 6
+[INFO] [1770595612.894527600] [pose_test_node]: Validation: True
+[INFO] [1770595612.895140048] [pose_test_node]: Telemetry: True
+[INFO] [1770595612.895788014] [pose_test_node]: Power Monitoring: Enabled
+[INFO] [1770595612.896471610] [pose_test_node]: Movement time: 2.0s
+[INFO] [1770595612.897053669] [pose_test_node]: Delay between poses: 2.0s
+[INFO] [1770595612.897580061] [pose_test_node]: ============================================================
+[INFO] [1770595612.898085119] [pose_test_node]: Waiting for joint trajectory controller...
+[INFO] [1770595614.918960495] [pose_test_node]: ✓ Loaded 11 poses from src/writing_robot_description/config/delivery_poses.yaml
+[INFO] [1770595614.919536684] [pose_test_node]: 
 ============================================================
-[INFO] [1768185814.938000378] [pose_test_node]: POSE SEQUENCE TEST
-[INFO] [1768185814.938578362] [pose_test_node]: ============================================================
-[INFO] [1768185814.939086754] [pose_test_node]: Total poses: 11
-[INFO] [1768185814.939596238] [pose_test_node]: Validation: True
-[INFO] [1768185814.940142722] [pose_test_node]: Telemetry: True
-[INFO] [1768185814.940672021] [pose_test_node]: ============================================================
-[INFO] [1768185814.941236746] [pose_test_node]: 
+[INFO] [1770595614.920086372] [pose_test_node]: POSE SEQUENCE TEST
+[INFO] [1770595614.920945302] [pose_test_node]: ============================================================
+[INFO] [1770595614.921602917] [pose_test_node]: Total poses: 11
+[INFO] [1770595614.922170049] [pose_test_node]: Validation: True
+[INFO] [1770595614.922684700] [pose_test_node]: Telemetry: True
+[INFO] [1770595614.923166258] [pose_test_node]: ============================================================
+[INFO] [1770595614.923662002] [pose_test_node]: 
 [1/11] pose 1 - poised to work
-[INFO] [1768185814.941892416] [pose_test_node]:   ✓ shoulder_pan: 1.558 rad (within [0.540, 2.044])
-[INFO] [1768185814.942582401] [pose_test_node]:   ✓ shoulder_lift: 2.879 rad (within [2.200, 2.886])
-[INFO] [1768185814.943108145] [pose_test_node]:   ✓ elbow_flex: 2.124 rad (within [0.726, 2.250])
-[INFO] [1768185814.943600629] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
-[INFO] [1768185814.944069594] [pose_test_node]:   ✓ wrist_roll: 1.182 rad (within [-1.448, 1.900])
-[INFO] [1768185814.944546022] [pose_test_node]:   ✓ pen_holder: 1.590 rad (within [0.190, 1.600])
-[INFO] [1768185814.945650231] [pose_test_node]: → Sent: pose 1 - poised to work
-[INFO] [1768185818.949158015] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185818.950222131] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.564rad Load: -2.40% Volt:12.2V Temp: 33.0°C
-[INFO] [1768185818.951038598] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.835rad Load: 16.30% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185818.951867454] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  2.202rad Curr:  -80mA Volt: 5.6V Temp: 20.0°C
-[INFO] [1768185818.952823311] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.262rad Curr:   43mA Volt: 5.5V Temp: 19.0°C
-[INFO] [1768185818.953637000] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.188rad Curr:  -32mA Volt: 5.6V Temp: 19.0°C
-[INFO] [1768185818.954303504] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.552rad Curr:   22mA Volt: 5.5V Temp: 22.0°C
-[INFO] [1768185818.955140045] [pose_test_node]:   ⚡ Power Analysis for "pose 1 - poised to work":
-[INFO] [1768185818.955875938] [pose_test_node]:      Peak 5V current (INA219):    0.128A
-[INFO] [1768185818.956547089] [pose_test_node]:      Motor current sum (XL330s):  0.177A (at end)
-[INFO] [1768185818.957165870] [pose_test_node]:      5V voltage: 5.68V (min) / 5.73V (max)
-[INFO] [1768185818.957809225] [pose_test_node]:      Peak 12V current:            0.153A
-[INFO] [1768185818.958449025] [pose_test_node]:      Peak total power:            2.57W
-[INFO] [1768185818.959102195] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185818.959756772] [pose_test_node]:        Supply current (INA219):     0.127A
-[INFO] [1768185818.960390312] [pose_test_node]:        Motor current sum (XL330s):  0.177A
-[INFO] [1768185818.961032167] [pose_test_node]:        Controller benefit:          0.050A (28% efficiency)
-[INFO] [1768185818.961708689] [pose_test_node]: 
+[INFO] [1770595614.924154041] [pose_test_node]:   ✓ shoulder_pan: 1.558 rad (within [0.540, 2.044])
+[INFO] [1770595614.924652303] [pose_test_node]:   ✓ shoulder_lift: 2.879 rad (within [2.200, 2.886])
+[INFO] [1770595614.925128361] [pose_test_node]:   ✓ elbow_flex: 2.124 rad (within [0.726, 2.250])
+[INFO] [1770595614.925638438] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
+[INFO] [1770595614.926148607] [pose_test_node]:   ✓ wrist_roll: 1.182 rad (within [-1.448, 1.900])
+[INFO] [1770595614.926671777] [pose_test_node]:   ✓ pen_holder: 1.590 rad (within [0.190, 1.600])
+[INFO] [1770595614.927827338] [pose_test_node]: → Sent: pose 1 - poised to work
+[INFO] [1770595618.934589703] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595618.935407226] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.557rad Load:  0.00% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595618.936180933] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.839rad Load: 14.00% Volt:12.1V Temp: 34.0°C
+[INFO] [1770595618.937008160] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  2.303rad Curr: -109mA Volt: 5.5V Temp: 21.0°C
+[INFO] [1770595618.937838905] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.276rad Curr:   13mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595618.938645446] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.186rad Curr:  -12mA Volt: 5.5V Temp: 22.0°C
+[INFO] [1770595618.939474062] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.621rad Curr:  -21mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595618.940354344] [pose_test_node]:   ⚡ Power Analysis for "pose 1 - poised to work":
+[INFO] [1770595618.941070959] [pose_test_node]:      Peak 5V current (INA219):    0.199A
+[INFO] [1770595618.941883204] [pose_test_node]:      Peak motor sum (XL330s):     0.162A
+[INFO] [1770595618.942663431] [pose_test_node]:      5V voltage: 5.66V (min) / 5.78V (max)
+[INFO] [1770595618.943420453] [pose_test_node]:      Peak 12V current:            0.147A
+[INFO] [1770595618.944070382] [pose_test_node]:      Peak total power:            2.70W
+[INFO] [1770595618.944706071] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595618.945295500] [pose_test_node]:        Supply current (INA219):     0.197A
+[INFO] [1770595618.945858670] [pose_test_node]:        Motor current sum (XL330s):  0.155A
+[INFO] [1770595618.946427932] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595618.947019361] [pose_test_node]: 
 [2/11] pose 2 - reach to grab
-[INFO] [1768185818.962500823] [pose_test_node]:   ✓ shoulder_pan: 1.283 rad (within [0.540, 2.044])
-[INFO] [1768185818.963182789] [pose_test_node]:   ✓ shoulder_lift: 2.314 rad (within [2.200, 2.886])
-[INFO] [1768185818.963775255] [pose_test_node]:   ✓ elbow_flex: 1.320 rad (within [0.726, 2.250])
-[INFO] [1768185818.964259221] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
-[INFO] [1768185818.964750890] [pose_test_node]:   ✓ wrist_roll: 1.871 rad (within [-1.448, 1.900])
-[INFO] [1768185818.965226892] [pose_test_node]:   ✓ pen_holder: 0.982 rad (within [0.190, 1.600])
-[INFO] [1768185818.966257471] [pose_test_node]: → Sent: pose 2 - reach to grab
-[INFO] [1768185822.969187733] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185822.970164405] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.291rad Load: -2.80% Volt:12.2V Temp: 33.0°C
-[INFO] [1768185822.970998094] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.293rad Load:  7.30% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185822.971942025] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.524rad Curr: -344mA Volt: 5.4V Temp: 20.0°C
-[INFO] [1768185822.972769362] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.261rad Curr:   45mA Volt: 5.3V Temp: 19.0°C
-[INFO] [1768185822.973525014] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.866rad Curr:   32mA Volt: 5.3V Temp: 19.0°C
-[INFO] [1768185822.974186777] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.042rad Curr:  -31mA Volt: 5.3V Temp: 22.0°C
-[INFO] [1768185822.974997337] [pose_test_node]:   ⚡ Power Analysis for "pose 2 - reach to grab":
-[INFO] [1768185822.975637895] [pose_test_node]:      Peak 5V current (INA219):    0.253A
-[INFO] [1768185822.976251491] [pose_test_node]:      Motor current sum (XL330s):  0.452A (at end)
-[INFO] [1768185822.976881346] [pose_test_node]:      5V voltage: 5.50V (min) / 5.72V (max)
-[INFO] [1768185822.977519683] [pose_test_node]:      Peak 12V current:            0.148A
-[INFO] [1768185822.978136482] [pose_test_node]:      Peak total power:            2.83W
-[INFO] [1768185822.978799319] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185822.979444581] [pose_test_node]:        Supply current (INA219):     0.229A
-[INFO] [1768185822.980061436] [pose_test_node]:        Motor current sum (XL330s):  0.452A
-[INFO] [1768185822.980713791] [pose_test_node]:        Controller benefit:          0.223A (49% efficiency)
-[INFO] [1768185822.981482832] [pose_test_node]: 
+[INFO] [1770595618.947647864] [pose_test_node]:   ✓ shoulder_pan: 1.283 rad (within [0.540, 2.044])
+[INFO] [1770595618.948243219] [pose_test_node]:   ✓ shoulder_lift: 2.314 rad (within [2.200, 2.886])
+[INFO] [1770595618.948847352] [pose_test_node]:   ✓ elbow_flex: 1.320 rad (within [0.726, 2.250])
+[INFO] [1770595618.949454281] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
+[INFO] [1770595618.949942839] [pose_test_node]:   ✓ wrist_roll: 1.871 rad (within [-1.448, 1.900])
+[INFO] [1770595618.950446083] [pose_test_node]:   ✓ pen_holder: 0.982 rad (within [0.190, 1.600])
+[INFO] [1770595618.951630145] [pose_test_node]: → Sent: pose 2 - reach to grab
+[INFO] [1770595622.959307569] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595622.960186963] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.282rad Load: -0.20% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595622.961265228] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.293rad Load:  7.20% Volt:12.1V Temp: 34.0°C
+[INFO] [1770595622.962400956] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.497rad Curr: -107mA Volt: 5.5V Temp: 21.0°C
+[INFO] [1770595622.963309868] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.275rad Curr:   14mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595622.964102521] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.865rad Curr:   12mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595622.964913155] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.031rad Curr:  -26mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595622.965831974] [pose_test_node]:   ⚡ Power Analysis for "pose 2 - reach to grab":
+[INFO] [1770595622.966556515] [pose_test_node]:      Peak 5V current (INA219):    0.202A
+[INFO] [1770595622.967254760] [pose_test_node]:      Peak motor sum (XL330s):     0.182A
+[INFO] [1770595622.967983486] [pose_test_node]:      5V voltage: 5.66V (min) / 5.77V (max)
+[INFO] [1770595622.968709193] [pose_test_node]:      Peak 12V current:            0.123A
+[INFO] [1770595622.969415197] [pose_test_node]:      Peak total power:            2.63W
+[INFO] [1770595622.970100089] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595622.970903131] [pose_test_node]:        Supply current (INA219):     0.200A
+[INFO] [1770595622.971839136] [pose_test_node]:        Motor current sum (XL330s):  0.159A
+[INFO] [1770595622.972448380] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595622.972988364] [pose_test_node]: 
 [3/11] pose 3 - grab
-[INFO] [1768185822.982268299] [pose_test_node]:   ✓ shoulder_pan: 1.329 rad (within [0.540, 2.044])
-[INFO] [1768185822.982941025] [pose_test_node]:   ✓ shoulder_lift: 2.322 rad (within [2.200, 2.886])
-[INFO] [1768185822.983579732] [pose_test_node]:   ✓ elbow_flex: 1.005 rad (within [0.726, 2.250])
-[INFO] [1768185822.984071734] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
-[INFO] [1768185822.984567570] [pose_test_node]:   ✓ wrist_roll: 1.766 rad (within [-1.448, 1.900])
-[INFO] [1768185822.985055850] [pose_test_node]:   ✓ pen_holder: 1.501 rad (within [0.190, 1.600])
-[INFO] [1768185822.986153578] [pose_test_node]: → Sent: pose 3 - grab
-[INFO] [1768185826.995639873] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185826.996537285] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.329rad Load:  0.00% Volt:12.1V Temp: 33.0°C
-[INFO] [1768185826.997365345] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.282rad Load: 14.60% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185826.998173145] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.274rad Curr: -527mA Volt: 5.3V Temp: 20.0°C
-[INFO] [1768185826.998947001] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.261rad Curr:   43mA Volt: 5.2V Temp: 19.0°C
-[INFO] [1768185826.999710060] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.766rad Curr:    0mA Volt: 5.2V Temp: 19.0°C
-[INFO] [1768185827.001078104] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.467rad Curr:   19mA Volt: 5.2V Temp: 22.0°C
-[INFO] [1768185827.002191239] [pose_test_node]:   ⚡ Power Analysis for "pose 3 - grab":
-[INFO] [1768185827.003331467] [pose_test_node]:      Peak 5V current (INA219):    0.349A
-[INFO] [1768185827.004149583] [pose_test_node]:      Motor current sum (XL330s):  0.589A (at end)
-[INFO] [1768185827.004898198] [pose_test_node]:      5V voltage: 5.36V (min) / 5.73V (max)
-[INFO] [1768185827.005622979] [pose_test_node]:      Peak 12V current:            0.138A
-[INFO] [1768185827.006307371] [pose_test_node]:      Peak total power:            3.41W
-[INFO] [1768185827.007010856] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185827.007686378] [pose_test_node]:        Supply current (INA219):     0.281A
-[INFO] [1768185827.008221418] [pose_test_node]:        Motor current sum (XL330s):  0.589A
-[INFO] [1768185827.008759902] [pose_test_node]:        Controller benefit:          0.308A (52% efficiency)
-[INFO] [1768185827.009291701] [pose_test_node]: 
+[INFO] [1770595622.973529274] [pose_test_node]:   ✓ shoulder_pan: 1.329 rad (within [0.540, 2.044])
+[INFO] [1770595622.974001740] [pose_test_node]:   ✓ shoulder_lift: 2.322 rad (within [2.200, 2.886])
+[INFO] [1770595622.974470909] [pose_test_node]:   ✓ elbow_flex: 1.005 rad (within [0.726, 2.250])
+[INFO] [1770595622.974955411] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
+[INFO] [1770595622.975449655] [pose_test_node]:   ✓ wrist_roll: 1.766 rad (within [-1.448, 1.900])
+[INFO] [1770595622.975919916] [pose_test_node]:   ✓ pen_holder: 1.501 rad (within [0.190, 1.600])
+[INFO] [1770595622.976991385] [pose_test_node]: → Sent: pose 3 - grab
+[INFO] [1770595626.982988653] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595626.983824509] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.321rad Load:  3.30% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595626.984632624] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.279rad Load: 15.80% Volt:12.1V Temp: 34.0°C
+[INFO] [1770595626.985436036] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.204rad Curr: -127mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595626.986250614] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.275rad Curr:   14mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595626.987051156] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.766rad Curr:    0mA Volt: 5.5V Temp: 21.0°C
+[INFO] [1770595626.987946790] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.470rad Curr:   19mA Volt: 5.5V Temp: 22.0°C
+[INFO] [1770595626.988853813] [pose_test_node]:   ⚡ Power Analysis for "pose 3 - grab":
+[INFO] [1770595626.989580132] [pose_test_node]:      Peak 5V current (INA219):    0.296A
+[INFO] [1770595626.990292654] [pose_test_node]:      Peak motor sum (XL330s):     0.308A
+[INFO] [1770595626.991077270] [pose_test_node]:      5V voltage: 5.57V (min) / 5.77V (max)
+[INFO] [1770595626.991991034] [pose_test_node]:      Peak 12V current:            0.147A
+[INFO] [1770595626.992792001] [pose_test_node]:      Peak total power:            3.29W
+[INFO] [1770595626.993524486] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595626.994062063] [pose_test_node]:        Supply current (INA219):     0.207A
+[INFO] [1770595626.994644640] [pose_test_node]:        Motor current sum (XL330s):  0.160A
+[INFO] [1770595626.995276218] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595626.995846461] [pose_test_node]: 
 [4/11] pose 4 - lift and center
-[INFO] [1768185827.009828000] [pose_test_node]:   ✓ shoulder_pan: 1.576 rad (within [0.540, 2.044])
-[INFO] [1768185827.010348781] [pose_test_node]:   ✓ shoulder_lift: 2.575 rad (within [2.200, 2.886])
-[INFO] [1768185827.010901728] [pose_test_node]:   ✓ elbow_flex: 1.898 rad (within [0.726, 2.250])
-[INFO] [1768185827.011548287] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
-[INFO] [1768185827.012223105] [pose_test_node]:   ✓ wrist_roll: 1.766 rad (within [-1.448, 1.900])
-[INFO] [1768185827.012791256] [pose_test_node]:   ✓ pen_holder: 1.521 rad (within [0.190, 1.600])
-[INFO] [1768185827.013907465] [pose_test_node]: → Sent: pose 4 - lift and center
-[INFO] [1768185831.024413432] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185831.025349215] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.576rad Load:  0.00% Volt:12.1V Temp: 33.0°C
-[INFO] [1768185831.026158700] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.522rad Load: 19.10% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185831.026930130] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.931rad Curr:  -32mA Volt: 5.6V Temp: 20.0°C
-[INFO] [1768185831.027708671] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.261rad Curr:   45mA Volt: 5.6V Temp: 19.0°C
-[INFO] [1768185831.028499582] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.766rad Curr:    0mA Volt: 5.6V Temp: 19.0°C
-[INFO] [1768185831.029225104] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.470rad Curr:   26mA Volt: 5.5V Temp: 22.0°C
-[INFO] [1768185831.030122942] [pose_test_node]:   ⚡ Power Analysis for "pose 4 - lift and center":
-[INFO] [1768185831.030851261] [pose_test_node]:      Peak 5V current (INA219):    0.282A
-[INFO] [1768185831.031636246] [pose_test_node]:      Motor current sum (XL330s):  0.103A (at end)
-[INFO] [1768185831.032460065] [pose_test_node]:      5V voltage: 5.46V (min) / 5.75V (max)
-[INFO] [1768185831.033073550] [pose_test_node]:      Peak 12V current:            0.336A
-[INFO] [1768185831.033639182] [pose_test_node]:      Peak total power:            4.71W
-[INFO] [1768185831.034192722] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185831.034810670] [pose_test_node]:        Supply current (INA219):     0.109A
-[INFO] [1768185831.035366358] [pose_test_node]:        Motor current sum (XL330s):  0.103A
-[INFO] [1768185831.035903194] [pose_test_node]:        ✓ Supply matches motor sum
-[INFO] [1768185831.036451141] [pose_test_node]: 
+[INFO] [1770595626.996459150] [pose_test_node]:   ✓ shoulder_pan: 1.576 rad (within [0.540, 2.044])
+[INFO] [1770595626.997025116] [pose_test_node]:   ✓ shoulder_lift: 2.575 rad (within [2.200, 2.886])
+[INFO] [1770595626.997575841] [pose_test_node]:   ✓ elbow_flex: 1.898 rad (within [0.726, 2.250])
+[INFO] [1770595626.998075232] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
+[INFO] [1770595626.998567494] [pose_test_node]:   ✓ wrist_roll: 1.766 rad (within [-1.448, 1.900])
+[INFO] [1770595626.999073015] [pose_test_node]:   ✓ pen_holder: 1.521 rad (within [0.190, 1.600])
+[INFO] [1770595627.000152577] [pose_test_node]: → Sent: pose 4 - lift and center
+[INFO] [1770595631.006279604] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595631.007101461] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.571rad Load:  1.60% Volt:12.3V Temp: 32.0°C
+[INFO] [1770595631.007950150] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.528rad Load: 17.10% Volt:12.1V Temp: 35.0°C
+[INFO] [1770595631.008715099] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.931rad Curr:  -15mA Volt: 5.7V Temp: 21.0°C
+[INFO] [1770595631.009499862] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.275rad Curr:   14mA Volt: 5.6V Temp: 21.0°C
+[INFO] [1770595631.010273662] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.766rad Curr:    0mA Volt: 5.7V Temp: 21.0°C
+[INFO] [1770595631.011112445] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.496rad Curr:   19mA Volt: 5.6V Temp: 22.0°C
+[INFO] [1770595631.012230488] [pose_test_node]:   ⚡ Power Analysis for "pose 4 - lift and center":
+[INFO] [1770595631.013348512] [pose_test_node]:      Peak 5V current (INA219):    0.207A
+[INFO] [1770595631.014014682] [pose_test_node]:      Peak motor sum (XL330s):     0.170A
+[INFO] [1770595631.014584630] [pose_test_node]:      5V voltage: 5.66V (min) / 5.78V (max)
+[INFO] [1770595631.015131188] [pose_test_node]:      Peak 12V current:            0.226A
+[INFO] [1770595631.015674673] [pose_test_node]:      Peak total power:            3.34W
+[INFO] [1770595631.016219398] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595631.016789734] [pose_test_node]:        Supply current (INA219):     0.099A
+[INFO] [1770595631.017449960] [pose_test_node]:        Motor current sum (XL330s):  0.048A
+[WARN] [1770595631.018139148] [pose_test_node]:        ⚠ Supply higher than motor sum by 0.051A!
+[INFO] [1770595631.018772189] [pose_test_node]: 
 [5/11] pose 5 - raise and get ready to place
-[INFO] [1768185831.036984273] [pose_test_node]:   ✓ shoulder_pan: 1.596 rad (within [0.540, 2.044])
-[INFO] [1768185831.037559424] [pose_test_node]:   ✓ shoulder_lift: 2.795 rad (within [2.200, 2.886])
-[INFO] [1768185831.038137409] [pose_test_node]:   ✓ elbow_flex: 0.970 rad (within [0.726, 2.250])
-[INFO] [1768185831.038691726] [pose_test_node]:   ✓ wrist_flex: 1.473 rad (within [0.297, 2.700])
-[INFO] [1768185831.039245951] [pose_test_node]:   ✓ wrist_roll: 1.762 rad (within [-1.448, 1.900])
-[INFO] [1768185831.039794436] [pose_test_node]:   ✓ pen_holder: 1.521 rad (within [0.190, 1.600])
-[INFO] [1768185831.040941515] [pose_test_node]: → Sent: pose 5 - raise and get ready to place
-[INFO] [1768185835.051445982] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185835.052346598] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.587rad Load:  3.90% Volt:12.1V Temp: 33.0°C
-[INFO] [1768185835.053624345] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.738rad Load: 20.20% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185835.054680739] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.231rad Curr: -481mA Volt: 5.3V Temp: 20.0°C
-[INFO] [1768185835.055674226] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  1.466rad Curr:   37mA Volt: 5.2V Temp: 19.0°C
-[INFO] [1768185835.056732416] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.763rad Curr:  -29mA Volt: 5.3V Temp: 19.0°C
-[INFO] [1768185835.057764662] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.470rad Curr:   25mA Volt: 5.2V Temp: 22.0°C
-[INFO] [1768185835.058709722] [pose_test_node]:   ⚡ Power Analysis for "pose 5 - raise and get ready to place":
-[INFO] [1768185835.059443819] [pose_test_node]:      Peak 5V current (INA219):    0.356A
-[INFO] [1768185835.060121341] [pose_test_node]:      Motor current sum (XL330s):  0.572A (at end)
-[INFO] [1768185835.060795844] [pose_test_node]:      5V voltage: 5.34V (min) / 5.75V (max)
-[INFO] [1768185835.061460755] [pose_test_node]:      Peak 12V current:            0.296A
-[INFO] [1768185835.062151351] [pose_test_node]:      Peak total power:            4.88W
-[INFO] [1768185835.062935151] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185835.063786322] [pose_test_node]:        Supply current (INA219):     0.271A
-[INFO] [1768185835.064482733] [pose_test_node]:        Motor current sum (XL330s):  0.572A
-[INFO] [1768185835.065131514] [pose_test_node]:        Controller benefit:          0.301A (53% efficiency)
-[INFO] [1768185835.065662961] [pose_test_node]: 
+[INFO] [1770595631.019402896] [pose_test_node]:   ✓ shoulder_pan: 1.596 rad (within [0.540, 2.044])
+[INFO] [1770595631.020014584] [pose_test_node]:   ✓ shoulder_lift: 2.795 rad (within [2.200, 2.886])
+[INFO] [1770595631.020972386] [pose_test_node]:   ✓ elbow_flex: 0.970 rad (within [0.726, 2.250])
+[INFO] [1770595631.021680371] [pose_test_node]:   ✓ wrist_flex: 1.473 rad (within [0.297, 2.700])
+[INFO] [1770595631.022307226] [pose_test_node]:   ✓ wrist_roll: 1.762 rad (within [-1.448, 1.900])
+[INFO] [1770595631.022878192] [pose_test_node]:   ✓ pen_holder: 1.521 rad (within [0.190, 1.600])
+[INFO] [1770595631.024021291] [pose_test_node]: → Sent: pose 5 - raise and get ready to place
+[INFO] [1770595635.029673131] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595635.030496857] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.585rad Load:  4.40% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595635.031631659] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.738rad Load: 19.50% Volt:12.1V Temp: 35.0°C
+[INFO] [1770595635.032539072] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.197rad Curr: -157mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595635.033470965] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  1.465rad Curr:   14mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595635.034200914] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.761rad Curr:    0mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595635.034980973] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.496rad Curr:   18mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595635.035845441] [pose_test_node]:   ⚡ Power Analysis for "pose 5 - raise and get ready to place":
+[INFO] [1770595635.036509426] [pose_test_node]:      Peak 5V current (INA219):    0.263A
+[INFO] [1770595635.037135207] [pose_test_node]:      Peak motor sum (XL330s):     0.242A
+[INFO] [1770595635.037770544] [pose_test_node]:      5V voltage: 5.60V (min) / 5.77V (max)
+[INFO] [1770595635.038420121] [pose_test_node]:      Peak 12V current:            0.204A
+[INFO] [1770595635.039040439] [pose_test_node]:      Peak total power:            3.80W
+[INFO] [1770595635.039636683] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595635.040205501] [pose_test_node]:        Supply current (INA219):     0.236A
+[INFO] [1770595635.040792134] [pose_test_node]:        Motor current sum (XL330s):  0.189A
+[INFO] [1770595635.041546582] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595635.042283327] [pose_test_node]: 
 [6/11] pose 6 - place high
-[INFO] [1768185835.066134982] [pose_test_node]:   ✓ shoulder_pan: 1.598 rad (within [0.540, 2.044])
-[INFO] [1768185835.066599503] [pose_test_node]:   ✓ shoulder_lift: 2.655 rad (within [2.200, 2.886])
-[INFO] [1768185835.067084209] [pose_test_node]:   ✓ elbow_flex: 0.806 rad (within [0.726, 2.250])
-[INFO] [1768185835.067589508] [pose_test_node]:   ✓ wrist_flex: 1.473 rad (within [0.297, 2.700])
-[INFO] [1768185835.068075251] [pose_test_node]:   ✓ wrist_roll: 1.762 rad (within [-1.448, 1.900])
-[INFO] [1768185835.068611069] [pose_test_node]:   ✓ pen_holder: 0.655 rad (within [0.190, 1.600])
-[INFO] [1768185835.069646648] [pose_test_node]: → Sent: pose 6 - place high
-[INFO] [1768185839.080669673] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185839.081595363] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.588rad Load:  3.90% Volt:12.1V Temp: 33.0°C
-[INFO] [1768185839.082762961] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.650rad Load:  1.30% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185839.083626021] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.105rad Curr: -613mA Volt: 5.2V Temp: 21.0°C
-[INFO] [1768185839.084490211] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  1.464rad Curr:   40mA Volt: 5.1V Temp: 19.0°C
-[INFO] [1768185839.085244881] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.762rad Curr:    5mA Volt: 5.2V Temp: 19.0°C
-[INFO] [1768185839.085982848] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  0.723rad Curr:  -31mA Volt: 5.1V Temp: 22.0°C
-[INFO] [1768185839.086868389] [pose_test_node]:   ⚡ Power Analysis for "pose 6 - place high":
-[INFO] [1768185839.087633449] [pose_test_node]:      Peak 5V current (INA219):    0.450A
-[INFO] [1768185839.088314156] [pose_test_node]:      Motor current sum (XL330s):  0.689A (at end)
-[INFO] [1768185839.088943567] [pose_test_node]:      5V voltage: 5.20V (min) / 5.72V (max)
-[INFO] [1768185839.089555718] [pose_test_node]:      Peak 12V current:            0.166A
-[INFO] [1768185839.090145239] [pose_test_node]:      Peak total power:            3.66W
-[INFO] [1768185839.090749261] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185839.091308838] [pose_test_node]:        Supply current (INA219):     0.323A
-[INFO] [1768185839.091901618] [pose_test_node]:        Motor current sum (XL330s):  0.689A
-[INFO] [1768185839.092665419] [pose_test_node]:        Controller benefit:          0.366A (53% efficiency)
-[INFO] [1768185839.093291737] [pose_test_node]: 
+[INFO] [1770595635.042983497] [pose_test_node]:   ✓ shoulder_pan: 1.598 rad (within [0.540, 2.044])
+[INFO] [1770595635.043636593] [pose_test_node]:   ✓ shoulder_lift: 2.655 rad (within [2.200, 2.886])
+[INFO] [1770595635.044146226] [pose_test_node]:   ✓ elbow_flex: 0.806 rad (within [0.726, 2.250])
+[INFO] [1770595635.044632858] [pose_test_node]:   ✓ wrist_flex: 1.473 rad (within [0.297, 2.700])
+[INFO] [1770595635.045090619] [pose_test_node]:   ✓ wrist_roll: 1.762 rad (within [-1.448, 1.900])
+[INFO] [1770595635.045583918] [pose_test_node]:   ✓ pen_holder: 0.655 rad (within [0.190, 1.600])
+[INFO] [1770595635.046660480] [pose_test_node]: → Sent: pose 6 - place high
+[INFO] [1770595639.054135903] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595639.054977241] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.585rad Load:  5.00% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595639.055810875] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.648rad Load:  2.20% Volt:12.1V Temp: 35.0°C
+[INFO] [1770595639.057763997] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.051rad Curr: -176mA Volt: 5.3V Temp: 22.0°C
+[INFO] [1770595639.059192430] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  1.463rad Curr:   14mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595639.060223361] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.759rad Curr:   11mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595639.061494553] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  0.709rad Curr:  -28mA Volt: 5.3V Temp: 22.0°C
+[INFO] [1770595639.062503299] [pose_test_node]:   ⚡ Power Analysis for "pose 6 - place high":
+[INFO] [1770595639.063174507] [pose_test_node]:      Peak 5V current (INA219):    0.439A
+[INFO] [1770595639.063763880] [pose_test_node]:      Peak motor sum (XL330s):     0.428A
+[INFO] [1770595639.064322772] [pose_test_node]:      5V voltage: 5.43V (min) / 5.78V (max)
+[INFO] [1770595639.064838441] [pose_test_node]:      Peak 12V current:            0.121A
+[INFO] [1770595639.065348018] [pose_test_node]:      Peak total power:            3.79W
+[INFO] [1770595639.065854076] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595639.066389135] [pose_test_node]:        Supply current (INA219):     0.269A
+[INFO] [1770595639.066911786] [pose_test_node]:        Motor current sum (XL330s):  0.229A
+[INFO] [1770595639.067454603] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595639.068010199] [pose_test_node]: 
 [7/11] pose 7 - reach to grab again
-[INFO] [1768185839.093891054] [pose_test_node]:   ✓ shoulder_pan: 1.283 rad (within [0.540, 2.044])
-[INFO] [1768185839.094493483] [pose_test_node]:   ✓ shoulder_lift: 2.314 rad (within [2.200, 2.886])
-[INFO] [1768185839.095074375] [pose_test_node]:   ✓ elbow_flex: 1.320 rad (within [0.726, 2.250])
-[INFO] [1768185839.095679212] [pose_test_node]:   ✓ wrist_flex: 2.327 rad (within [0.297, 2.700])
-[INFO] [1768185839.096293474] [pose_test_node]:   ✓ wrist_roll: 1.871 rad (within [-1.448, 1.900])
-[INFO] [1768185839.096899477] [pose_test_node]:   ✓ pen_holder: 0.982 rad (within [0.190, 1.600])
-[INFO] [1768185839.098191521] [pose_test_node]: → Sent: pose 7 - reach to grab again
-[INFO] [1768185843.100491520] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185843.101416080] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.291rad Load: -2.80% Volt:12.2V Temp: 33.0°C
-[INFO] [1768185843.102925162] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.293rad Load:  7.30% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185843.103826481] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.381rad Curr:  -59mA Volt: 5.6V Temp: 21.0°C
-[INFO] [1768185843.104513300] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.261rad Curr:   86mA Volt: 5.5V Temp: 19.0°C
-[INFO] [1768185843.105155099] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.865rad Curr:   32mA Volt: 5.6V Temp: 19.0°C
-[INFO] [1768185843.105814825] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  0.944rad Curr:   22mA Volt: 5.5V Temp: 22.0°C
-[INFO] [1768185843.106584810] [pose_test_node]:   ⚡ Power Analysis for "pose 7 - reach to grab again":
-[INFO] [1768185843.107181850] [pose_test_node]:      Peak 5V current (INA219):    0.322A
-[INFO] [1768185843.107830557] [pose_test_node]:      Motor current sum (XL330s):  0.199A (at end)
-[INFO] [1768185843.108457208] [pose_test_node]:      5V voltage: 5.40V (min) / 5.72V (max)
-[INFO] [1768185843.109046378] [pose_test_node]:      Peak 12V current:            0.124A
-[INFO] [1768185843.109638140] [pose_test_node]:      Peak total power:            3.16W
-[INFO] [1768185843.110252273] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185843.110880276] [pose_test_node]:        Supply current (INA219):     0.136A
-[INFO] [1768185843.111633687] [pose_test_node]:        Motor current sum (XL330s):  0.199A
-[INFO] [1768185843.112281117] [pose_test_node]:        Controller benefit:          0.063A (32% efficiency)
-[INFO] [1768185843.112904194] [pose_test_node]: 
+[INFO] [1770595639.068575961] [pose_test_node]:   ✓ shoulder_pan: 1.283 rad (within [0.540, 2.044])
+[INFO] [1770595639.069138760] [pose_test_node]:   ✓ shoulder_lift: 2.314 rad (within [2.200, 2.886])
+[INFO] [1770595639.069684189] [pose_test_node]:   ✓ elbow_flex: 1.320 rad (within [0.726, 2.250])
+[INFO] [1770595639.070254859] [pose_test_node]:   ✓ wrist_flex: 2.327 rad (within [0.297, 2.700])
+[INFO] [1770595639.071165104] [pose_test_node]:   ✓ wrist_roll: 1.871 rad (within [-1.448, 1.900])
+[INFO] [1770595639.071847867] [pose_test_node]:   ✓ pen_holder: 0.982 rad (within [0.190, 1.600])
+[INFO] [1770595639.072937836] [pose_test_node]: → Sent: pose 7 - reach to grab again
+[INFO] [1770595643.076834907] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595643.077880487] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.282rad Load:  0.00% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595643.078745566] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.293rad Load:  7.30% Volt:12.1V Temp: 35.0°C
+[INFO] [1770595643.079595329] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.379rad Curr:  -25mA Volt: 5.6V Temp: 22.0°C
+[INFO] [1770595643.080519205] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.269rad Curr:   29mA Volt: 5.6V Temp: 21.0°C
+[INFO] [1770595643.081724822] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.865rad Curr:   11mA Volt: 5.6V Temp: 21.0°C
+[INFO] [1770595643.082738605] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  0.956rad Curr:   19mA Volt: 5.6V Temp: 22.0°C
+[INFO] [1770595643.083718110] [pose_test_node]:   ⚡ Power Analysis for "pose 7 - reach to grab again":
+[INFO] [1770595643.084369225] [pose_test_node]:      Peak 5V current (INA219):    0.267A
+[INFO] [1770595643.084950561] [pose_test_node]:      Peak motor sum (XL330s):     0.256A
+[INFO] [1770595643.085536583] [pose_test_node]:      5V voltage: 5.60V (min) / 5.76V (max)
+[INFO] [1770595643.086111179] [pose_test_node]:      Peak 12V current:            0.126A
+[INFO] [1770595643.086726904] [pose_test_node]:      Peak total power:            2.94W
+[INFO] [1770595643.087370889] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595643.087955207] [pose_test_node]:        Supply current (INA219):     0.128A
+[INFO] [1770595643.088534284] [pose_test_node]:        Motor current sum (XL330s):  0.084A
+[INFO] [1770595643.089129972] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595643.089704623] [pose_test_node]: 
 [8/11] pose 8 - grab
-[INFO] [1768185843.113505697] [pose_test_node]:   ✓ shoulder_pan: 1.329 rad (within [0.540, 2.044])
-[INFO] [1768185843.113985310] [pose_test_node]:   ✓ shoulder_lift: 2.314 rad (within [2.200, 2.886])
-[INFO] [1768185843.114530313] [pose_test_node]:   ✓ elbow_flex: 1.005 rad (within [0.726, 2.250])
-[INFO] [1768185843.115021741] [pose_test_node]:   ✓ wrist_flex: 2.037 rad (within [0.297, 2.700])
-[INFO] [1768185843.115498781] [pose_test_node]:   ✓ wrist_roll: 1.766 rad (within [-1.448, 1.900])
-[INFO] [1768185843.115984246] [pose_test_node]:   ✓ pen_holder: 1.521 rad (within [0.190, 1.600])
-[INFO] [1768185843.117041641] [pose_test_node]: → Sent: pose 8 - grab
-[INFO] [1768185847.119906698] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185847.120991926] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.329rad Load:  0.00% Volt:12.1V Temp: 33.0°C
-[INFO] [1768185847.121821282] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.282rad Load: 11.20% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185847.122747713] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.429rad Curr:-1043mA Volt: 4.8V Temp: 21.0°C
-[INFO] [1768185847.123627143] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.034rad Curr:   37mA Volt: 4.9V Temp: 19.0°C
-[INFO] [1768185847.124374906] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.766rad Curr:    0mA Volt: 4.8V Temp: 19.0°C
-[INFO] [1768185847.125102799] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.472rad Curr:   23mA Volt: 4.8V Temp: 22.0°C
-[INFO] [1768185847.125904043] [pose_test_node]:   ⚡ Power Analysis for "pose 8 - grab":
-[INFO] [1768185847.126542732] [pose_test_node]:      Peak 5V current (INA219):    0.477A
-[INFO] [1768185847.127159828] [pose_test_node]:      Motor current sum (XL330s):  1.103A (at end)
-[INFO] [1768185847.127804849] [pose_test_node]:      5V voltage: 5.17V (min) / 5.73V (max)
-[INFO] [1768185847.128483464] [pose_test_node]:      Peak 12V current:            0.132A
-[INFO] [1768185847.129125837] [pose_test_node]:      Peak total power:            4.03W
-[INFO] [1768185847.129760267] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185847.130366621] [pose_test_node]:        Supply current (INA219):     0.468A
-[INFO] [1768185847.130981810] [pose_test_node]:        Motor current sum (XL330s):  1.103A
-[INFO] [1768185847.131630665] [pose_test_node]:        Controller benefit:          0.635A (58% efficiency)
-[INFO] [1768185847.132311483] [pose_test_node]: 
+[INFO] [1770595643.090342942] [pose_test_node]:   ✓ shoulder_pan: 1.329 rad (within [0.540, 2.044])
+[INFO] [1770595643.091185761] [pose_test_node]:   ✓ shoulder_lift: 2.314 rad (within [2.200, 2.886])
+[INFO] [1770595643.091895617] [pose_test_node]:   ✓ elbow_flex: 1.005 rad (within [0.726, 2.250])
+[INFO] [1770595643.092571009] [pose_test_node]:   ✓ wrist_flex: 2.037 rad (within [0.297, 2.700])
+[INFO] [1770595643.093154253] [pose_test_node]:   ✓ wrist_roll: 1.766 rad (within [-1.448, 1.900])
+[INFO] [1770595643.093715756] [pose_test_node]:   ✓ pen_holder: 1.521 rad (within [0.190, 1.600])
+[INFO] [1770595643.094865336] [pose_test_node]: → Sent: pose 8 - grab
+[INFO] [1770595647.099860876] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595647.100639010] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.321rad Load:  3.30% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595647.102176981] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.279rad Load: 12.40% Volt:12.1V Temp: 35.0°C
+[INFO] [1770595647.103261190] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.253rad Curr: -179mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595647.104011917] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.033rad Curr:   13mA Volt: 5.3V Temp: 21.0°C
+[INFO] [1770595647.104795902] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.766rad Curr:    0mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595647.105570351] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.496rad Curr:   18mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595647.106458707] [pose_test_node]:   ⚡ Power Analysis for "pose 8 - grab":
+[INFO] [1770595647.107161730] [pose_test_node]:      Peak 5V current (INA219):    0.322A
+[INFO] [1770595647.107861826] [pose_test_node]:      Peak motor sum (XL330s):     0.343A
+[INFO] [1770595647.108529440] [pose_test_node]:      5V voltage: 5.54V (min) / 5.76V (max)
+[INFO] [1770595647.109142759] [pose_test_node]:      Peak 12V current:            0.135A
+[INFO] [1770595647.109731002] [pose_test_node]:      Peak total power:            3.38W
+[INFO] [1770595647.110251375] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595647.110859971] [pose_test_node]:        Supply current (INA219):     0.257A
+[INFO] [1770595647.111597438] [pose_test_node]:        Motor current sum (XL330s):  0.210A
+[INFO] [1770595647.112220478] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595647.112794148] [pose_test_node]: 
 [9/11] pose 9 - place low
-[INFO] [1768185847.133149710] [pose_test_node]:   ✓ shoulder_pan: 1.925 rad (within [0.540, 2.044])
-[INFO] [1768185847.133864065] [pose_test_node]:   ✓ shoulder_lift: 2.403 rad (within [2.200, 2.886])
-[INFO] [1768185847.134521217] [pose_test_node]:   ✓ elbow_flex: 1.352 rad (within [0.726, 2.250])
-[INFO] [1768185847.135037071] [pose_test_node]:   ✓ wrist_flex: 2.327 rad (within [0.297, 2.700])
-[INFO] [1768185847.135545129] [pose_test_node]:   ✓ wrist_roll: 1.737 rad (within [-1.448, 1.900])
-[INFO] [1768185847.136017502] [pose_test_node]:   ✓ pen_holder: 1.521 rad (within [0.190, 1.600])
-[INFO] [1768185847.137066433] [pose_test_node]: → Sent: pose 9 - place low
-[INFO] [1768185851.148527071] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185851.149433039] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.918rad Load:  1.90% Volt:12.1V Temp: 33.0°C
-[INFO] [1768185851.150255932] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.342rad Load: 22.50% Volt:12.2V Temp: 41.0°C
-[INFO] [1768185851.151069695] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.473rad Curr: -145mA Volt: 5.5V Temp: 21.0°C
-[INFO] [1768185851.151882755] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.261rad Curr:   86mA Volt: 5.4V Temp: 19.0°C
-[INFO] [1768185851.152755648] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.742rad Curr:  -32mA Volt: 5.5V Temp: 19.0°C
-[INFO] [1768185851.153749172] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.472rad Curr:   25mA Volt: 5.4V Temp: 22.0°C
-[INFO] [1768185851.154694899] [pose_test_node]:   ⚡ Power Analysis for "pose 9 - place low":
-[INFO] [1768185851.155369995] [pose_test_node]:      Peak 5V current (INA219):    0.468A
-[INFO] [1768185851.156112073] [pose_test_node]:      Motor current sum (XL330s):  0.288A (at end)
-[INFO] [1768185851.156782428] [pose_test_node]:      5V voltage: 5.18V (min) / 5.72V (max)
-[INFO] [1768185851.157524098] [pose_test_node]:      Peak 12V current:            0.233A
-[INFO] [1768185851.158189213] [pose_test_node]:      Peak total power:            3.86W
-[INFO] [1768185851.158878698] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185851.159542053] [pose_test_node]:        Supply current (INA219):     0.168A
-[INFO] [1768185851.160119482] [pose_test_node]:        Motor current sum (XL330s):  0.288A
-[INFO] [1768185851.160623040] [pose_test_node]:        Controller benefit:          0.120A (42% efficiency)
-[INFO] [1768185851.161096875] [pose_test_node]: 
+[INFO] [1770595647.113351559] [pose_test_node]:   ✓ shoulder_pan: 1.925 rad (within [0.540, 2.044])
+[INFO] [1770595647.113873376] [pose_test_node]:   ✓ shoulder_lift: 2.403 rad (within [2.200, 2.886])
+[INFO] [1770595647.114376953] [pose_test_node]:   ✓ elbow_flex: 1.352 rad (within [0.726, 2.250])
+[INFO] [1770595647.114864881] [pose_test_node]:   ✓ wrist_flex: 2.327 rad (within [0.297, 2.700])
+[INFO] [1770595647.115387643] [pose_test_node]:   ✓ wrist_roll: 1.737 rad (within [-1.448, 1.900])
+[INFO] [1770595647.115912609] [pose_test_node]:   ✓ pen_holder: 1.521 rad (within [0.190, 1.600])
+[INFO] [1770595647.117095838] [pose_test_node]: → Sent: pose 9 - place low
+[INFO] [1770595651.123650534] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595651.124516520] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.916rad Load:  2.70% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595651.125387414] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.344rad Load: 21.50% Volt:12.1V Temp: 35.0°C
+[INFO] [1770595651.126240529] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.411rad Curr:  -24mA Volt: 5.6V Temp: 22.0°C
+[INFO] [1770595651.127092108] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.272rad Curr:   28mA Volt: 5.6V Temp: 21.0°C
+[INFO] [1770595651.127937094] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.736rad Curr:    0mA Volt: 5.6V Temp: 21.0°C
+[INFO] [1770595651.128787117] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.496rad Curr:   18mA Volt: 5.6V Temp: 22.0°C
+[INFO] [1770595651.129735881] [pose_test_node]:   ⚡ Power Analysis for "pose 9 - place low":
+[INFO] [1770595651.130378792] [pose_test_node]:      Peak 5V current (INA219):    0.255A
+[INFO] [1770595651.131110833] [pose_test_node]:      Peak motor sum (XL330s):     0.248A
+[INFO] [1770595651.132040171] [pose_test_node]:      5V voltage: 5.60V (min) / 5.77V (max)
+[INFO] [1770595651.132804323] [pose_test_node]:      Peak 12V current:            0.218A
+[INFO] [1770595651.133421160] [pose_test_node]:      Peak total power:            3.36W
+[INFO] [1770595651.134007385] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595651.134590907] [pose_test_node]:        Supply current (INA219):     0.120A
+[INFO] [1770595651.135162965] [pose_test_node]:        Motor current sum (XL330s):  0.070A
+[WARN] [1770595651.135839191] [pose_test_node]:        ⚠ Supply higher than motor sum by 0.050A!
+[INFO] [1770595651.136450898] [pose_test_node]: 
 [10/11] pose 10 - release
-[INFO] [1768185851.161649971] [pose_test_node]:   ✓ shoulder_pan: 1.872 rad (within [0.540, 2.044])
-[INFO] [1768185851.162277363] [pose_test_node]:   ✓ shoulder_lift: 2.403 rad (within [2.200, 2.886])
-[INFO] [1768185851.162828403] [pose_test_node]:   ✓ elbow_flex: 1.266 rad (within [0.726, 2.250])
-[INFO] [1768185851.163306461] [pose_test_node]:   ✓ wrist_flex: 2.327 rad (within [0.297, 2.700])
-[INFO] [1768185851.163777130] [pose_test_node]:   ✓ wrist_roll: 1.737 rad (within [-1.448, 1.900])
-[INFO] [1768185851.164260614] [pose_test_node]:   ✓ pen_holder: 0.582 rad (within [0.190, 1.600])
-[INFO] [1768185851.165265119] [pose_test_node]: → Sent: pose 10 - release
-[INFO] [1768185855.168191658] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185855.169125126] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.880rad Load: -2.80% Volt:12.1V Temp: 33.0°C
-[INFO] [1768185855.169992593] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.342rad Load: 22.50% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185855.170834820] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.521rad Curr: -468mA Volt: 5.2V Temp: 21.0°C
-[INFO] [1768185855.171677657] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.259rad Curr:   86mA Volt: 5.2V Temp: 19.0°C
-[INFO] [1768185855.172666903] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.737rad Curr:    0mA Volt: 5.2V Temp: 19.0°C
-[INFO] [1768185855.173549482] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  0.652rad Curr:  -34mA Volt: 5.2V Temp: 22.0°C
-[INFO] [1768185855.174455505] [pose_test_node]:   ⚡ Power Analysis for "pose 10 - release":
-[INFO] [1768185855.175068915] [pose_test_node]:      Peak 5V current (INA219):    0.289A
-[INFO] [1768185855.175713511] [pose_test_node]:      Motor current sum (XL330s):  0.588A (at end)
-[INFO] [1768185855.176312922] [pose_test_node]:      5V voltage: 5.44V (min) / 5.72V (max)
-[INFO] [1768185855.176896461] [pose_test_node]:      Peak 12V current:            0.189A
-[INFO] [1768185855.177486057] [pose_test_node]:      Peak total power:            3.81W
-[INFO] [1768185855.178090764] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185855.178714397] [pose_test_node]:        Supply current (INA219):     0.288A
-[INFO] [1768185855.179281622] [pose_test_node]:        Motor current sum (XL330s):  0.588A
-[INFO] [1768185855.179883236] [pose_test_node]:        Controller benefit:          0.300A (51% efficiency)
-[INFO] [1768185855.180545017] [pose_test_node]: 
+[INFO] [1770595651.137072290] [pose_test_node]:   ✓ shoulder_pan: 1.872 rad (within [0.540, 2.044])
+[INFO] [1770595651.137672071] [pose_test_node]:   ✓ shoulder_lift: 2.403 rad (within [2.200, 2.886])
+[INFO] [1770595651.138241185] [pose_test_node]:   ✓ elbow_flex: 1.266 rad (within [0.726, 2.250])
+[INFO] [1770595651.138808633] [pose_test_node]:   ✓ wrist_flex: 2.327 rad (within [0.297, 2.700])
+[INFO] [1770595651.139304061] [pose_test_node]:   ✓ wrist_roll: 1.737 rad (within [-1.448, 1.900])
+[INFO] [1770595651.139794212] [pose_test_node]:   ✓ pen_holder: 0.582 rad (within [0.190, 1.600])
+[INFO] [1770595651.140943477] [pose_test_node]: → Sent: pose 10 - release
+[INFO] [1770595655.145097495] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595655.146019611] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.871rad Load:  0.00% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595655.146870097] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.344rad Load: 21.40% Volt:12.0V Temp: 35.0°C
+[INFO] [1770595655.147701749] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.470rad Curr: -130mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595655.148539235] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.272rad Curr:   27mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595655.149398203] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.735rad Curr:   10mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595655.150282503] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  0.640rad Curr:  -30mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595655.151505010] [pose_test_node]:   ⚡ Power Analysis for "pose 10 - release":
+[INFO] [1770595655.152359403] [pose_test_node]:      Peak 5V current (INA219):    0.238A
+[INFO] [1770595655.152953629] [pose_test_node]:      Peak motor sum (XL330s):     0.211A
+[INFO] [1770595655.153519354] [pose_test_node]:      5V voltage: 5.62V (min) / 5.78V (max)
+[INFO] [1770595655.154045634] [pose_test_node]:      Peak 12V current:            0.183A
+[INFO] [1770595655.154573378] [pose_test_node]:      Peak total power:            3.46W
+[INFO] [1770595655.155095251] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595655.155645698] [pose_test_node]:        Supply current (INA219):     0.236A
+[INFO] [1770595655.156168646] [pose_test_node]:        Motor current sum (XL330s):  0.197A
+[INFO] [1770595655.156730556] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595655.157294541] [pose_test_node]: 
 [11/11] pose 11 - poised to work
-[INFO] [1768185855.181158464] [pose_test_node]:   ✓ shoulder_pan: 1.558 rad (within [0.540, 2.044])
-[INFO] [1768185855.181807227] [pose_test_node]:   ✓ shoulder_lift: 2.879 rad (within [2.200, 2.886])
-[INFO] [1768185855.182576527] [pose_test_node]:   ✓ elbow_flex: 2.124 rad (within [0.726, 2.250])
-[INFO] [1768185855.183245938] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
-[INFO] [1768185855.183869700] [pose_test_node]:   ✓ wrist_roll: 1.182 rad (within [-1.448, 1.900])
-[INFO] [1768185855.184390351] [pose_test_node]:   ✓ pen_holder: 1.590 rad (within [0.190, 1.600])
-[INFO] [1768185855.185452597] [pose_test_node]: → Sent: pose 11 - poised to work
-[INFO] [1768185859.186740851] [pose_test_node]:   📊 Joint States:
-[INFO] [1768185859.188096284] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.565rad Load: -2.80% Volt:12.2V Temp: 33.0°C
-[INFO] [1768185859.188928955] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.836rad Load: 15.80% Volt:12.1V Temp: 41.0°C
-[INFO] [1768185859.189703958] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  2.169rad Curr:  -40mA Volt: 5.6V Temp: 21.0°C
-[INFO] [1768185859.190443314] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.261rad Curr:   45mA Volt: 5.5V Temp: 19.0°C
-[INFO] [1768185859.191165336] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.188rad Curr:  -32mA Volt: 5.6V Temp: 19.0°C
-[INFO] [1768185859.191908562] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.552rad Curr:   24mA Volt: 5.6V Temp: 22.0°C
-[INFO] [1768185859.192971919] [pose_test_node]:   ⚡ Power Analysis for "pose 11 - poised to work":
-[INFO] [1768185859.193744275] [pose_test_node]:      Peak 5V current (INA219):    0.287A
-[INFO] [1768185859.194361593] [pose_test_node]:      Motor current sum (XL330s):  0.141A (at end)
-[INFO] [1768185859.194938651] [pose_test_node]:      5V voltage: 5.44V (min) / 5.72V (max)
-[INFO] [1768185859.195507932] [pose_test_node]:      Peak 12V current:            0.208A
-[INFO] [1768185859.196076194] [pose_test_node]:      Peak total power:            3.70W
-[INFO] [1768185859.196703623] [pose_test_node]:      Holding current comparison:
-[INFO] [1768185859.197389701] [pose_test_node]:        Supply current (INA219):     0.113A
-[INFO] [1768185859.198084686] [pose_test_node]:        Motor current sum (XL330s):  0.141A
-[INFO] [1768185859.198693559] [pose_test_node]:        ✓ Supply matches motor sum
-[INFO] [1768185859.199275303] [pose_test_node]: 
+[INFO] [1770595655.157833154] [pose_test_node]:   ✓ shoulder_pan: 1.558 rad (within [0.540, 2.044])
+[INFO] [1770595655.158371750] [pose_test_node]:   ✓ shoulder_lift: 2.879 rad (within [2.200, 2.886])
+[INFO] [1770595655.158923327] [pose_test_node]:   ✓ elbow_flex: 2.124 rad (within [0.726, 2.250])
+[INFO] [1770595655.159486885] [pose_test_node]:   ✓ wrist_flex: 2.279 rad (within [0.297, 2.700])
+[INFO] [1770595655.160056444] [pose_test_node]:   ✓ wrist_roll: 1.182 rad (within [-1.448, 1.900])
+[INFO] [1770595655.160930282] [pose_test_node]:   ✓ pen_holder: 1.590 rad (within [0.190, 1.600])
+[INFO] [1770595655.162289993] [pose_test_node]: → Sent: pose 11 - poised to work
+[INFO] [1770595659.167578183] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595659.168472336] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.557rad Load:  0.00% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595659.169323118] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.838rad Load: 14.60% Volt:12.1V Temp: 35.0°C
+[INFO] [1770595659.170207456] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  2.168rad Curr:  -18mA Volt: 5.7V Temp: 22.0°C
+[INFO] [1770595659.171110701] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.272rad Curr:   14mA Volt: 5.6V Temp: 21.0°C
+[INFO] [1770595659.172265541] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.186rad Curr:  -12mA Volt: 5.7V Temp: 21.0°C
+[INFO] [1770595659.173097971] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.563rad Curr:   19mA Volt: 5.6V Temp: 22.0°C
+[INFO] [1770595659.174076087] [pose_test_node]:   ⚡ Power Analysis for "pose 11 - poised to work":
+[INFO] [1770595659.174857036] [pose_test_node]:      Peak 5V current (INA219):    0.228A
+[INFO] [1770595659.175601521] [pose_test_node]:      Peak motor sum (XL330s):     0.202A
+[INFO] [1770595659.176337451] [pose_test_node]:      5V voltage: 5.63V (min) / 5.76V (max)
+[INFO] [1770595659.177087437] [pose_test_node]:      Peak 12V current:            0.201A
+[INFO] [1770595659.177835292] [pose_test_node]:      Peak total power:            3.22W
+[INFO] [1770595659.178459092] [pose_test_node]:      Holding current comparison:
+[INFO] [1770595659.178983780] [pose_test_node]:        Supply current (INA219):     0.107A
+[INFO] [1770595659.179499561] [pose_test_node]:        Motor current sum (XL330s):  0.063A
+[INFO] [1770595659.180003637] [pose_test_node]:        ✓ Supply within 50mA of  motor sum
+[INFO] [1770595659.180644511] [pose_test_node]: 
 ============================================================
-[INFO] [1768185859.199863436] [pose_test_node]: SUMMARY
-[INFO] [1768185859.200463402] [pose_test_node]: ============================================================
-[INFO] [1768185859.201072256] [pose_test_node]: Poses tested: 11
-[INFO] [1768185859.201765390] [pose_test_node]: Validation errors: 0
-[INFO] [1768185859.202496004] [pose_test_node]: Validation warnings: 0
-[INFO] [1768185859.203206934] [pose_test_node]: ============================================================
-[INFO] [1768185859.203895252] [pose_test_node]: 
+[INFO] [1770595659.181739221] [pose_test_node]: SUMMARY
+[INFO] [1770595659.182302131] [pose_test_node]: ============================================================
+[INFO] [1770595659.182818985] [pose_test_node]: Poses tested: 11
+[INFO] [1770595659.183334044] [pose_test_node]: Validation errors: 0
+[INFO] [1770595659.183829676] [pose_test_node]: Validation warnings: 0
+[INFO] [1770595659.184335401] [pose_test_node]: ============================================================
+[INFO] [1770595659.184893496] [pose_test_node]: 
 ===========================================================================
-[INFO] [1768185859.204397810] [pose_test_node]: 📊 TELEMETRY SUMMARY
-[INFO] [1768185859.204916776] [pose_test_node]: ===========================================================================
-[INFO] [1768185859.205429353] [pose_test_node]: XL430 (IDs 1-2): Avg Load: 6.5%
-[INFO] [1768185859.205921077] [pose_test_node]: XL330 (IDs 3-6): Total Current: -3mA, Avg: -1mA (-0.0W @ 12V)
-[INFO] [1768185859.206499784] [pose_test_node]: Max Temperature: 41.0°C
-[INFO] [1768185859.206973786] [pose_test_node]: Voltage: 5.50V - 12.20V (avg 7.77V)
-[INFO] [1768185859.207570715] [pose_test_node]: ===========================================================================
+[INFO] [1770595659.185391721] [pose_test_node]: 📊 TELEMETRY SUMMARY
+[INFO] [1770595659.185905909] [pose_test_node]: ===========================================================================
+[INFO] [1770595659.186461523] [pose_test_node]: XL430 (IDs 1-2): Avg Load: 7.3%
+[INFO] [1770595659.186994063] [pose_test_node]: XL330 (IDs 3-6): Total Current: 3mA, Avg: 1mA (0.0W @ 12V)
+[INFO] [1770595659.187587825] [pose_test_node]: Max Temperature: 35.0°C
+[INFO] [1770595659.188085791] [pose_test_node]: Voltage: 5.60V - 12.10V (avg 7.80V)
+[INFO] [1770595659.188648127] [pose_test_node]: ===========================================================================
 ```
 
 ## Servo Range of motion test example
