@@ -111,9 +111,10 @@ Before diving into the algorithm, it's helpful to establish terminology mapping 
 
 **3. Import and attach the servo motor**
    - So when we import the servo for this part (ros2 link) it shows up as below. Notice it is placed at the coordinate center, which in this case, is not where we want it to be.
-   - 
-    <p align="center">
-  <img src="../images/illustration_imported_servo.jpg" alt="initial import of servo" width="600"> 
+
+
+  <p align="center">
+  <img src="../images/illustration_imported_servo.jpg" alt="initial import of servo" width="800"> 
 </p>
 
 
