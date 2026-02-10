@@ -8,6 +8,8 @@ The particular example illustrated is defined by [this pose sequence](../src/wri
   <img src="../images/story_board_for_example_pose_test.jpg" alt="story board for example pose test" width="900">
 </p>
 
+and the electrical wiring of the physical robot (including current sensors) is detailed [here](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#electrical-notes).
+
 <p align="center">
   <img src="../images/current_v_pose.001.jpeg" alt="current sensor data" width="900">
 </p>
