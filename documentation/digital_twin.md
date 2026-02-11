@@ -1,6 +1,6 @@
-# Creating a High-Fidelity Digital Twin for Robot Arms
+# Creating a High-Fidelity Digital Twin for Robot Arms with ROS2
 
-> A guide to building accurate visual and kinematic representations of robot arms in URDF using actual 3D-printed mesh files
+Notes on building accurate visual and kinematic representations of a ROS2-based robot arms in URDF using actual 3D-printed mesh files
 
 ## 📋 Table of Contents
 
@@ -21,20 +21,26 @@
 
 Most URDF definitions use simplified geometric primitives (boxes, cylinders, spheres) to represent robot links. While functional for motion planning and basic visualization, these simple representations create an unintuitive experience in RViz2—the simulated robot bears little visual resemblance to the physical hardware. 
 
-For example, a basic translation of the Koch v1.1 follower arm's links and joints into URDF produces a digital representation that is only abstractly related to the actual robot. This disconnect makes it difficult to:
-
-- ✅ Visually verify robot configurations and trajectories
-- ✅ Debug mechanical interference issues
-- ✅ Communicate designs to stakeholders
-- ✅ Develop intuition about robot behavior
-
-**These notes document the process of creating a high-fidelity digital twin** that looks and moves like the physical robot, using the actual 3D-printed STL meshes in the URDF definition.
+For example, a basic translation of the Koch v1.1 follower arm's links and joints into URDF produces a digital representation that is only abstractly related to the actual robot. 
 For example, although our robot arm looks as shown on the left, most developers work with a digital representation that is looks vastly different as seen on the right below:
+
 <p align="center">
   <img src="../images/real_robot.jpg" alt="Real Robot Arm" width="400">
   <img src="../images/poor_digital_twin.jpg" alt="The  poor digital twin" width="400">
-</p>
-and our goal is to create something that represents reality more faithfully.
+</p> 
+
+This disconnect makes it difficult to:
+
+- Visually verify robot configurations and trajectories
+- Debug mechanical interference issues
+- Communicate designs to others, and
+- Develop intuition about robot behavior
+
+At first glance it would seem easy to just use the CAD files used to 3D print the robot in the URDF to build a digital twin in ROS2. It turned out not to be.
+**These notes document our learnings and outline a process of creating a high-fidelity ROS2-based digital twin** that looks and moves like the physical robot, using  those 3D-printed STL meshes in the URDF definition.
+
+Essentially our goal is to create something that represents reality more faithfully as shown below.
+
 <p align="center">
   <img src="../images/digital_twin.jpg" alt="The digital twin" width="400">
 </p>
@@ -49,7 +55,7 @@ A high-fidelity digital twin, as defined in these notes, focuses on accurate **v
 - ❌ Compliance and flexibility in links
 - ❌ Backlash and mechanical tolerances
 
-These additional physical properties should be incorporated in future iterations for more comprehensive simulation fidelity.
+These additional physical properties should be incorporated in future iterations for more comprehensive simulation fidelity. We currently don't cover this, but other sections in this repository are meant to gather that data (example see [Power Monitoring of Robotic arm](./documentation/power_monitoring.md) )
 
 ---
 
@@ -57,7 +63,8 @@ These additional physical properties should be incorporated in future iterations
 
 ### Why can't we just reference STL files directly in the URDF?
 
-While URDF supports mesh files in the `<visual>` and `<collision>` elements, simply pointing to STL files is insufficient. The challenge lies in **coordinate frame alignment**.
+That is, why isn't this just a trivial task of including those STL files into the URDF? 
+While URDF supports mesh files in the `<visual>` and `<collision>` elements, simply pointing to STL files turns out to be insufficient. The challenge lies in **coordinate frame alignment**.
 
 Each link in a URDF has an implicit reference frame. For correct kinematic behavior:
 
