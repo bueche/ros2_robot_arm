@@ -55,7 +55,7 @@ A high-fidelity digital twin, as defined in these notes, focuses on accurate **v
 - ❌ Compliance and flexibility in links
 - ❌ Backlash and mechanical tolerances
 
-These additional physical properties should be incorporated in future iterations for more comprehensive simulation fidelity. We currently don't cover this, but other sections in this repository are meant to gather that data (example see [Power Monitoring of Robotic arm](./documentation/power_monitoring.md) )
+These additional physical properties should be incorporated in future iterations for more comprehensive simulation fidelity. We currently don't cover this, but other sections in this repository are meant to gather that data (example see [Power Monitoring of Robotic arm](./power_monitoring.md) )
 
 ---
 
