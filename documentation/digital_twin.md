@@ -11,6 +11,7 @@
   - [Where can I get the STL files?](#where-can-i-get-the-stl-files-for-this-exercise)
   - [What is the alignment algorithm?](#what-is-the-high-level-algorithm-for-aligning-parts-in-cad)
   - [How do I export from FreeCAD?](#how-do-i-export-link-and-joint-definitions-from-freecad)
+  - [How do I test with the Display only robot?](#how-do-I-test-with-the-display-only-robot)
 - [Best Practices](#recommendations-and-best-practices)
 - [Summary](#summary)
 
@@ -215,6 +216,9 @@ Example output:
 ```
 
 ---
+
+### How do I test with the Display only robot? 
+It is possible to run only an rviz display only flavor of the robot. see [here](./documentation/display_launch.md) for more details. This is a useful step to test the validity of the data extraction from Freecad to the URDF.
 
 ## Recommendations and Best Practices
 
