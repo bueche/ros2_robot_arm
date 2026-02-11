@@ -22,3 +22,8 @@ This setup includes:
 - [power_logger.py](../src/writing_robot_control/writing_robot_control/power_logger.py): A ros2 client which pulls the power data (from the power_monitoring_node) and the pose data (from pose_test) and writes this to a CSV file for further analysis. Each timestamp is 100ms from the last by default.
 
  
+## Observations and Investigations To Come
+
+- **The Jump in current from pose 5 to pose 6**: Pose 5 represents a movement to the "place high" position and Pose 6 just involves the opening of the pen-link (or thumb) while in that high position. This raises the total current draw on the 5v servos significantly and unexpectedly (see graph and story board above). This might imply opportunities for movement optimization.
+- **The difference in servo reported current vs. external sensor reported current**: That is, if we sum the Dynamixel reported "Present Input current" with the input current measured by the sensors the difference is in total ~50 mA (total for all four XL330 servo's combined). This is pretty consistent for the moving robot, but the difference is even higher for the "at rest" robot (~65 mA). This could be due to calibration on the wrt to the sensors, but they match closely and are far closer to a multi-meter reading (see diagram above).
+
