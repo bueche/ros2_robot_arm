@@ -1,0 +1,25 @@
+# Use an ARM64-compatible Ubuntu base image
+FROM ubuntu:24.04
+
+# Set noninteractive mode to avoid prompts during install
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Add ROS 2 package sources
+RUN apt-get update && apt-get install -y curl gnupg2 lsb-release
+RUN apt install -y software-properties-common
+RUN add-apt-repository universe
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /etc/apt/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list
+
+
+
+# Install ROS 2 Jazzy (desktop-full version)
+RUN apt-get update && apt-get install -y ros-jazzy-desktop ros-dev-tools
+
+# Source ROS setup in every shell session
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /etc/bash.bashrc
+
+# Set the default shell
+CMD ["/bin/bash"]
+
