@@ -1,0 +1,56 @@
+
+
+ros2 launch writing_robot_description simulation.launch.py
+
+ros2 run writing_robot_control draw_square_sim
+
+# Restart the visualizer
+ros2 run writing_robot_description drawing_visualizer
+
+
+
+
+ros2 launch writing_robot_description simulation.launch.py \
+  surface_angle:=1.57 surface_rotation_axis:=y
+
+ros2 launch writing_robot_description simulation.launch.py \
+  surface_angle:=1.57 surface_rotation_axis:=x
+
+ros2 launch writing_robot_description simulation.launch.py \
+  surface_angle:=1.57 surface_rotation_axis:=z
+
+ros2 launch writing_robot_description simulation.launch.py \
+  surface_angle:=0.0 surface_rotation_axis:=y
+
+
+# Spawn joint state broadcaster first
+ros2 run controller_manager spawner joint_state_broadcaster
+
+# Then spawn trajectory controller
+ros2 run controller_manager spawner joint_trajectory_controller
+
+
+ros2 launch writing_robot_description koch_sim_fixed.launch.py
+
+
+ros2 launch writing_robot_description koch_v11_real_robot.launch.py
+
+
+ros2 topic pub --once /koch_v11_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "{
+  joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, pen_holder],
+  points: [
+    {positions: [2.53, 1.04, -1.46, -1.57, -0.02, 2.22], time_from_start: {sec: 6}}
+  ]
+}"
+
+ros2 topic echo /joint_states
+
+
+ ros2 run writing_robot_control pose_test --ros-args -p program:=default -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf
+
+ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/delivery_poses.yaml -p validate:=true -p telemetry:=true \
+-p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf -p power_monitoring:=true -p delay:=1.0
+
+ros2 run writing_robot_control power_monitor_node
+
+ ros2 run writing_robot_control power_logger
