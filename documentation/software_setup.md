@@ -56,7 +56,7 @@ In the example below the user id that cloned this environment has a UID and GID 
 ```
 $ cd ~/robot_ws/src
 $ # create base ros 
-$ sudo docker build -platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t ros-humble-arm64 --load  --no-cache -f docker/Dockerfile.ros-humble-arm64 .
+$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t ros-humble-arm64 --load  --no-cache -f docker/Dockerfile.ros-humble-arm64 .
 $ # create image upon base
 $ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t robot-humble-arm64 --load  --no-cache -f docker/Dockerfile.humble.arm64  .
 ```
