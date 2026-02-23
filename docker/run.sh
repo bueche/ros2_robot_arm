@@ -10,8 +10,8 @@ function show_help() {
   \t-c --container_name\t Name of the container (default locomotive_container).
   \t--use_nvidia\t\t Use NVIDIA runtime.
   Examples:
-  \trun_locomotive.sh
-  \trun_locomotive.sh --image_name custom_image_name --container_name custom_container_name\n"
+  \trun.sh
+  \trun.sh --image_name custom_image_name --container_name custom_container_name\n"
 }
 
 # Parse arguments
@@ -26,22 +26,35 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# Set default values if not provided
-IMAGE_NAME=${IMAGE_NAME:-locomotive_air_cleaner_capstone-arm64}
-CONTAINER_NAME=${CONTAINER_NAME:-locomotive_container}
+HOST_UID=$(id -u)
+HOST_GID=$(id -g)
 
-USER=ubuntu
-SSH_PATH=/home/$USER/.ssh
-WORKSPACE_SRC_CONTAINER=/home/$USER/ws/src
-WORKSPACE_ROOT_CONTAINER=/home/$USER/ws
-SSH_AUTH_SOCK_USER=$SSH_AUTH_SOCK
+# Set default values if not provided
+IMAGE_NAME=${IMAGE_NAME:-robot-humble-arm64}
+CONTAINER_NAME=${CONTAINER_NAME:-robot_container}
+
+CONTAINER_USER=ubuntu
+HOST_USER=$USER
+
+SSH_PATH=/home/$HOST_USER/.ssh
+if [ -z "$SSH_AUTH_SOCK" ]; then
+    echo "Warning: SSH_AUTH_SOCK not set, starting ssh-agent..."
+    eval $(ssh-agent -s)
+    ssh-add $SSH_PATH/id_ed25519  # or whatever your key is named
+fi
+
+WORKSPACE_HOST=/home/$HOST_USER/robot_ws
+WORKSPACE_SRC_CONTAINER=/home/$CONTAINER_USER/robot_ws/src
+WORKSPACE_ROOT_CONTAINER=/home/$CONTAINER_USER/robot_ws
+SSH_AUTH_SOCK_CONTAINER_USER=$SSH_AUTH_SOCK
+
 
 # Ensure cache folders exist
-mkdir -p .build
-mkdir -p .install
+mkdir -p $WORKSPACE_HOST/.build
+mkdir -p $WORKSPACE_HOST/.install
 
 # Check if container name is already in use
-if sudo docker container ls -a | grep "${CONTAINER_NAME}$" -c &> /dev/null; then
+if docker container ls -a | grep "${CONTAINER_NAME}$" -c &> /dev/null; then
    echo -e "Error: Docker container named $CONTAINER_NAME is already running.\n"
    echo -e "Try removing it with: \n\tdocker rm $CONTAINER_NAME"
    echo -e "Or use a different container name."
@@ -50,17 +63,17 @@ fi
 
 # Start the container
 xhost +
-sudo docker run --privileged --net=host -it $NVIDIA_FLAGS \
+docker run --privileged --net=host -it $NVIDIA_FLAGS \
        -e DISPLAY=$DISPLAY \
-       -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK_USER \
-       -v $(dirname $SSH_AUTH_SOCK_USER):$(dirname $SSH_AUTH_SOCK_USER) \
+       -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK_CONTAINER_USER \
+       -v $(dirname $SSH_AUTH_SOCK_CONTAINER_USER):$(dirname $SSH_AUTH_SOCK_CONTAINER_USER) \
+       -v $SSH_PATH:/home/$CONTAINER_USER/.ssh:ro \
        -v /tmp/.X11-unix:/tmp/.X11-unix \
-       -v $(pwd):$WORKSPACE_SRC_CONTAINER \
-       -v $(pwd)/.build:$WORKSPACE_ROOT_CONTAINER/build:rw \
-       -v $(pwd)/.install:$WORKSPACE_ROOT_CONTAINER/install:rw \
-       -v $SSH_PATH:$SSH_PATH \
+       -v $WORKSPACE_HOST:$WORKSPACE_ROOT_CONTAINER:rw \
+       -v $WORKSPACE_HOST/.build:$WORKSPACE_ROOT_CONTAINER/build:rw \
+       -v $WORKSPACE_HOST/.install:$WORKSPACE_ROOT_CONTAINER/install:rw \
        -v /dev:/dev \
-       -u 1000:1000 \
+       -u $HOST_UID:$HOST_GID \
        --name $CONTAINER_NAME $IMAGE_NAME
 xhost -
 
@@ -70,7 +83,7 @@ function onexit() {
     read -p "Do you want to overwrite the image '$IMAGE_NAME' with current changes? [y/n]: " answer
     if [[ "${answer:0:1}" =~ y|Y ]]; then
       echo "Overwriting Docker image..."
-      sudo docker commit $CONTAINER_NAME $IMAGE_NAME
+      docker commit $CONTAINER_NAME $IMAGE_NAME
       break
     elif [[ "${answer:0:1}" =~ n|N ]]; then
       break

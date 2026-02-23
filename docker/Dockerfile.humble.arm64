@@ -11,7 +11,7 @@
 #
 # To build an image with this (for arm64):
 #
-# docker build --platform linux/arm64 -t locomotive_air_cleaner_capstone-arm64 --load  --no-cache -f docker/Dockerfile
+# docker build --platform linux/arm64 -t robot-humble-arm64 --load  --no-cache -f docker/Dockerfile.humble.arm64
 #
 ARG ARCH
 FROM osrf/ros:humble-desktop-full AS amd64
@@ -37,8 +37,13 @@ SHELL ["/bin/bash", "-c"]
 
 # Copy requirement files and install dependencies
 COPY docker/requirements.humble.txt requirements.txt
-RUN sudo add-apt-repository universe
-RUN apt-get update && apt-get install --no-install-recommends -y $(cat requirements.txt)
+RUN sudo add-apt-repository universe && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc \
+    | gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu jammy main" \
+    > /etc/apt/sources.list.d/ros2.list && \
+    apt-get update && apt-get install --no-install-recommends -y $(cat requirements.txt)
+
 RUN rm requirements.txt
 
 RUN if ! id "$USERNAME" >/dev/null 2>&1; then \
@@ -86,7 +91,8 @@ RUN echo "source /opt/ros/humble/setup.bash" >> /home/$USER/.bashrc
 
 # Add OSRF key and repository (Ubuntu 24.04 method)
 RUN sudo mkdir -p /etc/apt/keyrings && \
-    curl -fsSL http://packages.osrfoundation.org/gazebo.key | sudo tee /etc/apt/keyrings/osrf-gpg.key > /dev/null
+    curl -fsSL http://packages.osrfoundation.org/gazebo.key \
+    | gpg --dearmor | sudo tee /etc/apt/keyrings/osrf-gpg.key > /dev/null
 
 RUN echo "deb [signed-by=/etc/apt/keyrings/osrf-gpg.key] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
 
@@ -149,7 +155,7 @@ RUN cd /tmp && \
     rm -f vscode.deb
 
 # Update system and initialize rosdep only if it hasn't been initialized
-RUN sudo apt update && sudo apt upgrade -y && \
+RUN sudo apt update && \
     if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then \
         sudo rosdep init; \
     else \
@@ -166,43 +172,17 @@ RUN mkdir -p /home/${USERNAME}/.vscode/extensions && \
 COPY docker/vscode_extensions.sh /usr/local/bin/vscode_extensions.sh
 # RUN chmod +x /usr/local/bin/vscode_extensions.sh
 
-RUN cd ${ROS_WS} && \
-    rm -rf build install log && \
-    sudo apt-get update && \
-    . /opt/ros/${ROS_DISTRO}/setup.bash && \
-    rosdep install --from-paths src --ignore-src -r -y --rosdistro ${ROS_DISTRO} && \
-    sudo apt-get clean && \
-    sudo rm -rf /var/lib/apt/lists/* && \
-    colcon build --symlink-install
 
 
 # Source ROS workspace automatically when new terminal is opened
 RUN sudo echo ". /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc && \
-#    sudo echo ". ${EXERCISES_WS}/install/setup.bash" >> ~/.bashrc && \
     sudo echo ". ${ROS_WS}/install/setup.bash" >> ~/.bashrc
 
-
-# Source ROS in the main terminal
-# COPY docker/ros_entrypoint.sh /ros_entrypoint.sh
-# Clone custom repository
-
-# Install LiDAR dependencies
-RUN cd ${ROS_WS}/src && \
-    git clone https://github.com/Slamtec/sllidar_ros2.git
-
-RUN cd ${ROS_WS} && \
-    .  /opt/ros/humble/setup.bash && \
-    rosdep update && \
-    rosdep install --from-paths src --ignore-src -r -y && \
-    colcon build --symlink-install
-# Source environment
-RUN echo "source ${ROS_WS}/install/setup.bash" >> /home/${USERNAME}/.bashrc
 
 
 # Set working directory
 WORKDIR ${ROS_WS}
 
-# CMD ["/bin/bash"]
 CMD ["/bin/bash", "-c", "ssh-keygen -A & /usr/sbin/sshd -D & /usr/local/bin/vscode_extensions.sh ; exec bash"]
 # CMD ["/bin/bash", "-c", "exec bash"]
 
