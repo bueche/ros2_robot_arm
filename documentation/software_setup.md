@@ -56,16 +56,16 @@ In the example below the user id that cloned this environment has a UID and GID 
 ```
 $ cd ~/robot_ws/src
 $ # create base ros 
-$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t ros-humble-arm64 --load  --no-cache -f docker/Dockerfile.ros-humble-arm64 .
+$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t ros-jazzy-arm64 --load  --no-cache -f docker/Dockerfile.ros-jazzy-arm64 .
 $ # create image upon base
-$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t robot-humble-arm64 --load  --no-cache -f docker/Dockerfile.humble.arm64  .
+$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t robot-jazzy-arm64 --load  --no-cache -f docker/Dockerfile.jazzy.arm64  .
 ```
 This will run for a while and create the docker image.
 ```
 $ docker image list
 REPOSITORY           TAG       IMAGE ID       CREATED         SIZE
-robot-humble-arm64   latest    7ad21e00ddc5   44 hours ago    5.52GB
-ros-humble-arm64     latest    3756d0e83149   9 months ago    3.98GB
+robot-jazzy-arm64   latest    7ad21e00ddc5   44 hours ago    5.52GB
+ros-jazzy-arm64     latest    3756d0e83149   9 months ago    3.98GB
 ```
 2. Start the container
 ```
@@ -86,8 +86,8 @@ $ bash  additional_env_setup.sh
 
 ### Dynamixel software changes
    - This ros2-based software requires some small enhancements to improve telemetry for the dynamixel servos. This involved modifying the [dynamixel_hardware_interface](https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface) and [dynamixel_interface](https://github.com/ROBOTIS-GIT/dynamixel_interfaces) packages of Robotis. The changes are small. See the following PRs for more details.
-      - [dynamixel_interface PR-9](https://github.com/ROBOTIS-GIT/dynamixel_interfaces/pull/9)
-      - [dynamixel_hardware_interface PR-106](https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface/pull/106)
+      - [dynamixel_interface PR-10](https://github.com/ROBOTIS-GIT/dynamixel_interfaces/pull/10)
+      - [dynamixel_hardware_interface PR-107](https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface/pull/107)
     
 These PRs are applied automatically to the Dynamixel software downloads done by the ` additional_env_setup.sh` noted above.
 
