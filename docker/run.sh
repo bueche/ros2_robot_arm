@@ -4,10 +4,10 @@ set +e
 
 # Usage information
 function show_help() {
-  echo -e "\nUsage: run_locomotive.sh [OPTIONS]\n
+  echo -e "\nUsage: run.sh [OPTIONS]\n
   Options:
-  \t-i --image_name\t\t Name of the image to be run (default locomotive_air_cleaner_capstone-arm64).
-  \t-c --container_name\t Name of the container (default locomotive_container).
+  \t-i --image_name\t\t Name of the image to be run (default robot-humble-arm64).
+  \t-c --container_name\t Name of the container (default robot_container).
   \t-w --workspace\t\t Host workspace directory name (default: robot_ws). 
   \t--use_nvidia\t\t Use NVIDIA runtime.
   Examples:
