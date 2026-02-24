@@ -1,0 +1,191 @@
+#
+# Dockerfile for robot development environment - ROS 2 Jazzy
+#
+# Preconditions:
+# 1. Ubuntu 24.04 installed on host (raspberry pi or nvidia orin nano)
+# 2. docker installed on host
+# 3. git installed.
+# 4. (optional) vnc installed and running
+# 5. openssh-server running
+# 6. If running on arm64 then ros-jazzy-arm64 image has been created and locally stored,
+#    OR use osrf/ros:jazzy-desktop-full directly (will pull from Docker Hub).
+#
+# To build an image with this (for arm64):
+#
+# docker build --platform linux/arm64 -t robot-jazzy-arm64 --load --no-cache -f docker/Dockerfile.jazzy.arm64 .
+#
+# To build with custom UID/GID (recommended if host user is not uid 1000):
+#
+# docker build --platform linux/arm64 --build-arg UID=$(id -u) --build-arg GID=$(id -g) \
+#              -t robot-jazzy-arm64 --load --no-cache -f docker/Dockerfile.jazzy.arm64 .
+#
+
+ARG ARCH
+FROM osrf/ros:jazzy-desktop-full AS amd64
+# Comment out the line below when building on amd64
+FROM ros-jazzy-arm64 AS arm64
+
+# Arguments for user setup - defaults to 1000, override with --build-arg if needed
+ARG USERNAME=ubuntu
+ARG USER=$USERNAME
+ARG UID=1000
+ARG GID=1000
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_WS=/home/${USERNAME}/robot_ws
+ENV TERM=linux
+ENV ROS_DISTRO=jazzy
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+# Make default shell in Dockerfile bash instead of sh
+SHELL ["/bin/bash", "-c"]
+
+
+# Copy requirement files and install dependencies
+# Refresh ROS GPG key and apt source before installing to avoid stale key errors
+COPY docker/requirements.jazzy.txt requirements.txt
+RUN sudo add-apt-repository universe && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc \
+    | gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" \
+    > /etc/apt/sources.list.d/ros2.list && \
+    apt-get update && apt-get install --no-install-recommends -y $(cat requirements.txt)
+
+RUN rm requirements.txt
+
+RUN if ! id "$USERNAME" >/dev/null 2>&1; then \
+        useradd -m -s /bin/bash -u $UID -U $USERNAME; \
+    else \
+        usermod --uid $UID --gid $GID $USERNAME; \
+    fi && \
+    echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME && \
+    chmod 0440 /etc/sudoers.d/$USERNAME
+
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+        curl -SsL https://github.com/boxboat/fixuid/releases/download/v0.6.0/fixuid-0.6.0-linux-arm64.tar.gz | tar -C /usr/local/bin -xzf -; \
+    elif [ "$ARCH" = "amd64" ]; then \
+        curl -SsL https://github.com/boxboat/fixuid/releases/download/v0.6.0/fixuid-0.6.0-linux-amd64.tar.gz | tar -C /usr/local/bin -xzf -; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    chown root:root /usr/local/bin/fixuid && \
+    chmod 4755 /usr/local/bin/fixuid && \
+    mkdir -p /etc/fixuid && \
+    printf "user: $USER\ngroup: $USER\n" > /etc/fixuid/config.yml
+
+
+# Adds USER to dialout, plugdev, and video groups.
+# dialout/plugdev needed for serial port access (Dynamixel servos).
+# video needed for GPU device access on Jetson.
+RUN sudo usermod -a -G dialout $USER
+RUN sudo usermod -a -G plugdev $USER
+RUN sudo usermod -a -G video $USER
+
+RUN echo "export QT_X11_NO_MITSHM=1" >> /home/$USER/.bashrc
+
+USER $USER
+
+# Switch to user
+USER ${USERNAME}
+
+# Adds to bashrc the ROS Jazzy overlay sourcing
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/$USER/.bashrc
+
+# Add OSRF key and repository (Noble/24.04 method)
+RUN sudo mkdir -p /etc/apt/keyrings && \
+    curl -fsSL http://packages.osrfoundation.org/gazebo.key \
+    | gpg --dearmor | sudo tee /etc/apt/keyrings/osrf-gpg.key > /dev/null
+
+RUN echo "deb [signed-by=/etc/apt/keyrings/osrf-gpg.key] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+
+# Install Gazebo Harmonic (replaces Ignition Fortress from Humble)
+# Harmonic is the recommended Gazebo version for ROS 2 Jazzy
+RUN sudo apt update && sudo apt install -y \
+    gz-harmonic && \
+    sudo apt clean && \
+    sudo rm -rf /var/lib/apt/lists/*
+
+
+# Install ROS 2 Jazzy specific dependencies
+RUN sudo apt-get update && \
+    sudo apt-get install -y --no-install-recommends \
+    ros-jazzy-navigation2 \
+    ros-jazzy-tf-transformations \
+    ros-jazzy-ros2-control \
+    ros-jazzy-ros2-controllers \
+    ros-jazzy-controller-manager \
+    && sudo apt-get clean && \
+    sudo rm -rf /var/lib/apt/lists/*
+
+
+# Install SSH server without using systemctl
+RUN sudo apt update && sudo apt install -y openssh-server && \
+    sudo mkdir -p /var/run/sshd && \
+    test -f /etc/ssh/ssh_host_rsa_key || sudo ssh-keygen -A && \
+    sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# Ensure .ssh directory exists with correct ownership for mount point
+RUN mkdir -p /home/${USERNAME}/.ssh && \
+    chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.ssh
+
+# Expose SSH port
+EXPOSE 22
+
+# Install Arduino IDE (supports ARM64 and AMD64)
+RUN cd /tmp && \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+        wget https://downloads.arduino.cc/arduino-1.8.19-linuxaarch64.tar.xz -O arduino.tar.xz; \
+    elif [ "$ARCH" = "amd64" ]; then \
+        wget https://downloads.arduino.cc/arduino-1.8.19-linux64.tar.xz -O arduino.tar.xz; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    tar -xf arduino.tar.xz && \
+    sudo mv arduino-1.8.19 /opt/ && \
+    cd /opt/arduino-1.8.19 && \
+    sudo ./install.sh && \
+    rm -rf /tmp/arduino.tar.xz
+
+# Install Visual Studio Code
+RUN cd /tmp && \
+    sudo apt update && sudo apt install -y wget xdg-utils && \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        wget -O vscode.deb "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64"; \
+    elif [ "$ARCH" = "arm64" ]; then \
+        wget -O vscode.deb "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-arm64"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    sudo dpkg -i vscode.deb && \
+    rm -f vscode.deb
+
+# Initialize rosdep only if it hasn't been initialized
+RUN sudo apt update && \
+    if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then \
+        sudo rosdep init; \
+    else \
+        echo "rosdep already initialized, skipping..."; \
+    fi && \
+    rosdep update
+
+# Ensure VS Code works by setting up a user directory
+RUN mkdir -p /home/${USERNAME}/.vscode/extensions && \
+    sudo chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.vscode
+
+# Add script to install VS Code extensions at runtime
+COPY docker/vscode_extensions.sh /usr/local/bin/vscode_extensions.sh
+
+# Source ROS workspace automatically when new terminal is opened
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USERNAME}/.bashrc && \
+    echo "source ${ROS_WS}/install/setup.bash 2>/dev/null || true" >> /home/${USERNAME}/.bashrc
+
+# Set working directory
+WORKDIR ${ROS_WS}
+
+CMD ["/bin/bash", "-c", "ssh-keygen -A & /usr/sbin/sshd -D & /usr/local/bin/vscode_extensions.sh ; exec bash"]
+# CMD ["/bin/bash", "-c", "exec bash"]
