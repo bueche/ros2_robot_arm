@@ -79,8 +79,8 @@ clone_or_update https://github.com/ROBOTIS-GIT/dynamixel_interfaces.git $ROS_DIS
 # ============================================================
 # Apply PRs
 # ============================================================
-apply_pr dynamixel_hardware_interface 106 https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface
-apply_pr dynamixel_interfaces 9 https://github.com/ROBOTIS-GIT/dynamixel_interfaces
+apply_pr dynamixel_hardware_interface 107 https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface
+apply_pr dynamixel_interfaces 10 https://github.com/ROBOTIS-GIT/dynamixel_interfaces
 
 echo ">>> Installing dependencies via rosdep..."
 cd ~/${WORKSPACE}
