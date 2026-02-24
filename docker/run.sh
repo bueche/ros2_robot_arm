@@ -6,7 +6,7 @@ set +e
 function show_help() {
   echo -e "\nUsage: run.sh [OPTIONS]\n
   Options:
-  \t-i --image_name\t\t Name of the image to be run (default robot-humble-arm64).
+  \t-i --image_name\t\t Name of the image to be run (default robot-jazzy-arm64).
   \t-c --container_name\t Name of the container (default robot_container).
   \t-w --workspace\t\t Host workspace directory name (default: robot_ws). 
   \t--use_nvidia\t\t Use NVIDIA runtime.
@@ -40,7 +40,7 @@ HOST_UID=$(id -u)
 HOST_GID=$(id -g)
 
 # Set default values if not provided
-IMAGE_NAME=${IMAGE_NAME:-robot-humble-arm64}
+IMAGE_NAME=${IMAGE_NAME:-robot-jazzy-arm64}
 CONTAINER_NAME=${CONTAINER_NAME:-robot_container}
 
 CONTAINER_USER=ubuntu
