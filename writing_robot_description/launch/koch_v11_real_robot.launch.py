@@ -1,31 +1,28 @@
 #!/usr/bin/env python3
 """
 Launch file for koch_v11 robot with REAL Dynamixel hardware
-Runs on RPi5 - RViz should be launched separately on Nvidia Nano
-Follows the working pattern from koch_v11_simulation.launch.py
+Workaround: Set controller types directly in controller_manager parameters
 """
 
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import RegisterEventHandler
-from launch.event_handlers import OnProcessExit
+from launch.actions import TimerAction
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     
-    # Get paths (SAME PATTERN as simulation)
+    # Get paths
     pkg_path = get_package_share_directory('writing_robot_description')
     urdf_file = os.path.join(pkg_path, 'urdf', 'koch_v11_arm_real.urdf')
-    rviz_config_file = os.path.join(pkg_path, 'rviz', 'koch_v11_rviz_config.rviz')
     controllers_file = os.path.join(pkg_path, 'config', 'koch_v11_controllers_real.yaml')
     
-    # Read URDF (EXACT pattern from working simulation)
+    # Read URDF
     with open(urdf_file, 'r') as file:
         robot_description = file.read()
     
-    # Robot State Publisher (SAME PATTERN as simulation)
+    # Robot State Publisher
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -36,38 +33,56 @@ def generate_launch_description():
         }]
     )
     
-    # Controller Manager (SAME PATTERN as simulation)
+    # Controller Manager - explicitly set controller types
     controller_manager = Node(
         package='controller_manager',
         executable='ros2_control_node',
         parameters=[
-            {'robot_description': robot_description},
-            controllers_file
+            {
+                'robot_description': robot_description,
+                'update_rate': 100,
+                # Explicitly define controller types here
+                'joint_state_broadcaster': {
+                    'type': 'joint_state_broadcaster/JointStateBroadcaster',
+                },
+                'koch_v11_controller': {
+                    'type': 'joint_trajectory_controller/JointTrajectoryController',
+                },
+            },
         ],
         output='screen',
     )
     
-    # Joint State Broadcaster Spawner
-    joint_state_broadcaster_spawner = Node(
-        package='controller_manager',
-        executable='spawner',
-        arguments=['joint_state_broadcaster'],
-        output='screen',
+    # Joint State Broadcaster Spawner - with params file for controller-specific config
+    joint_state_broadcaster_spawner = TimerAction(
+        period=2.0,
+        actions=[
+            Node(
+                package='controller_manager',
+                executable='spawner',
+                arguments=[
+                    'joint_state_broadcaster',
+                    '-p', controllers_file,
+                ],
+                output='screen',
+            )
+        ]
     )
     
-    # Koch v11 Controller Spawner (delayed - waits for joint_state_broadcaster spawner to exit)
-    koch_v11_controller_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=joint_state_broadcaster_spawner,
-            on_exit=[
-                Node(
-                    package='controller_manager',
-                    executable='spawner',
-                    arguments=['koch_v11_controller'],
-                    output='screen',
-                )
-            ],
-        )
+    # Koch Controller Spawner
+    koch_v11_controller_spawner = TimerAction(
+        period=4.0,
+        actions=[
+            Node(
+                package='controller_manager',
+                executable='spawner',
+                arguments=[
+                    'koch_v11_controller',
+                    '-p', controllers_file,
+                ],
+                output='screen',
+            )
+        ]
     )
     
     return LaunchDescription([
