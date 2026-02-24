@@ -86,8 +86,8 @@ $ bash  additional_env_setup.sh
 
 ### Dynamixel software changes
    - This ros2-based software requires some small enhancements to improve telemetry for the dynamixel servos. This involved modifying the [dynamixel_hardware_interface](https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface) and [dynamixel_interface](https://github.com/ROBOTIS-GIT/dynamixel_interfaces) packages of Robotis. The changes are small. See the following PRs for more details.
-      - [dynamixel_interface PR-9](https://github.com/ROBOTIS-GIT/dynamixel_interfaces/pull/9)
-      - [dynamixel_hardware_interface PR-106](https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface/pull/106)
+      - [dynamixel_interface PR-10](https://github.com/ROBOTIS-GIT/dynamixel_interfaces/pull/10)
+      - [dynamixel_hardware_interface PR-107](https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface/pull/107)
     
 These PRs are applied automatically to the Dynamixel software downloads done by the ` additional_env_setup.sh` noted above.
 
