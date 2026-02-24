@@ -55,8 +55,10 @@ RUN sudo add-apt-repository universe && \
 RUN rm requirements.txt
 
 RUN if ! id "$USERNAME" >/dev/null 2>&1; then \
-        useradd -m -s /bin/bash -u $UID -U $USERNAME; \
+        groupadd -g $GID $USERNAME && \
+        useradd -m -s /bin/bash -u $UID -g $GID $USERNAME; \
     else \
+        groupadd -g $GID $USERNAME 2>/dev/null || groupmod -g $GID $USERNAME; \
         usermod --uid $UID --gid $GID $USERNAME; \
     fi && \
     echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME && \

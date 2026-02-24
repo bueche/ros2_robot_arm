@@ -8,6 +8,7 @@ function show_help() {
   Options:
   \t-i --image_name\t\t Name of the image to be run (default locomotive_air_cleaner_capstone-arm64).
   \t-c --container_name\t Name of the container (default locomotive_container).
+  \t-w --workspace\t\t Host workspace directory name (default: robot_ws). 
   \t--use_nvidia\t\t Use NVIDIA runtime.
   Examples:
   \trun.sh
@@ -19,6 +20,7 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         -i|--image_name) IMAGE_NAME="${2}"; shift ;;
         -c|--container_name) CONTAINER_NAME="${2}"; shift ;;
+        -w|--workspace) WORKSPACE_HOST_DIR="${2}"; shift ;;
         -h|--help) show_help ; exit 1 ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
@@ -51,7 +53,8 @@ if [ -z "$SSH_AUTH_SOCK" ]; then
     ssh-add $SSH_PATH/id_ed25519  # or whatever your key is named
 fi
 
-WORKSPACE_HOST=/home/$HOST_USER/robot_ws
+WORKSPACE_HOST_DIR=${WORKSPACE_HOST_DIR:-robot_ws}
+WORKSPACE_HOST=/home/$HOST_USER/$WORKSPACE_HOST_DIR
 WORKSPACE_SRC_CONTAINER=/home/$CONTAINER_USER/robot_ws/src
 WORKSPACE_ROOT_CONTAINER=/home/$CONTAINER_USER/robot_ws
 SSH_AUTH_SOCK_CONTAINER_USER=$SSH_AUTH_SOCK
