@@ -20,11 +20,19 @@ while [[ "$#" -gt 0 ]]; do
         -i|--image_name) IMAGE_NAME="${2}"; shift ;;
         -c|--container_name) CONTAINER_NAME="${2}"; shift ;;
         -h|--help) show_help ; exit 1 ;;
-        --use_nvidia) NVIDIA_FLAGS="--gpus=all -e NVIDIA_DRIVER_CAPABILITIES=all" ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
+
+# auto detect nvidia
+if [ -f /etc/nv_tegra_release ]; then
+    echo "starting container on Nvidia Nano"
+    NVIDIA_FLAGS="--runtime nvidia \
+                  -e NVIDIA_VISIBLE_DEVICES=all \
+                  -e NVIDIA_DRIVER_CAPABILITIES=all \
+                  --group-add video "
+fi
 
 HOST_UID=$(id -u)
 HOST_GID=$(id -g)
