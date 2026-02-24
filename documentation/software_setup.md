@@ -56,16 +56,16 @@ In the example below the user id that cloned this environment has a UID and GID 
 ```
 $ cd ~/robot_ws/src
 $ # create base ros 
-$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t ros-humble-arm64 --load  --no-cache -f docker/Dockerfile.ros-humble-arm64 .
+$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t ros-jazzy-arm64 --load  --no-cache -f docker/Dockerfile.ros-jazzy-arm64 .
 $ # create image upon base
-$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t robot-humble-arm64 --load  --no-cache -f docker/Dockerfile.humble.arm64  .
+$ sudo docker build --platform linux/arm64 --build-arg UID=1002 --build-arg GID=1002 -t robot-jazzy-arm64 --load  --no-cache -f docker/Dockerfile.jazzy.arm64  .
 ```
 This will run for a while and create the docker image.
 ```
 $ docker image list
 REPOSITORY           TAG       IMAGE ID       CREATED         SIZE
-robot-humble-arm64   latest    7ad21e00ddc5   44 hours ago    5.52GB
-ros-humble-arm64     latest    3756d0e83149   9 months ago    3.98GB
+robot-jazzy-arm64   latest    7ad21e00ddc5   44 hours ago    5.52GB
+ros-jazzy-arm64     latest    3756d0e83149   9 months ago    3.98GB
 ```
 2. Start the container
 ```
