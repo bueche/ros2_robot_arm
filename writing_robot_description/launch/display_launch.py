@@ -12,7 +12,7 @@ def generate_launch_description():
     urdf_file = os.path.join(
         get_package_share_directory('writing_robot_description'),
         'urdf',
-        'robot_arm.urdf'
+        'koch_v11_arm_real.urdf'
     )
     
     # Read the URDF file
