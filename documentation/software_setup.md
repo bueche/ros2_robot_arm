@@ -7,6 +7,7 @@ This section describes how to setup the software to run the koch_v11 follower on
 - [Docker setup on host OS](#docker_setup_on_host_os): installing and setting up docker on the host os.
 - [Docker image and container setup](#docker_image_and_container_setup): This section describes how to create the docker images needed for this project and how to startup and finish setting up the containers.
 - [Dynamixel software changes](#dynamixel_software_changes): Outlines the changes made to the Dynamixel software to pull additional telemetry data from the servos on Ros2.
+- [Simple simulation smoke test](#simple_smoke_test): After installing the software you can test a decent percentage of it with the display only test.
 - [TODO list](#todo_list): some notes on changes to come.
 
 ## Underlying hardware and OS variations
@@ -91,8 +92,23 @@ $ bash  additional_env_setup.sh
     
 These PRs are applied automatically to the Dynamixel software downloads done by the ` additional_env_setup.sh` noted above.
 
+## Simple smoke test
+It is possible to test a good percentage of the software setup by successful execution of the launch_display.
+```
+$ cd ~/robot_ws
+$ colcon build --symlink-install
+$ ros2 launch writing_robot_description display_launch.py
+
+```
+This will launch rviz with a display only version of the robot that can be controlled with the joint_state_publisher gui. Again, the hardware does not have to be wired to have this working. 
+This is essentially a simple visual simulation.
+
+<p align="center">
+  <img src="../images/display_only_example.jpg" alt="display onlyd" width="600">
+</p>
+
+
 ## TODO list
-- Get this working on ros2 jazzy
 - get amd64 containers tested on windows.
 - clean up some noise in the scripts 
 
