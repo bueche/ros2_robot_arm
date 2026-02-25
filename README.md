@@ -1,7 +1,6 @@
 # Ros2 Robot Arm Study Using Koch v1.1 Follower
-## ---> under construction 🚧 : Incomplete and Changing <----
-## Summary
-The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/)) and its powered by The Robot Operating System v2 [ROS2](https://github.com/ros2). This effort is meant to learn and explore both the software and hardware used in robotic arm development. 
+
+The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/)) and its powered by The Robot Operating System v2 [ROS2](https://github.com/ros2). This effort is meant to learn and explore both the software and hardware used in robotic arm development. This branch supports Ros2 Jazzy (4.2+).
 
 This includes:
  - Fabrication and/or purchase, modification, and assembly of robotic parts (brackets, Dynamixel servos, and related circuit boards)
