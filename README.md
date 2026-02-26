@@ -17,7 +17,7 @@ This includes:
 
 The documentation for this repository covers the following:
 - [Software Setup](./documentation/software_setup.md): how to create the docker envrionment and any additional setup commands. 
-- [Hardware Setup](./documentation/hardware_setup.md): Although the setup of the koch_v11 physical robot (leader and follower arms) is partially documented ([Arm assembly by Jen Moss](https://www.youtube.com/watch?v=8nQIg9BwwTk)), those instructions lacked details on some of the required electrical setup. In addition, we are using different controller boards (e.g., Dynamixel OpenRB 150).
+- [Hardware Setup](./documentation/hardware_setup.md): Although the setup of the koch_v11 physical robot (leader and follower arms) is partially documented ([Arm assembly by Jess Moss](https://www.youtube.com/watch?v=8nQIg9BwwTk)), those instructions lacked details on some of the required electrical setup. In addition, we are using different controller boards (e.g., Dynamixel OpenRB 150).
 - [Notes on creating the digital twin](./documentation/digital_twin.md): A series of notes that cover the problems and solutions for creating the digital twin.
 - [Launching the Physical Robot and its Digital Twin](./documentation/launching_physical.md) Steps involved in bringing up the physical robot and the digital twin.
 - [Running the pose_test utility](./documentation/pose_test.md): The pose test utility will iterate through a series of predefined poses and take measurements of the physical robot during this time.
