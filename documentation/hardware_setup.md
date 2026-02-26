@@ -2,11 +2,12 @@
 This section describes the hardware setup including a detailed electrical layout.
 
 ## Sections
-- [Hardware Overview](#hardware_overview): Outlines the hardware setup.
-- [Bill of Materials](#bill_of_materials): What was purchased, motivation, and alternatives.
-- [3D printing of robot parts](#3d_print_of_hardware): How to print the pieces.
-- [Electrical Notes](#electrical_setup): Exactly how this robot was wired with additional notes.
-- [Learnings and Next Steps](#learnings_and_next_steps): What did we learning in assemblying this robot and areas of improvement.
+- [Hardware Overview](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#hardware_overview): Outlines the hardware setup.
+- [Bill of Materials](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#bill_of_materials): What was purchased, motivation, and alternatives.
+- [3D printing of robot parts](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#3d_print_of_hardware): How to print the pieces.
+- [Assembly of robot](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#assembly_of_robot): how to assemble the robot.
+- [Electrical Notes](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#electrical_setup): Exactly how this robot was wired with additional notes.
+- [Learnings and Next Steps](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#learnings_and_next_steps): What did we learning in assemblying this robot and areas of improvement.
 
 ## Hardware Overview
 The Kock v1.1 follower arm is a 6-degrees of robotic arm with the links illustrated as illustrated below. It is powered by four Dynamixel [XL330](https://en.robotis.com/shop_en/item.php?it_id=902-0163-000)'s and two Dynamixel [XL430](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/) servos. The controlling hardware is a combination of an [OpenRB 150](https://emanual.robotis.com/docs/en/parts/controller/openrb-150/) and a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/). The two types of servos operate at different voltages so in addition to a [Robotis U2D2](https://en.robotis.com/shop_en/item.php?it_id=902-0145-001) we also are leveraging a Buck converter to step down the 12V to 5v+ for the XL330s. This project also includes sensors to measure the input electrical current. To that end, we are using IN219 current sensors.
@@ -24,6 +25,11 @@ TBD
 ## 3D Print of Hardware
 There are a number of ways to print the various custom pieces of the robot arm. We have both printed pieces via a local 3D print and used the [Craftcloud](https://craftcloud3d.com/) service. The meshes used in this print are located [here](../writing_robot_description/meshes). These are derived as binary representatinos of the ones located in the original [koch v1.1](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL) version.
 
+## Assembly of Robot
+- **Arm Assembly**: The basic assembly of the koch v1.1 robot is outlined in detail in the [Jess Moss Youtube video](https://www.youtube.com/watch?v=8nQIg9BwwTk) (follower assembly starts around 8:22 min into the video). The key divergence from this work is the shoulder link. In this version the XL430 servo is positioned upright (vs. horizontal) and we use a standard Robotis bracket (see BOM) instead of the one defined by Jess.
+- **Anchoring of arm**: TBD
+- **Electronic board enclosure**: TBD
+- **Electrical wiring**: See below
 
 ## Electrical Notes
 
