@@ -91,6 +91,21 @@ $ bash  additional_env_setup.sh
     
 These PRs are applied automatically to the Dynamixel software downloads done by the ` additional_env_setup.sh` noted above.
 
+## Simple smoke test
+It is possible to test a good percentage of the software setup by successful execution of the launch_display.
+```
+$ cd ~/robot_ws
+$ colcon build --symlink-install
+$ ros2 launch writing_robot_description display_launch.py
+
+```
+This will launch rviz with a display only version of the robot that can be controlled with the joint_state_publisher gui. Again, the hardware does not have to be wired to have this working. 
+This is essentially a simple visual simulation.
+
+<p align="center">
+  <img src="../images/display_only_example.jpg" alt="display onlyd" width="600">
+</p>
+
 ## TODO list
 - Get this working on ros2 jazzy
 - get amd64 containers tested on windows.
