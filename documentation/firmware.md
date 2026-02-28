@@ -41,10 +41,10 @@ This restriction can be enforced using the Max Position Limit and Min Position L
 </p>
 
 But was this helpful? In the end, we judge this sort of safeguard as only partially helpful for the following reasons:
-1. *Safe movement depends partially on the position of the other joints/links, so this mechanism is perhaps too primitive and limited*. For example, if the `wrist_flex` joint points up then the `shoulder_lift` can rotate more. This is illustrated below.
+1. *Safe movement depends partially on the position of the other joints/links, so this mechanism is perhaps too primitive and limited*. For example, if the `wrist_flex` joint points up then the `shoulder_lift` can rotate more. This is illustrated below. I'm expecting to get more sophistication from [MoveIt2](https://moveit.picknik.ai/main/index.html) ... stay tuned.
 
 <p align="center">
-  <img src="../images/lower-range-of-motion.jpg" alt="lower possible range of motion for servo 2" width="600">
+  <img src="../images/more_room_for_rotating_joint.jpg" alt="lower possible range of motion for servo 2" width="600">
 </p>
 
 2. *The behavior of the robot when hitting these underlying limits in ros2 was unpredictable.* It was far more deterministric to use the limits defined in the URDF file as shown below. 
@@ -64,7 +64,7 @@ But was this helpful? In the end, we judge this sort of safeguard as only partia
 
 The main difficulty in using these limits were that they had to be manually determined by manually positioning each arm and querying their ROS2 radian-based positions and then working out whether max was the lowest position or the highest position.  
 
-**Note** I believe it is possible that the reader might attach the servos such that this order is reversed.
+**Note** I believe it is possible that the reader might attach the servos such that this order is reversed. This means that using the URDF I've provided might require additional testing to ensure its calibrated to the choices you made.
 
 Finally, note that the Dynamixel Wizard allows the user to query telemetry values like the input current, temperature, voltage, and load, but only for one servo at a time. See the example below.
 
@@ -75,9 +75,45 @@ Finally, note that the Dynamixel Wizard allows the user to query telemetry value
 So part of our motivation for enhancing the pull of these in the ros2 environment was to collect that data under regular use and when multiple servos were in action.
 
 ## ESP32 and Current Sensors
+Now while the openRB 150 communicates via its dynamixel protocol with the servos, when working with the current sensors and the ESP32 a different communication bus and protocol are used ([I2C](https://en.wikipedia.org/wiki/I2C)). The wiring of this is shown in the hardware section of this project. We are using multiple INA219 sensors and two different I2C busses: one for the INA219 sensors and one for the INA226 sensor. 
 
-- I2C addresses and current sensors
+Since there are multiple devices on the same bus, one must ensure that they all have different addresses (similar to the servo id on the dynamixel servos ... they must all have different ids). I found that there were at least two approaches to achieve this when buying set of sensors:
+1. All could have the default address (typically 0x40) and its necessary to solder some pads on the sensor to change the address, or
+2. They might be pre-programed to have different addresses. If so, then its necessary to probe the bus to see which address the sensor responds to.
+   
+The picture below shows where I needed to solder to get one of the INA219 sensors to respond to a different I2C address.
 
 <p align="center">
   <img src="../images/ina219-i2c-address.jpg" alt="i2c addressing on INA219" width="600">
 </p>
+
+This information then needs to be reflected into the ESP32 sketch (either [read_ina219_ina226.ino](https://github.com/bueche/ros2_robot_arm/blob/main/power_monitor/sketch/read_ina219_ina226.ino) or [read_ina219.ino](https://github.com/bueche/ros2_robot_arm/blob/main/power_monitor/sketch/read_ina219.ino)) as noted below. Notice the two I2C buses and the initialization of the sensors and their addresses. 
+
+```
+// ---------- I2C Bus 0 pins (INA219 sensors) ----------
+#define I2C0_SDA 1
+#define I2C0_SCL 2
+
+// ---------- I2C Bus 1 pins (INA226 sensor) ----------
+// ESP32-S3 - INA226 is connected to these pins
+// Exact brand: ESP32-S3 N16R8 (Lonely Binary) found on Amazon
+#define I2C1_SDA 21
+#define I2C1_SCL 47
+
+// Create second I2C bus object
+TwoWire I2C_Bus1 = TwoWire(1);
+
+// ---------- INA219 sensors on Bus 0 ----------
+// 12V rail on address 0x40 (default)
+Adafruit_INA219 ina219_12v(0x40);
+// 5V rail on address 0x41 (second module, address jumper set!)
+Adafruit_INA219 ina219_5v(0x41);
+
+// ---------- INA226 sensor on Bus 1 ----------
+// Can use address 0x44 or 0x40(found by I2C scanner.. but varies per INA226 sensor)
+// The MECCANIXITY INA226 (sold on Amazon) sensors are preset with different addresses
+// when purchased as a group of sensors. You can't assume a default.
+INA226 ina226_5v(0x44, &I2C_Bus1);
+
+```
+
