@@ -34,7 +34,7 @@ Why bother trying to restrict the motion? The motivation was to attempt to preve
   <img src="../images/example.need.for.shoulder.limit.jpg" alt="range of motion for servo 2 motivation" width="600">
 </p>
 
-This restriction can be enforced using the Max Position Limit and Min Position Limit in the servo as shown below. 
+This restriction can be enforced using the Max Position Limit and Min Position Limit in the servo as shown below.
 
 <p align="center">
   <img src="../images/servo-2.dyn.wiz.max.min.pos.jpg" alt="range of motion for servo 2" width="600">
@@ -64,15 +64,37 @@ But was this helpful? In the end, we judge this sort of safeguard as only partia
 
 The main difficulty in using these limits were that they had to be manually determined by manually positioning each arm and querying their ROS2 radian-based positions and then working out whether max was the lowest position or the highest position.  
 
-**Note** I believe it is possible that the reader might attach the servos such that this order is reversed. This means that using the URDF I've provided might require additional testing to ensure its calibrated to the choices you made.
+**Note** I believe it is possible that the reader might attach the servos such that this order is reversed. This means that using the URDF I've provided might require additional testing to ensure its calibrated to the choices you made.  That is, note in the previous diagram that Max and Min boundaries seem a little unintuitive as the Max seems to restrict physically lower movement and the Min restricts the upper movement. This happens because clock-wise (CW) movement of the frontside wheel is considered movement in the negative direction and the counter clock wise movement (CCW) is considered positive (by default). So depending on how you oriented the servo and when attaching the brackets, the movement of the arm being "up" will be considered positive or negative. This is illustrated below.
 
-Finally, note that the Dynamixel Wizard allows the user to query telemetry values like the input current, temperature, voltage, and load, but only for one servo at a time. See the example below.
+<p align="center">
+  <img src="../images/servo-orientation-max-min.jpg" alt="mounting orientation" width="600">
+</p>
+
+
+Finally, note that the Dynamixel Wizard allows the user to query telemetry values like the input current, temperature, voltage, and load, but only for one servo at a time. See the example below. So part of our motivation for enhancing the pull of these in the ros2 environment was to collect that data under regular use and when multiple servos were in action.
+
 
 <p align="center">
   <img src="../images/servo-6.present.current.jpg" alt="more telemetry" width="600">
 </p>
 
-So part of our motivation for enhancing the pull of these in the ros2 environment was to collect that data under regular use and when multiple servos were in action.
+And related to our discussion above, both the load or the current values reported by the Dynamixel servo can be negative or positive. In this context "negative current" just means that the input current is used to rotate the wheel in the CW or negative direction. It is disconnected from the concept of an alternating current direction.  This is similarly applied to the load metric of the XL430s. So, later in the [documenation on the `pose_test.py` utility](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/pose_test.md) the output which shows negative current or negative load is just showing which direction the wheel was turning. This is why we consider the total current draw from the servo's to be be the sum of the absolute value of each current draw.
+
+```
+INFO] [1770595614.927827338] [pose_test_node]: → Sent: pose 1 - poised to work
+[INFO] [1770595618.934589703] [pose_test_node]:   📊 Joint States:
+[INFO] [1770595618.935407226] [pose_test_node]:   📊 shoulder_pan    [XL430] Pos:  1.557rad Load:  0.00% Volt:12.1V Temp: 32.0°C
+[INFO] [1770595618.936180933] [pose_test_node]:   📊 shoulder_lift   [XL430] Pos:  2.839rad Load: 14.00% Volt:12.1V Temp: 34.0°C
+[INFO] [1770595618.937008160] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  2.303rad Curr: -109mA Volt: 5.5V Temp: 21.0°C
+[INFO] [1770595618.937838905] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.276rad Curr:   13mA Volt: 5.4V Temp: 21.0°C
+[INFO] [1770595618.938645446] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.186rad Curr:  -12mA Volt: 5.5V Temp: 22.0°C
+[INFO] [1770595618.939474062] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.621rad Curr:  -21mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595618.940354344] [pose_test_node]:   ⚡ Power Analysis for "pose 1 - poised to work":
+[INFO] [1770595618.941070959] [pose_test_node]:      Peak 5V current (INA219):    0.199A
+[INFO] [1770595618.941883204] [pose_test_node]:      Peak motor sum (XL330s):     0.162A
+[INFO] [1770595618.942663431] [pose_test_node]:      5V voltage: 5.66V (min) / 5.78V (max)
+```
+
 
 ## ESP32 and Current Sensors
 Now while the openRB 150 communicates via its dynamixel protocol with the servos, when working with the current sensors and the ESP32 a different communication bus and protocol are used ([I2C](https://en.wikipedia.org/wiki/I2C)). The wiring of this is shown in the hardware section of this project. We are using multiple INA219 sensors and two different I2C busses: one for the INA219 sensors and one for the INA226 sensor. 
