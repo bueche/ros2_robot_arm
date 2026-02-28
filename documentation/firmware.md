@@ -8,30 +8,71 @@ This section provides installation and configuration notes for the firmware for 
 - [ESP32 and Current Sensors](./firmware.md#esp32_and_current_sensors)
 
 ## OpenRB 150
-- link to Robotis documentation: https://emanual.robotis.com/docs/en/parts/controller/openrb-150/
+- The software environment setup for the OpenRB 150 controller is detailed nicely in the Robotis documentation. See: https://emanual.robotis.com/docs/en/parts/controller/openrb-150/
+- One subtlety is that the `usb_to_dynamixel` sketch is packaged with the openRB 150 board manager package, not the `Dynamixel2Arduino` library.
+   
 <p align="center">
   <img src="../images/openRB.sketch.jpg" alt="open rb 150 sketch" width="600">
 </p>
 
 ## Dynamixel servos
-- setting each servo id
-- changing the baud rate
+Each Dynamixel servo needs to be initialized properly. Again, the documentation for the Dynamixel Wizard provides that information. Aside from updating the firmware, we applied three different configurations:
+- The servo ID was set from the factor default of 1 to relect the order defined in the URDF file.
+- The communication rate for the servo was changed from the default of 56K to 1M (1000000).
+- The max and min position were tuned in an effort to provide safe guards for the moving arm. Although driven by sound motivations, this turned out to be not as useful as desired as we will discuss below.
+
+When all of the servo id's have been properly setup then the Dynamixel wizard will show that they are all found during a scan and each can be examined separately. A successful scan is illustrated below.
+
 <p align="center">
   <img src="../images/setup.dyn.wiz.scan.jpg" alt="scan" width="600">
   <img src="../images/successful.dyn.wiz.scan.jpg" alt="successful scan" width="600">
 </p>
 
-- attempting to restrict the range of motion
+Why bother trying to restrict the motion? The motivation was to attempt to prevent the servo from moving in such a way that the arm could be damaged when no collision detection was being enforced. That is, the degrees of freedom of the robot could lead to situations in which the arm was positioned in a way that clearly would not work. An example of this is shown in the display digital twin as the hand is positioned to be below the surface. This could be avoided by restricting the rotation of the `shoulder_lift` joint (which joins the `upper_arm_link` and the `shoulder_link`). 
+
+<p align="center">
+  <img src="../images/example.need.for.shoulder.limit.jpg" alt="range of motion for servo 2 motivation" width="600">
+</p>
+
+This restriction can be enforced using the Max Position Limit and Min Position Limit in the servo as shown below. 
 
 <p align="center">
   <img src="../images/servo-2.dyn.wiz.max.min.pos.jpg" alt="range of motion for servo 2" width="600">
 </p>
 
-- additional telemetry
+But was this helpful? In the end, we judge this sort of safeguard as only partially helpful for the following reasons:
+1. *Safe movement depends partially on the position of the other joints/links, so this mechanism is perhaps too primitive and limited*. For example, if the `wrist_flex` joint points up then the `shoulder_lift` can rotate more. This is illustrated below.
+
+<p align="center">
+  <img src="../images/lower-range-of-motion.jpg" alt="lower possible range of motion for servo 2" width="600">
+</p>
+
+2. *The behavior of the robot when hitting these underlying limits in ros2 was unpredictable.* It was far more deterministric to use the limits defined in the URDF file as shown below. 
+
+```
+<!-- Joint 2: shoulder_lift -->
+  <joint name="shoulder_lift">
+    <command_interface name="position">
+      <param name="min">2.8857</param>  <!-- highest physical position -->
+      <param name="max">2.2000</param>   <!-- lowest physical position -->
+    </command_interface>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+    <state_interface name="effort"/>
+  </joint>
+```
+
+The main difficulty in using these limits were that they had to be manually determined by manually positioning each arm and querying their ROS2 radian-based positions and then working out whether max was the lowest position or the highest position.  
+
+**Note** I believe it is possible that the reader might attach the servos such that this order is reversed.
+
+Finally, note that the Dynamixel Wizard allows the user to query telemetry values like the input current, temperature, voltage, and load, but only for one servo at a time. See the example below.
 
 <p align="center">
   <img src="../images/servo-6.present.current.jpg" alt="more telemetry" width="600">
 </p>
+
+So part of our motivation for enhancing the pull of these in the ros2 environment was to collect that data under regular use and when multiple servos were in action.
 
 ## ESP32 and Current Sensors
 
