@@ -3,7 +3,7 @@
 ## Summary
 The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/)) and its powered by The Robot Operating System v2 [ROS2](https://github.com/ros2).  This repository supports both [Ros2 Jazzy](https://docs.ros.org/en/jazzy/index.html) and [Ros2 Humble](https://docs.ros.org/en/humble/index.html) (see respective  branches in this repository). 
 
-This effort is meant to learn and explore both the software and hardware used in robotic arm development.
+This effort is meant to learn and explore both the software and hardware used in robotic arm development. See FAQ at the bottom for more information.
 
 This includes:
  - Fabrication and/or purchase, modification, and assembly of robotic parts (brackets, Dynamixel servos, and related circuit boards and sensors)
@@ -28,8 +28,12 @@ The documentation for this repository covers the following:
 - [Running the pose load_test analysis tool](./documentation/load_test.md): Making projections on limits of the robot joints based on pose transitions.
 - [Running the display only version of the Digital twin](./documentation/display_launch.md): Its possible to run only an rviz display only flavor of the robot.
 - [Power monitoring using INA219, INA226, and servo-internal sensors](./documentation/power_monitoring.md): The utilities include a ros2 node that taps into INA219 sensors, INA226 sensors, and Dynamixel servo-internal sensors that have been added to measure voltage and current draw on the 5v and 12v set of servos. This provides insights into the servo dynamics and the corresponding power needs.
+
   
 <p align="center">
+ 
+  <img src="./images/story_board_for_example_pose_test.jpg" alt="story board for example pose test" width="900">
+
   <img src="./images/current_v_pose.001.jpeg" alt="current sensor data" width="900">
 </p>
 
@@ -37,6 +41,12 @@ The documentation for this repository covers the following:
 - TBD 🚧 
 
 ## FAQ
+### How can this repository be useful?
+This repository can be of use to someone building robotics in several ways:
+1. *Users of the Koch V1.1 follower arm*: Although some of the design and operation of the Koch v1.1 robot arm is open source, a user of it may encounter a number of gaps or issues when working with it. This repository should complement information and software from ROBOTIS and other sources. For example, we provide a  URDF that is configured and calibrated to provide a digital twin that matches the physical robot in appearance.
+2. *Users who are adapting robotic arms to ROS2 or not starting from a well defined kit*: ROBOTIS provides several full kits for someone getting started with robot arms that provide a good head start (including this [Koch v1.1.](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/), [OMX AI manipulator](https://robotis.us/omx-ai-us/), [OMY AI manipulator](https://robotis.us/omy-ai3m/), and more. This project provides information for someone who is departing from an easy-to-assemble kit.
+3. *Users wanting to pull more telemetry from Dynamixel servos in a ROS2 environment*: We provide information on how to do this.
+   
 ### What is a leader-follower robotic arm?
 A leader-follower robotic arm system consists of two robotic manipulators where one arm (the leader) is manually controlled by a human operator, and the second arm (the follower) replicates those movements in real-time. It's essentially a form of bilateral teleoperation. In this project we are primarily focused on the follower arm.
 ### Why is this project focused on the follower?
