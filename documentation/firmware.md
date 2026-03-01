@@ -4,7 +4,7 @@ This section provides installation and configuration notes for the firmware for 
 
 ## Sections
 - [OpenRB 150](#openrb-150)
-- [Dynamixel servos](#dynamixel-servo)
+- [Dynamixel servos](#dynamixel-servos)
 - [ESP32 and Current Sensors](#esp32-and-current-sensors)
 
 ## OpenRB 150
