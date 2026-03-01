@@ -1,4 +1,4 @@
-# Launching the Physical Robot and its digital twin in Rviz2
+# Launching the Physical Robot 
 
 Once the software and hardware envionment has been setup with the one-time setup items, then a few additional commands are needed to bring up the physical robot and its digital twin in Rviz2.
 
