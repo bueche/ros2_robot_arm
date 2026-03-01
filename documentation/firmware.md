@@ -3,9 +3,9 @@
 This section provides installation and configuration notes for the firmware for various components: the Dynamixel servos, the openRB 150 controller, the INA219 sensors, and the ESP32 controller (used for the sensors). 
 
 ## Sections
-- [OpenRB 150](./firmware.md#openrb_150)
-- [Dynamixel servos](./firmware.md#Dynamixel_servo)
-- [ESP32 and Current Sensors](./firmware.md#esp32_and_current_sensors)
+- [OpenRB 150](#openrb-150)
+- [Dynamixel servos](#dynamixel-servos)
+- [ESP32 and Current Sensors](#esp32-and-current-sensors)
 
 ## OpenRB 150
 - The software environment setup for the OpenRB 150 controller is detailed nicely in the Robotis documentation. See: https://emanual.robotis.com/docs/en/parts/controller/openrb-150/

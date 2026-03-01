@@ -2,16 +2,16 @@
 This section describes the hardware setup including a detailed electrical layout.
 
 ## Sections
-- [Hardware Overview](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#hardware_overview): Outlines the hardware setup.
-- [Bill of Materials](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#bill_of_materials): What was purchased, motivation, and alternatives.
-- [3D printing of robot parts](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#3d_print_of_hardware): How to print the pieces.
-- [Assembly of robot](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#assembly_of_robot): how to assemble the robot.
-- [Electrical Notes](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#electrical_setup): Exactly how this robot was wired with additional notes.
-- [Learnings and Next Steps](https://github.com/bueche/ros2_robot_arm/blob/main/documentation/hardware_setup.md#learnings_and_next_steps): What did we learning in assemblying this robot and areas of improvement.
-
+- [Hardware Overview](#hardware-overview): Outlines the hardware setup.
+- [Bill of Materials](#bill-of-materials): What was purchased, motivation, and alternatives.
+- [3D printing of robot parts](#3d-print-of-hardware): How to print the pieces.
+- [Assembly of robot](#assembly-of-robot): how to assemble the robot.
+- [Electrical Notes](#electrical-notes): Exactly how this robot was wired with additional notes.
+- [Learnings and Next Steps](#learnings-and-next-steps): What did we learning in assemblying this robot and areas of improvement.
 
 ## Hardware Overview
-The Kock v1.1 follower arm is a 6-degrees of robotic arm with the links illustrated as illustrated below. It is powered by four Dynamixel [XL330](https://en.robotis.com/shop_en/item.php?it_id=902-0163-000)'s and two Dynamixel [XL430](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/) servos. The controlling hardware is a combination of an [OpenRB 150](https://emanual.robotis.com/docs/en/parts/controller/openrb-150/) and a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/). The two types of servos operate at different voltages so in addition to a [Robotis U2D2](https://en.robotis.com/shop_en/item.php?it_id=902-0145-001) we also are leveraging a Buck converter to step down the 12V to 5v+ for the XL330s. This project also includes sensors to measure the input electrical current. To that end, we are using IN219 current sensors.
+The Koch v1.1 follower arm is a 6-degrees of robotic arm with the links illustrated as illustrated below. It is powered by four Dynamixel [XL330](https://en.robotis.com/shop_en/item.php?it_id=902-0163-000)'s and two Dynamixel [XL430](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/) servos. The controlling hardware is a combination of an [OpenRB 150](https://emanual.robotis.com/docs/en/parts/controller/openrb-150/) and a [Raspberry Pi 5](https://www.raspberrypi.com/products/raspberry-pi-5/). The two types of servos operate at different voltages so in addition to a [Robotis U2D2](https://en.robotis.com/shop_en/item.php?it_id=902-0145-001) we also are leveraging a Buck converter to step down the 12V to 5v+ for the XL330s. This project also includes sensors to measure the input electrical current. To that end, we are using IN219 and INA226 current sensors. The measurement of current is optional to the environment, but some of the analysis is greatly enhanced with it.
+
 <p align="center">
   <img src="../images/robot_links.jpg" alt="arm anotated" width="600">
 </p>
@@ -21,20 +21,81 @@ The joints of the robot are shown in the following diagram.
 </p>
 
 ## Bill of Materials
-TBD
+Koch v1.1 6-DOF Robotic Arm — Bill of Materials
+
+> **Note:** Prices are approximate and subject to change. Spares are recommended for sensors and buck converters due to sensitivity during assembly and testing.
+
+## Core Computing
+
+| Qty | Component | Description | Link | Unit Price | Total |
+|-----|-----------|-------------|------|-----------|-------|
+| 1 | 8GB Raspberry Pi 5 | main compute for robot arm | [Amazon B0CVR1LP7G](https://www.amazon.com/dp/B0CVR1LP7G) | $180 | $180 |
+| 1 | Raspberry Pi 256GB SD Card | Storage for Raspberry Pi OS and ROS2 workspace | [Amazon B09X7CRKRZ](https://www.amazon.com/dp/B09X7CRKRZ) | ~$25 | ~$25 |
+| 1 | NVIDIA Jetson Orin Nano Super Developer Kit | Optional: replaces Raspberry Pi; required for RViz visualization | [Amazon B0BZJTQ5YP](https://www.amazon.com/dp/B0BZJTQ5YP) | $245 | $245 |
+| 1 | Case for NVIDIA Jetson Orin Nano | Protective enclosure for Jetson | [Amazon B0CG38BS5S](https://www.amazon.com/dp/B0CG38BS5S) | $22 | $22 |
+
+## Dynamixel Servos and controller
+
+| Qty | Component | Description | Link | Unit Price | Total |
+|-----|-----------|-------------|------|-----------|-------|
+| 1 | OpenRB 150 | controller for servos | [Robotis](https://robotis.us/openrb-150) | $30 | $30 | 
+| 4 | XL330-M288-T | Wrist, shoulder, hand and gripper servos | [Robotis](https://en.robotis.com/shop_en/item.php?it_id=902-0163-000) | $24 | $96 |
+| 1 | XL330-M077-T | Substitute for XL330-M288-T if out of stock (not for elbow lift) | [Robotis](https://en.robotis.com/shop_en/item.php?it_id=902-0162-000) | $24 | $24 |
+| 2 | XL430-W250-T | Higher-torque servos for base rotation and elbow lift | [Robotis](https://en.robotis.com/shop_en/item.php?it_id=902-0135-000) | $24 | $48 |
+
+## Dynamixel Interface & Cabling
+
+| Qty | Component | Description | Link | Unit Price | Total |
+|-----|-----------|-------------|------|-----------|-------|
+| 1 | U2D2 PHB Set | USB-to-Dynamixel interface board set | [Robotis](https://en.robotis.com/shop_en/item.php?it_id=902-0145-001) | $20 | $20 |
+| 1 | Robot Cable-X3P 180mm (Pack of 10) | Servo daisy-chain cables | [Robotis](https://en.robotis.com/shop_en/item.php?it_id=903-0249-000) | $20 | $20 |
+| 1 | Robot Cable-X3P 180mm (Convertable) (Pack of 10) | used with to extend reach of cables with SMPS2Dynamixel apdapter | [ROBOTIS](https://en.robotis.com/shop_en/item.php?it_id=903-0251-000) | $20 | $20 | 
+| 1 | ROBOTIS SMPS2Dynamixel Power Adapter| for extending reach of Robotis cables | https://www.robotshop.com/products/robotis-smps2dynamixel-power-adapter-smps-to-dynamixel | $10 | $10 |
+
+## Power
+
+| Qty | Component | Description | Link | Unit Price | Total |
+|-----|-----------|-------------|------|-----------|-------|
+| 1 | 12V Power Supply 10A | Main power supply for OpenRB150, XL330s, XL430 servos | [Amazon B07MXXXBV8](https://www.amazon.com/dp/B07MXXXBV8) | ~$20 | ~$20 |
+| 1+ | Buck Converter (DC-DC Step-Down) | Steps 12V down to 5V for XL330 servos and logic; buy several for spares | [Amazon B085T73CSD](https://www.amazon.com/Converter-1-25-36V-Voltage-Regulator-Display/dp/B085T73CSD) | $15 (multi-pack) | $15 |
+
+## Telemetry / Current Sensing
+
+| Qty | Component | Description | Link | Unit Price | Total |
+|-----|-----------|-------------|------|-----------|-------|
+| 2 | INA219 Current Sensor | I²C current/voltage monitoring; spares recommended | [Amazon B0FKBDX2R2](https://www.amazon.com/dp/B0FKBDX2R2) | $10 (pack) | $10 |
+| 1 | INA226 Current Sensor | Higher-precision I²C power monitor; spares recommended | [Amazon B0FC656459](https://www.amazon.com/dp/B0FC656459) | $16 | $16 |
+| 1 | ESP32 Dev Kit | Microcontroller for telemetry and sensor aggregation | [Amazon B0FNQVZJ6D](https://www.amazon.com/dp/B0FNQVZJ6D) | $20 | $20 |
+
+## Prototyping & Wiring
+
+| Qty | Component | Description | Link | Unit Price | Total |
+|-----|-----------|-------------|------|-----------|-------|
+| 1 | Solderless Breadboard Kit | Full-size breadboard for circuit prototyping | [Amazon B08Y59P6D1](https://www.amazon.com/dp/B08Y59P6D1) | $10 | $10 |
+| 1 | Mini Breadboard Kit | Small breadboards for compact sensor wiring | [Amazon B01KKE602W](https://www.amazon.com/dp/B01KKE602W) | $8 | $8 |
+| 1 | 23AWG Breadboard Jumper Ribbon Cables Kit | Jumper wires for breadboard connections | — | $10 | $10 |
+
+## Mechanical Mounting
+
+| Qty | Component | Description | Link | Unit Price | Total |
+|-----|-----------|-------------|------|-----------|-------|
+| 2 | C-Clamps | Secure robot base to work surface; size depends on your table | Local hardware store | ~$10 | ~$10 |
+
+---
+
 
 ## 3D Print of Hardware
-There are a number of ways to print the various custom pieces of the robot arm. We have both printed pieces via a local 3D print and used the [Craftcloud](https://craftcloud3d.com/) service. The meshes used in this print are located [here](../writing_robot_description/meshes). These are derived as binary representatinos of the ones located in the original [koch v1.1](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL) version.
+There are a number of ways to print the various custom pieces of the robot arm. We have both printed pieces via a local 3D print and used the [Craftcloud](https://craftcloud3d.com/) service. The meshes used in this print are located [here](../writing_robot_description/meshes). These are derived as binary representations of the ones located in the original [koch v1.1](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL) version.
 
 ## Assembly of Robot
 - **Arm Assembly**: The basic assembly of the koch v1.1 robot is outlined in detail in the [Jess Moss Youtube video](https://www.youtube.com/watch?v=8nQIg9BwwTk) (follower assembly starts around 8:22 min into the video). The key divergence from this work is the shoulder link. In this version the XL430 servo is positioned upright (vs. horizontal) and we use a standard Robotis bracket (see BOM) instead of the one defined by Jess.
 - **Anchoring of arm**: TBD
 - **Electronic board enclosure**: TBD
 - **Electrical wiring**: See below
-  
+
 ## Electrical Notes
 
-The following is an electrical schematic of the robot.
+The following is an electrical schematic of the robot with the external current sensors.
 <p align="center">
   <img src="../images/koch_v11_with_IN219_sensors.jpg" alt="electrical wiring" width="900">
 </p>

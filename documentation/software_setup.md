@@ -3,11 +3,12 @@
 This section describes how to setup the software to run the koch_v11 follower on ros2. The ros2 environment configured and run on a docker image.
 
 ## Sections 
-- [Underlying hardware and OS variations](#underlying_hardware_and_os_variations): This section briefly outlines some of the hardware/OS variations that this has been tested on.
-- [Docker setup on host OS](#docker_setup_on_host_os): installing and setting up docker on the host os.
-- [Docker image and container setup](#docker_image_and_container_setup): This section describes how to create the docker images needed for this project and how to startup and finish setting up the containers.
-- [Dynamixel software changes](#dynamixel_software_changes): Outlines the changes made to the Dynamixel software to pull additional telemetry data from the servos on Ros2.
-- [TODO list](#todo_list): some notes on changes to come.
+- [Underlying hardware and OS variations](#underlying-hardware-and-os-variations): This section briefly outlines some of the hardware/OS variations that this has been tested on.
+- [Docker setup on host OS](#docker-setup-on-host-os): installing and setting up docker on the host os.
+- [Docker image and container setup](#docker-image-and-container-setup): This section describes how to create the docker images needed for this project and how to startup and finish setting up the containers.
+- [Dynamixel software changes](#dynamixel-software-changes): Outlines the changes made to the Dynamixel software to pull additional telemetry data from the servos on Ros2.
+- [Simple simulation smoke test](#simple-smoke-test): After installing the software you can test a decent percentage of it with the display only test.
+- [TODO list](#todo-list): some notes on changes to come.
 
 ## Underlying hardware and OS variations
 - The robot software setup and operation has been tested on a Raspberry Pi5 running Ubuntu 22.04 (Jammy). 
@@ -106,8 +107,8 @@ This is essentially a simple visual simulation.
   <img src="../images/display_only_example.jpg" alt="display onlyd" width="600">
 </p>
 
+
 ## TODO list
-- Get this working on ros2 jazzy
 - get amd64 containers tested on windows.
 - clean up some noise in the scripts 
 
