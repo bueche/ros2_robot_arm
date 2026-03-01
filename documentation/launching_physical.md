@@ -4,7 +4,7 @@ Once the software and hardware envionment has been setup with the one-time setup
 
 ## Table of Contents
 - [Ensure that the USB port can be accessed](./documentation/launching_physical.md#ensure_that_the_uSB_port_can_be_accessed)
-- [Launch the robot via ros2](./documentation/launching_physical.md#launch_the_robot_via_ros2)
+- [Launch the robot via ros2](./documentation/launching_physical.md#launch-the-robot-via-ros2)
 
   
 ## Ensure that the USB port can be accessed
