@@ -1,4 +1,4 @@
-# Robot Arm Pose Utilities and Analysis
+# Robot Arm Pose Driving Utilities and Analysis
 In this section we outline some of the software utilities used to cause the robot to move through and analyze a set of poses. 
 
 ## Sections
@@ -15,6 +15,13 @@ movment boundaries](https://github.com/bueche/ros2_robot_arm/blob/main/documenta
 
 ## Analysis Notes
 - [Power monitoring using INA219, INA226, and servo-internal sensors](./documentation/power_monitoring.md): The utilities include a ros2 node that taps into INA219 sensors, INA226 sensors, and Dynamixel servo-internal sensors that have been added to measure voltage and current draw on the 5v and 12v set of servos. This provides insights into the servo dynamics and the corresponding power needs.
+
+  
+<p align="center">
+ 
+  <img src="../images/story_board_for_example_pose_test.jpg" alt="story board for example pose test" width="900">
+
+</p>
 
 ## Next Steps
 - TBD
