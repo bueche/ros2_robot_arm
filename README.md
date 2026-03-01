@@ -22,20 +22,9 @@ The documentation for this repository covers the following:
 - [Hardware Setup](./documentation/hardware_setup.md): Although the setup of the koch_v11 physical robot (leader and follower arms) is partially documented ([Arm assembly by Jess Moss](https://www.youtube.com/watch?v=8nQIg9BwwTk)), those instructions lacked details on some of the required electrical setup. In addition, we are using different controller boards (e.g., Dynamixel OpenRB 150).
 - [Firmware Setup and Configuration](./documentation/firmware.md): Notes on the firmware setup and configuration for the OpenRB 150, the servo motors, the current sensors, and the ESP32.
 - [Notes on creating the digital twin](./documentation/digital_twin.md): A series of notes that cover the problems and solutions for creating the digital twin.
-- [Launching the Physical Robot and its Digital Twin](./documentation/launching_physical.md) Steps involved in bringing up the physical robot and the digital twin.
-- [Running the pose_test utility](./documentation/pose_test.md): The pose test utility will iterate through a series of predefined poses and take measurements of the physical robot during this time.
-- [Running the servo_monitor tool](./documentation/servo_monitor.md): The servo monitor tool holds the robot in a pose and measures the temp, current, and voltage as this pose is held.
-- [Running the pose load_test analysis tool](./documentation/load_test.md): Making projections on limits of the robot joints based on pose transitions.
-- [Running the display only version of the Digital twin](./documentation/display_launch.md): Its possible to run only an rviz display only flavor of the robot.
-- [Power monitoring using INA219, INA226, and servo-internal sensors](./documentation/power_monitoring.md): The utilities include a ros2 node that taps into INA219 sensors, INA226 sensors, and Dynamixel servo-internal sensors that have been added to measure voltage and current draw on the 5v and 12v set of servos. This provides insights into the servo dynamics and the corresponding power needs.
-
-  
-<p align="center">
- 
-  <img src="./images/story_board_for_example_pose_test.jpg" alt="story board for example pose test" width="900">
-
-  <img src="./images/current_v_pose.001.jpeg" alt="current sensor data" width="900">
-</p>
+- [Launching the Physical Robot](./documentation/launching_physical.md) Steps involved in bringing up the physical robot.
+- [Running the display only version of the Digital twin](./documentation/display_launch.md): This describes how to bring up the digital twin - either along side the physical robot or by itself as an rviz display-only flavor of the robot.
+- [Pose Sequence Tools and Analysis](./documentation/utilities.md): Several tools are provided that drive the robot through a series of poses and analyze physical characteristics (position, temp, current, voltage, etc). This section also provides some analysis case studies that are of interest.
 
 ## Medium articles:
 - TBD 🚧 
