@@ -91,11 +91,22 @@ poses:
       wrist_roll: 1.7373145480214949
       pen_holder: 0.5816627329506595
 
-  - name: pose 11 - poised to work
+  - name: pose 11 - ending raise high
     positions:
-      shoulder_pan: 1.557751118588178
-      shoulder_lift: 2.87915379159746
-      elbow_flex: 2.1240665498778704
-      wrist_flex: 2.2790742966536395
-      wrist_roll: 1.1817422278944798
-      pen_holder: 1.5899804520762093
+      shoulder_pan: 1.5976541029066929
+      shoulder_lift: 2.655083187347338
+      elbow_flex: 0.8057333372007817
+      wrist_flex: 1.4727763861016122
+      wrist_roll: 1.7618702306790426
+      pen_holder: 0.6553297809233024
+
+
+  - name: pose 12 - poised to work or shutdown
+    positions:
+      shoulder_pan: 1.5961193727405962
+      shoulder_lift: 2.61
+      elbow_flex: 1.4372234987336654
+      wrist_flex: 0.7255729126697013
+      wrist_roll: 1.7618702306790426
+      pen_holder: 1.520675055398144
+
