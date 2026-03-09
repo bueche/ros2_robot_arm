@@ -318,8 +318,8 @@
     <!-- Dynamixel Hardware Interface -->
     <hardware>
         <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
-	<param name="usb_port">/dev/ttyUSB0</param>
-	<param name="port_name">/dev/ttyUSB0</param>
+	<param name="usb_port">/dev/ttyOpenRB</param>
+	<param name="port_name">/dev/ttyOpenRB</param>
 	<param name="baud_rate">1000000</param>
         <param name="number_of_joints">6</param>
 	<param name="number_of_transmissions">6</param> 

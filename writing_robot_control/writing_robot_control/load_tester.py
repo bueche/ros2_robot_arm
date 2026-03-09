@@ -257,7 +257,7 @@ class LoadTester(Node):
         
         if DYNAMIXEL_AVAILABLE:
             try:
-                self.dxl_port = PortHandler('/dev/ttyUSB0')
+                self.dxl_port = PortHandler('/dev/ttyOpenRB')
                 self.dxl_packet = PacketHandler(2.0)
                 if self.dxl_port.openPort() and self.dxl_port.setBaudRate(57600):
                     self.get_logger().info('✓ Dynamixel SDK connected (telemetry enabled)')

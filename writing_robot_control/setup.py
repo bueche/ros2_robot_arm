@@ -27,6 +27,7 @@ setup(
             'load_tester = writing_robot_control.load_tester:main',
             'power_monitor_node = writing_robot_control.power_monitor_node:main',
             'power_logger = writing_robot_control.power_logger:main',
+            'imu_balance_node = writing_robot_control.imu_balance_node:main',
        ],
     },
 )
