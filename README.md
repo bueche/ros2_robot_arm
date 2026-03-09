@@ -27,6 +27,9 @@ The documentation for this repository covers the following:
 - [Running the display only version of the Digital twin](./documentation/display_launch.md): This describes how to bring up the digital twin - either along side the physical robot or by itself as an rviz display-only flavor of the robot.
 - [Pose Sequence Tools and Analysis](./documentation/utilities.md): Several tools are provided that drive the robot through a series of poses and analyze physical characteristics (position, temp, current, voltage, etc). This section also provides some analysis case studies that are of interest.
 
+<p align="center">
+  <img src="./images/robot_arm_in_motion.gif" alt="Real Robot Arm" width="400">
+</p>
 ## Medium articles:
 - TBD 🚧 
 
