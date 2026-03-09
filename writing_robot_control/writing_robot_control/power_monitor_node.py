@@ -58,7 +58,7 @@ class PowerMonitorNode(Node):
                 
                 # Parse CSV: t_us,bus12_v,shunt12_mv,current12_A,power12_W,bus5_v,shunt5_mv,current5_A,power5_W
                 parts = line.split(',')
-                if len(parts) < 10:
+                if len(parts) < 8:
                     return
                 
                 try:

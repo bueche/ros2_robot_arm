@@ -54,3 +54,13 @@ ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_r
 ros2 run writing_robot_control power_monitor_node
 
  ros2 run writing_robot_control power_logger
+
+
+ros2 topic echo /power_telemetry --once
+
+ros2 run writing_robot_control imu_balance_node
+
+ros2 topic echo /imu/raw 
+
+screen /dev/ttyIMU 115200
+# Ctrl+A then K to exit
