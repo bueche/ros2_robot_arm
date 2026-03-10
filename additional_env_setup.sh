@@ -3,7 +3,7 @@
 set -e  # stop on any error
 
 export WORKSPACE=robot_ws
-export ROS_DISTRO=humble
+export ROS_DISTRO=jazzy
 WORKSPACE_SRC=~/${WORKSPACE}/src
 
 # ============================================================
