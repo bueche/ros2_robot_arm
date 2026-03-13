@@ -42,6 +42,8 @@ rather than editing code — makes it easy to flip at launch time.
 Dependencies:
   pip install pyserial --break-system-packages
   ros2 packages: rclpy, sensor_msgs, geometry_msgs, std_msgs
+
+Notes: this draws heavily from: https://web2.qatar.cmu.edu/~gdicaro/16311-Fall17/slides/PID-without-PhD.pdf
 """
 
 import rclpy
@@ -130,7 +132,7 @@ class ImuBalanceNode(Node):
     def __init__(self):
         super().__init__('imu_balance_node')
 
-        # ── Parameters ──────────────────────────────────────────────────
+        # Parameters 
         self.declare_parameter('port',          '/dev/ttyIMU')
         self.declare_parameter('baud',          115200)
         self.declare_parameter('frame_id',      'imu_link')
@@ -155,7 +157,7 @@ class ImuBalanceNode(Node):
         deadband         = self.get_parameter('deadband_rad').value
         max_cmd          = self.get_parameter('max_cmd').value
 
-        # ── PID controllers ─────────────────────────────────────────────
+        # PID controllers 
         self._pid_pitch = PIDController(
             kp=self.get_parameter('pitch_kp').value,
             ki=self.get_parameter('pitch_ki').value,
@@ -171,14 +173,14 @@ class ImuBalanceNode(Node):
             max_output=max_cmd
         )
 
-        # ── Publishers ──────────────────────────────────────────────────
+        # Publishers 
         self._pub_imu = self.create_publisher(Imu,     '/imu/raw',           10)
         self._pub_err = self.create_publisher(Vector3, '/imu/balance_error', 10)
         self._pub_cmd = self.create_publisher(Vector3, '/imu/balance_cmd',   10)
         # Publish True while balance error is within deadband
         self._pub_stable = self.create_publisher(Bool, '/imu/is_stable',     10)
 
-        # ── State ────────────────────────────────────────────────────────
+        # State 
         self._latest = None          # most recent parsed JSON dict
         self._lock   = threading.Lock()
         self._serial = None
@@ -188,13 +190,13 @@ class ImuBalanceNode(Node):
         self._err_window_pitch = deque(maxlen=20)
         self._err_window_roll  = deque(maxlen=20)
 
-        # ── Serial reader thread ─────────────────────────────────────────
+        # Serial reader thread 
         self._serial_thread = threading.Thread(
             target=self._serial_reader, daemon=True
         )
         self._serial_thread.start()
 
-        # ── Publish timer ────────────────────────────────────────────────
+        # Publish timer 
         timer_period = 1.0 / self._pub_hz
         self._timer = self.create_timer(timer_period, self._publish_callback)
 
@@ -209,9 +211,10 @@ class ImuBalanceNode(Node):
             'Tip: recalibrate IMU by sending "c" to ESP32 serial when arm is level.'
         )
 
-    # ────────────────────────────────────────────────────────────────────
     def _serial_reader(self):
         """Background thread: open serial port and read JSON lines."""
+        hash_cnt = 0
+        hash_cnt_limit = 1000
         while self._running:
             try:
                 self.get_logger().info(f'Opening serial port {self._port}...')
@@ -222,6 +225,16 @@ class ImuBalanceNode(Node):
                     line = self._serial.readline().decode('utf-8', errors='ignore').strip()
 
                     if not line or line.startswith('#'):
+                        if line.startswith('#'):
+                            if hash_cnt == 0:
+                                self.get_logger().info('hash lines: ' + line)
+
+                            hash_cnt += 1
+
+                            if hash_cnt == hash_cnt_limit:
+                                self.get_logger().info('reset hash cnt at 1000 : ' + line)
+                                hash_cnt = 0
+
                         continue  # skip comments/empty lines from ESP32
 
                     try:
@@ -238,7 +251,6 @@ class ImuBalanceNode(Node):
                 self.get_logger().error(f'Reader thread error: {e}')
                 time.sleep(1.0)
 
-    # ────────────────────────────────────────────────────────────────────
     def _publish_callback(self):
         """Timer callback: publish IMU, balance error, and PID command."""
         with self._lock:
@@ -258,7 +270,7 @@ class ImuBalanceNode(Node):
         ay    = float(data.get('ay',    0.0))
         az    = float(data.get('az',    9.81))
 
-        # ── sensor_msgs/Imu ─────────────────────────────────────────────
+        # sensor_msgs/Imu 
         imu_msg = Imu()
         imu_msg.header.stamp    = now_ros.to_msg()
         imu_msg.header.frame_id = self._frame_id
@@ -305,7 +317,7 @@ class ImuBalanceNode(Node):
 
         self._pub_imu.publish(imu_msg)
 
-        # ── Balance error ────────────────────────────────────────────────
+        # Balance error 
         # Setpoint is 0 (the calibrated "level" position on the ESP32).
         # Error = current tilt angle (already zeroed by calibration on ESP32).
         pitch_err = pitch
@@ -320,7 +332,7 @@ class ImuBalanceNode(Node):
         err_msg.z = 0.0
         self._pub_err.publish(err_msg)
 
-        # ── PID correction commands ──────────────────────────────────────
+        # PID correction commands 
         pitch_cmd = self._pid_pitch.update(pitch_err, now_sec)
         roll_cmd  = self._pid_roll.update(roll_err,  now_sec)
 
@@ -329,15 +341,15 @@ class ImuBalanceNode(Node):
         if self._inv_roll:
             roll_cmd  = -roll_cmd
 
-        # pitch_cmd → wrist_flex joint delta (rad/s)
-        # roll_cmd  → wrist_roll  joint delta (rad/s)
+        # pitch_cmd : wrist_flex joint delta (rad/s)
+        # roll_cmd  : wrist_roll  joint delta (rad/s)
         cmd_msg = Vector3()
         cmd_msg.x = pitch_cmd   # wrist_flex
         cmd_msg.y = roll_cmd    # wrist_roll
         cmd_msg.z = 0.0
         self._pub_cmd.publish(cmd_msg)
 
-        # ── Stability flag ───────────────────────────────────────────────
+        # Stability flag 
         # True when average error over rolling window is within deadband
         deadband = self.get_parameter('deadband_rad').value
         avg_pitch_err = sum(self._err_window_pitch) / max(len(self._err_window_pitch), 1)
@@ -348,7 +360,6 @@ class ImuBalanceNode(Node):
         stable_msg.data = is_stable
         self._pub_stable.publish(stable_msg)
 
-    # ────────────────────────────────────────────────────────────────────
     def send_calibrate(self):
         """Send 'c' to ESP32 to trigger onboard recalibration."""
         if self._serial and self._serial.is_open:
@@ -364,7 +375,6 @@ class ImuBalanceNode(Node):
         super().destroy_node()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 def main(args=None):
     rclpy.init(args=args)
     node = ImuBalanceNode()
