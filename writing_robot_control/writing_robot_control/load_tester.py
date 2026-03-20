@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified Load Testing Tool for Koch v1.1 - v6
+Unified Load Testing Tool for Koch v1.1 - v10
 
 Features:
 - Basic load testing (torque predictions)
@@ -11,6 +11,21 @@ Features:
 - Servo telemetry (temp/current/voltage - if dynamixel_sdk available)
 - Comparison matrix (compare all servo options)
 - XL330-M077-T support (more available than M288)
+- Cup/payload simulation: model a held object (cup + ball bearing) and check servo margins
+
+New in v10:
+- Per-pose cup in YAML: each pose can have its own `cup:` block
+- Transition cup is set by the DESTINATION pose (you're holding it when you arrive)
+- `cup: ~` (null) on a pose explicitly clears the cup for that transition
+- Priority chain: per-pose cup > sequence-level cup > CLI --cup-mass
+- Sequence summary table now shows which cup was active for each transition
+
+New in v9:
+- --cup-mass, --cup-offset: add a fictitious held object at the wrist tip
+- --cup-scan: sweep a range of cup masses and report the maximum safe payload
+- YAML poses can include a top-level `cup` block (mass_kg, offset_m) that overrides CLI
+- Wrist margin report: shows headroom on wrist_flex and wrist_roll specifically
+- All existing FK torque paths updated to include cup contribution
 
 New in v6:
 - Forward kinematics for accurate torque calculations
@@ -22,23 +37,70 @@ Usage:
   # Basic tests (v5 compatibility)
   ros2 run writing_robot_control load_tester --full_analysis
   ros2 run writing_robot_control load_tester --joint shoulder_lift --static
-  
+
   # Trajectory analysis
   ros2 run writing_robot_control load_tester --joint shoulder_lift --static \\
     --previous-position 0.0 --movement-time 2.0
-  
-  # Full pose transition (NEW!)
+
+  # Full pose transition
   ros2 run writing_robot_control load_tester --analyze-transition \\
     --pose-from "0.0,1.57,0.0,0.0,0.0,0.0" \\
     --pose-to "0.0,1.57,1.57,0.0,0.0,0.0" \\
     --movement-time 2.0
-  
-  # YAML sequence analysis (NEW!)
+
+  # Pose transition with a cup (50g cup + 30g ball, 45mm offset from wrist tip)
+  ros2 run writing_robot_control load_tester --analyze-transition \\
+    --pose-from "0.0,1.57,0.0,0.0,0.0,0.0" \\
+    --pose-to "0.0,1.57,1.57,0.0,0.0,0.0" \\
+    --cup-mass 0.080 --cup-offset 0.045
+
+  # Scan cup masses from 0 to 250g to find safe limit
+  ros2 run writing_robot_control load_tester --analyze-transition \\
+    --pose-from "0.0,1.57,0.0,0.0,0.0,0.0" \\
+    --pose-to "0.0,1.57,1.57,0.0,0.0,0.0" \\
+    --cup-scan --cup-scan-max 0.250
+
+  # YAML sequence analysis - cup defined per-pose in YAML (v10):
+  #   Each pose may have its own `cup:` block. The destination pose's cup
+  #   is used for that transition. `cup: ~` explicitly means no cup.
+  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml
+
+  # YAML sequence - CLI cup used as fallback when a pose has no cup defined
   ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
-    --movement-time 2.0
-  
+    --cup-mass 0.100 --cup-offset 0.045
+
   # What-if scenarios
   ros2 run writing_robot_control load_tester --joint shoulder_lift --what-if XL330-M077
+
+YAML FORMAT (v10 per-pose cup example):
+  # Sequence-level default cup (used when a pose has no cup: block)
+  cup:
+    mass_kg: 0.080
+    offset_m: 0.045
+    label: "default cup"
+
+  poses:
+    - name: home
+      positions: {shoulder_pan: 0.0, shoulder_lift: 1.57, ...}
+      # No cup: block → inherits sequence-level default
+
+    - name: pickup
+      positions: {shoulder_pan: 0.3, shoulder_lift: 1.2, ...}
+      cup: ~                          # Explicitly NO cup for this pose
+
+    - name: carry
+      positions: {shoulder_pan: 0.0, shoulder_lift: 1.4, ...}
+      cup:
+        mass_kg: 0.110                # Full cup: 80g cup + 30g ball
+        offset_m: 0.045
+        label: "full cup"
+
+    - name: deposit
+      positions: {shoulder_pan: -0.3, shoulder_lift: 1.0, ...}
+      cup:
+        mass_kg: 0.050                # Empty cup only after ball removed
+        offset_m: 0.040
+        label: "empty cup"
 """
 
 import rclpy
@@ -62,9 +124,101 @@ except ImportError:
     pass
 
 
+class CupPayload:
+    """Represents a held object (cup + ball bearing) attached at the wrist tip.
+
+    The cup is treated as a point mass located at `offset_m` beyond the end of the
+    hand link (i.e. further along the wrist/hand chain axis).  The FK code places
+    this mass and folds it into every torque calculation for every joint, just like
+    the existing link masses.
+
+    Attributes:
+        mass_kg   : total mass of cup + contents (kg)
+        offset_m  : distance from hand-link tip to cup COM along the tool axis (m)
+                    For a small printed cup this is typically 0.030-0.060 m.
+        label     : human-readable description shown in reports
+        _explicit_none : True when the pose explicitly declared `cup: ~` (null).
+                         This overrides any fallback default.
+    """
+    def __init__(self, mass_kg: float = 0.0, offset_m: float = 0.040,
+                 label: str = "cup+ball", _explicit_none: bool = False):
+        self.mass_kg       = float(mass_kg)
+        self.offset_m      = float(offset_m)
+        self.label         = label
+        self._explicit_none = _explicit_none
+
+    @classmethod
+    def empty(cls) -> 'CupPayload':
+        """No cup, no mass."""
+        return cls(mass_kg=0.0)
+
+    @classmethod
+    def explicit_none(cls) -> 'CupPayload':
+        """Sentinel: pose explicitly declared cup: ~ (null) — suppresses any default."""
+        return cls(mass_kg=0.0, _explicit_none=True)
+
+    @classmethod
+    def from_dict(cls, d) -> 'CupPayload':
+        """Construct from a YAML value.
+
+        - d is None / falsy   → explicit_none (pose declared `cup: ~`)
+        - d is a dict         → normal cup with mass_kg, offset_m, label
+        """
+        if d is None:
+            return cls.explicit_none()
+        return cls(
+            mass_kg        = float(d.get('mass_kg',  0.0)),
+            offset_m       = float(d.get('offset_m', 0.040)),
+            label          = str(d.get('label', 'cup+ball')),
+            _explicit_none = False
+        )
+
+    def is_empty(self) -> bool:
+        """True if this cup carries no mass (including explicit_none sentinel)."""
+        return self.mass_kg <= 0.0
+
+    def __repr__(self):
+        if self._explicit_none:
+            return "CupPayload(explicit_none)"
+        return f"CupPayload(mass={self.mass_kg*1000:.1f}g, offset={self.offset_m*1000:.1f}mm, label='{self.label}')"
+
+
+def resolve_cup(pose_cup_raw, sequence_cup: 'CupPayload', cli_cup: 'CupPayload') -> 'CupPayload':
+    """Determine the effective cup for a transition, using priority chain:
+
+      per-pose YAML cup  >  sequence-level YAML cup  >  CLI --cup-mass
+
+    Special case: if the pose declares `cup: ~` (null), that is an explicit
+    'no cup' and suppresses both sequence-level and CLI defaults.
+
+    Args:
+        pose_cup_raw  : raw value from pose_data.get('cup', _UNSET) — use the
+                        sentinel _POSE_CUP_UNSET to mean "key not present".
+        sequence_cup  : CupPayload resolved from the top-level YAML `cup:` block.
+        cli_cup       : CupPayload from --cup-mass (may be empty).
+
+    Returns:
+        CupPayload to use for the transition.
+    """
+    # Key was present in the pose
+    if pose_cup_raw is not _POSE_CUP_UNSET:
+        return CupPayload.from_dict(pose_cup_raw)   # handles None → explicit_none
+
+    # Key absent from pose → fall through to sequence-level, then CLI
+    if sequence_cup and not sequence_cup.is_empty():
+        return sequence_cup
+    if cli_cup and not cli_cup.is_empty():
+        return cli_cup
+    return CupPayload.empty()
+
+
+# Sentinel object — distinct from None so we can tell "key absent" vs "key: ~"
+_POSE_CUP_UNSET = object()
+
+
 class LoadTester(Node):
     """Unified load testing with what-if analysis and optional telemetry."""
-    
+
     def __init__(self):
         super().__init__('load_tester')
         
@@ -257,7 +411,7 @@ class LoadTester(Node):
         
         if DYNAMIXEL_AVAILABLE:
             try:
-                self.dxl_port = PortHandler('/dev/ttyOpenRB')
+                self.dxl_port = PortHandler('/dev/ttyUSB0')
                 self.dxl_packet = PacketHandler(2.0)
                 if self.dxl_port.openPort() and self.dxl_port.setBaudRate(57600):
                     self.get_logger().info('✓ Dynamixel SDK connected (telemetry enabled)')
@@ -638,95 +792,142 @@ class LoadTester(Node):
             'z': pen_com_z,
             'dist': pen_dist
         }
+
+        # --- END EFFECTOR (wrist tip / tool mount point) ---
+        # This is the reference point used to place cup/payload COMs.
+        # We track it explicitly so cup_payload can offset from here.
+        ee_x = pen_start_x
+        ee_z = pen_start_z
+        positions['_end_effector'] = {
+            'x': ee_x,
+            'z': ee_z,
+            'dist': np.sqrt(ee_x**2 + ee_z**2),
+            'wrist_angle': wrist_angle  # store for cup offset direction
+        }
         
         return positions
     
-    def calculate_torque_with_fk(self, joint_name, pose, payload_mass=0.0):
+    def _cup_com_position(self, com_positions: dict, cup: 'CupPayload') -> dict:
+        """Return the {x, z, dist} of the cup COM given FK positions and a CupPayload.
+
+        The cup COM is placed `cup.offset_m` beyond the end-effector along the tool axis
+        (same direction as the wrist/hand chain).
+        """
+        ee = com_positions['_end_effector']
+        wa = ee['wrist_angle']
+        cx = ee['x'] + cup.offset_m * np.cos(wa)
+        cz = ee['z'] + cup.offset_m * np.sin(wa)
+        return {'x': cx, 'z': cz, 'dist': np.sqrt(cx**2 + cz**2)}
+
+    def calculate_torque_with_fk(self, joint_name, pose, payload_mass=0.0, cup: 'CupPayload' = None):
         """Calculate torque using forward kinematics for accurate moment arms.
-        
+
         This is the CORRECT way to calculate torque - considers full arm configuration!
-        
+
         Args:
             joint_name: Joint to calculate torque for
             pose: Full arm configuration dict
-            payload_mass: Additional payload (kg)
-        
+            payload_mass: Legacy additional payload at pen tip (kg). Use `cup` instead.
+            cup: CupPayload instance describing a held cup/object. Overrides payload_mass
+                 for wrist-tip loads.
+
         Returns:
             Static torque (Nm) with correct moment arms
         """
         g = 9.81
-        
+
         # Get actual COM positions using FK
         com_positions = self.calculate_forward_kinematics(pose)
+
+        # Resolve cup contribution
+        cup_torque = 0.0
+        cup_z_from_elbow = 0.0
+        if cup and not cup.is_empty():
+            cup_com = self._cup_com_position(com_positions, cup)
+            # For shoulder: torque = m*g*|z|
+            cup_torque_shoulder = cup.mass_kg * g * abs(cup_com['z'])
+            # For elbow: need delta-z from elbow
+            lift = pose.get('shoulder_lift', 0.0)
+            L_upper_arm_elbow = 0.093
+            elbow_z = L_upper_arm_elbow * np.sin(lift)
+            cup_torque_elbow = cup.mass_kg * g * abs(cup_com['z'] - elbow_z)
+            # For wrist_flex: delta-z from wrist joint
+            # Reuse pen_link z as a proxy for wrist joint z (close enough)
+            wrist_j_z = com_positions['wrist_link']['z']
+            cup_torque_wrist = cup.mass_kg * g * abs(cup_com['z'] - wrist_j_z)
+        else:
+            cup_torque_shoulder = 0.0
+            cup_torque_elbow = 0.0
+            cup_torque_wrist = 0.0
         
         # Get joint angle
         joint_angle = pose.get(joint_name, 0.0)
-        
+
         if joint_name == 'shoulder_pan':
             # Vertical axis - no gravity torque
             return 0.0
-        
+
         elif joint_name == 'shoulder_lift':
             # All links downstream of shoulder
             links = ['upper_arm_link', 'forearm_link', 'wrist_link', 'hand_link', 'pen_link']
-            
+
             total_torque = 0.0
             for link in links:
                 mass = self.link_masses.get(link, 0.0)
-                # Use actual distance from FK (accounts for elbow/wrist bending!)
-                distance = com_positions[link]['dist']
                 z_height = com_positions[link]['z']
-                
-                # Torque = m * g * horizontal_distance
-                # horizontal_distance = distance * sin(angle_from_vertical)
-                # But we can use z_height directly: torque = m * g * z_height
                 torque = mass * g * abs(z_height)
                 total_torque += torque
-            
-            # Payload at pen tip
+
+            # Legacy payload at pen tip
             if payload_mass > 0:
                 pen_z = com_positions['pen_link']['z']
                 total_torque += payload_mass * g * abs(pen_z)
-            
+
+            # Cup payload at wrist tip
+            total_torque += cup_torque_shoulder
+
             return total_torque
-        
+
         elif joint_name == 'elbow_flex':
             # Links downstream of elbow
             links = ['forearm_link', 'wrist_link', 'hand_link', 'pen_link']
-            
+
             # Need to calculate torque relative to elbow joint
             lift = pose.get('shoulder_lift', 0.0)
             L_upper_arm = 0.093
             elbow_x = L_upper_arm * np.cos(lift)
             elbow_z = L_upper_arm * np.sin(lift)
-            
+
             total_torque = 0.0
             for link in links:
                 mass = self.link_masses.get(link, 0.0)
-                # Distance from elbow joint
                 link_x = com_positions[link]['x']
                 link_z = com_positions[link]['z']
-                dx = link_x - elbow_x
                 dz = link_z - elbow_z
-                distance_from_elbow = np.sqrt(dx**2 + dz**2)
-                
-                # Torque about elbow
                 torque = mass * g * abs(dz)
                 total_torque += torque
-            
-            # Payload
+
+            # Legacy payload
             if payload_mass > 0:
                 pen_z = com_positions['pen_link']['z']
                 dz = pen_z - elbow_z
                 total_torque += payload_mass * g * abs(dz)
-            
+
+            # Cup payload
+            total_torque += cup_torque_elbow
+
             return total_torque
-        
+
+        elif joint_name in ('wrist_flex', 'wrist_roll'):
+            # Use simplified model but add cup contribution
+            base_torque = self.calculate_static_torque(joint_name, joint_angle, payload_mass)
+            return base_torque + cup_torque_wrist
+
         else:
-            # Wrist joints - use simplified model (small effect)
             return self.calculate_static_torque(joint_name, joint_angle, payload_mass)
     
-    def analyze_pose_transition(self, pose_from, pose_to, movement_time=2.0, csv_output=None, yaml_file=None, transition_name=None):
+    def analyze_pose_transition(self, pose_from, pose_to, movement_time=2.0, csv_output=None,
+                                yaml_file=None, transition_name=None, cup: 'CupPayload' = None):
         """Analyze complete arm transition between two poses.
         
         This is the full analysis using forward kinematics!
@@ -738,6 +939,7 @@ class LoadTester(Node):
             csv_output: Optional path to CSV file for appending results
             yaml_file: Optional source YAML filename for CSV metadata
             transition_name: Optional name for this transition (e.g., "pose1 → pose2")
+            cup: Optional CupPayload describing a held object at the wrist tip
         
         Returns:
             dict of {joint_name: dynamics_analysis}
@@ -748,6 +950,8 @@ class LoadTester(Node):
         self.get_logger().info("FULL POSE TRANSITION ANALYSIS")
         self.get_logger().info(f"{'='*60}")
         self.get_logger().info(f"Movement time: {movement_time:.1f}s")
+        if cup and not cup.is_empty():
+            self.get_logger().info(f"Cup payload:   {cup.label}  {cup.mass_kg*1000:.1f}g @ {cup.offset_m*1000:.1f}mm offset")
         
         # Show pose configurations
         self.get_logger().info(f"\nFrom pose:")
@@ -769,8 +973,8 @@ class LoadTester(Node):
             angle_to = pose_to.get(joint_name, 0.0)
             
             # Calculate torques with FK (correct!)
-            static_torque_from = self.calculate_torque_with_fk(joint_name, pose_from)
-            static_torque_to = self.calculate_torque_with_fk(joint_name, pose_to)
+            static_torque_from = self.calculate_torque_with_fk(joint_name, pose_from, cup=cup)
+            static_torque_to = self.calculate_torque_with_fk(joint_name, pose_to, cup=cup)
             
             # Calculate torque with simplified model (for comparison)
             simple_torque_to = self.calculate_static_torque(joint_name, angle_to)
@@ -816,7 +1020,7 @@ class LoadTester(Node):
             }
         
         # Display results
-        self._display_pose_transition_results(results)
+        self._display_pose_transition_results(results, cup=cup)
         
         # Write to CSV if requested
         if csv_output:
@@ -829,11 +1033,11 @@ class LoadTester(Node):
             # Use provided yaml_file or default
             source_file = yaml_file if yaml_file else "manual_transition"
             
-            self.write_csv_results(csv_output, source_file, movement_time, transition_name, results)
+            self.write_csv_results(csv_output, source_file, movement_time, transition_name, results, cup=cup)
         
         return results
     
-    def _display_pose_transition_results(self, results):
+    def _display_pose_transition_results(self, results, cup=None):
         """Display pose transition analysis results."""
         
         self.get_logger().info(f"\n{'='*60}")
@@ -895,16 +1099,117 @@ class LoadTester(Node):
         if abs(max_fk_error[1]['fk_error_pct']) > 20:
             self.get_logger().warn(f"\n⚠️  FK correction significant for {max_fk_error[0]}: {max_fk_error[1]['fk_error_pct']:+.1f}%")
             self.get_logger().warn("   Simplified single-joint model would be inaccurate!")
+
+        # --- CUP / WRIST MARGIN REPORT ---
+        if cup and not cup.is_empty():
+            self.get_logger().info(f"\n{'='*60}")
+            self.get_logger().info(f"CUP PAYLOAD MARGIN REPORT  ({cup.label}  {cup.mass_kg*1000:.1f}g @ {cup.offset_m*1000:.1f}mm)")
+            self.get_logger().info(f"{'='*60}")
+            self.get_logger().info(f"  {'Joint':<16} {'Available':>10} {'Required':>10} {'Margin':>10} {'Headroom':>10}  Status")
+            self.get_logger().info(f"  {'-'*70}")
+            for joint_name in ('wrist_flex', 'wrist_roll', 'elbow_flex', 'shoulder_lift'):
+                if joint_name not in results:
+                    continue
+                d = results[joint_name]
+                margin_nm = d['available_torque'] - d['total_required']
+                headroom_pct = 100.0 - d['utilization']
+                if d['utilization'] > 100:
+                    status = "❌ OVERLOADED"
+                elif d['utilization'] > 80:
+                    status = "⚠️  HIGH"
+                elif d['utilization'] > 50:
+                    status = "⚠️  MODERATE"
+                else:
+                    status = "✓ OK"
+                self.get_logger().info(
+                    f"  {joint_name:<16} {d['available_torque']:>9.3f}Nm {d['total_required']:>9.3f}Nm "
+                    f"  {margin_nm:>+9.3f}Nm {headroom_pct:>8.1f}%  {status}"
+                )
     
-    def analyze_pose_sequence_from_yaml(self, yaml_file, movement_time=2.0, csv_output=None):
+    def cup_scan(self, pose_from, pose_to, movement_time=2.0,
+                 cup_offset_m=0.040, scan_max_kg=0.250, steps=20):
+        """Sweep cup masses from 0 to scan_max_kg and report safe limit.
+
+        For each mass step, runs a full FK transition analysis and records the
+        worst-case utilisation across all joints.  Prints a table and returns
+        the maximum safe mass (worst-case util < 80%).
+
+        Args:
+            pose_from / pose_to : joint-angle dicts
+            movement_time       : seconds
+            cup_offset_m        : distance from hand tip to cup COM (m)
+            scan_max_kg         : upper bound of mass sweep (kg)
+            steps               : number of mass steps
+
+        Returns:
+            max_safe_mass_kg (float)
+        """
+        self.get_logger().info(f"\n{'='*60}")
+        self.get_logger().info(f"CUP MASS SCAN  (offset={cup_offset_m*1000:.1f}mm, 0–{scan_max_kg*1000:.0f}g, {steps} steps)")
+        self.get_logger().info(f"{'='*60}")
+        self.get_logger().info(f"  {'Mass (g)':>9}  {'Worst joint':<16}  {'Util%':>7}  {'wrist_flex util%':>17}  {'wrist_roll util%':>17}  Status")
+        self.get_logger().info(f"  {'-'*85}")
+
+        masses = np.linspace(0.0, scan_max_kg, steps + 1)
+        max_safe_kg = 0.0
+        last_safe_kg = 0.0
+
+        for mass in masses:
+            cup = CupPayload(mass_kg=mass, offset_m=cup_offset_m)
+            results = {}
+            for joint_name in self.joint_names:
+                servo_type = self.current_servos[joint_name]
+                angle_from = pose_from.get(joint_name, 0.0)
+                angle_to   = pose_to.get(joint_name, 0.0)
+
+                static_torque_to = self.calculate_torque_with_fk(joint_name, pose_to, cup=cup)
+                angular_distance = self.calculate_angular_distance(joint_name, angle_from, angle_to)
+                accel_torque     = self.calculate_acceleration_torque(joint_name, angular_distance, movement_time)
+                avg_velocity     = abs(angular_distance) / movement_time if movement_time > 0 else 0
+                friction_torque  = self.calculate_dynamic_friction(joint_name, avg_velocity)
+                back_emf_loss, torque_factor = self.calculate_back_emf_losses(joint_name, avg_velocity, servo_type)
+                total_required   = static_torque_to + accel_torque + friction_torque
+                available_torque = self.servo_specs[servo_type]['stall_torque'] * torque_factor
+                utilization      = (total_required / available_torque * 100) if available_torque > 0 else float('inf')
+                results[joint_name] = {'utilization': utilization, 'total_required': total_required, 'available_torque': available_torque}
+
+            worst_joint, worst_data = max(results.items(), key=lambda x: x[1]['utilization'])
+            wf_util = results.get('wrist_flex', {}).get('utilization', 0.0)
+            wr_util = results.get('wrist_roll', {}).get('utilization', 0.0)
+
+            if worst_data['utilization'] > 100:
+                status = "❌ OVER"
+            elif worst_data['utilization'] > 80:
+                status = "⚠️  HIGH"
+            elif worst_data['utilization'] > 50:
+                status = "⚠️  MOD"
+            else:
+                status = "✓ SAFE"
+                last_safe_kg = mass
+
+            self.get_logger().info(
+                f"  {mass*1000:>9.1f}  {worst_joint:<16}  {worst_data['utilization']:>7.1f}  "
+                f"{wf_util:>17.1f}  {wr_util:>17.1f}  {status}"
+            )
+
+        self.get_logger().info(f"\n{'='*60}")
+        self.get_logger().info(f"Maximum SAFE cup mass  (util < 80%): {last_safe_kg*1000:.1f}g")
+        self.get_logger().info(f"Cup offset used: {cup_offset_m*1000:.1f}mm")
+        self.get_logger().info(f"{'='*60}")
+        return last_safe_kg
+
+    def analyze_pose_sequence_from_yaml(self, yaml_file, movement_time=2.0, csv_output=None, cli_cup: 'CupPayload' = None):
         """Analyze complete pose sequence from YAML file.
         
-        Compatible with pose_test.py YAML format.
+        Compatible with pose_test.py YAML format.  If the YAML contains a top-level
+        `cup` block (mass_kg, offset_m, label) it will be used as the cup payload
+        unless one is supplied via the `cup` argument (CLI takes precedence).
         
         Args:
             yaml_file: Path to YAML file
             movement_time: Default movement time between poses
             csv_output: Optional path to CSV file for appending results
+            cup: CupPayload from CLI (overrides YAML cup block if provided)
         """
         self.get_logger().info(f"\n{'='*60}")
         self.get_logger().info(f"YAML POSE SEQUENCE ANALYSIS")
@@ -927,48 +1232,80 @@ class LoadTester(Node):
         if not poses:
             self.get_logger().error("No poses found in YAML file!")
             return
-        
+
+        # Resolve sequence-level cup: CLI arg takes precedence over YAML block
+        if cli_cup and not cli_cup.is_empty():
+            sequence_cup = cli_cup
+            self.get_logger().info(f"Cup (CLI default):      {sequence_cup}")
+        else:
+            yaml_cup_data = data.get('cup', None)
+            if yaml_cup_data:
+                sequence_cup = CupPayload.from_dict(yaml_cup_data)
+                self.get_logger().info(f"Cup (YAML sequence):    {sequence_cup}")
+            else:
+                sequence_cup = CupPayload.empty()
+
+        if not sequence_cup.is_empty():
+            self.get_logger().info(f"  → {sequence_cup.mass_kg*1000:.1f}g payload at {sequence_cup.offset_m*1000:.1f}mm (sequence default; poses may override)")
+        else:
+            self.get_logger().info(f"  → No sequence-level cup; per-pose cup: blocks will be used if present")
+
         self.get_logger().info(f"Found {len(poses)} poses")
-        
+
         if csv_output:
             self.get_logger().info(f"CSV output: {csv_output}")
-        
+
         # Analyze each transition
         all_results = []
-        
+
         for i in range(len(poses) - 1):
             pose_from_data = poses[i]
-            pose_to_data = poses[i + 1]
-            
+            pose_to_data   = poses[i + 1]
+
             # Extract pose dictionaries
             pose_from = pose_from_data.get('positions', {})
-            pose_to = pose_to_data.get('positions', {})
-            
+            pose_to   = pose_to_data.get('positions', {})
+
             # Fill in missing joints with zeros
             for joint in self.joint_names:
                 if joint not in pose_from:
                     pose_from[joint] = 0.0
                 if joint not in pose_to:
                     pose_to[joint] = 0.0
-            
+
+            # --- Resolve per-pose cup for this transition ---
+            # The DESTINATION pose determines the cup (you're holding it when you arrive).
+            # Use _POSE_CUP_UNSET sentinel to distinguish "key absent" from "key: ~".
+            pose_to_cup_raw = pose_to_data.get('cup', _POSE_CUP_UNSET)
+            transition_cup  = resolve_cup(pose_to_cup_raw, sequence_cup, cli_cup)
+
+            from_name = pose_from_data.get('name', f'pose_{i}')
+            to_name   = pose_to_data.get('name',   f'pose_{i+1}')
+
             self.get_logger().info(f"\n{'='*60}")
-            self.get_logger().info(f"TRANSITION {i+1}/{len(poses)-1}: {pose_from_data.get('name', f'pose_{i}')} → {pose_to_data.get('name', f'pose_{i+1}')}")
+            self.get_logger().info(f"TRANSITION {i+1}/{len(poses)-1}: {from_name} → {to_name}")
+            if not transition_cup.is_empty():
+                self.get_logger().info(f"  Cup: {transition_cup.label}  {transition_cup.mass_kg*1000:.1f}g @ {transition_cup.offset_m*1000:.1f}mm")
+            else:
+                self.get_logger().info(f"  Cup: none")
             self.get_logger().info(f"{'='*60}")
-            
+
             # Create transition name for CSV
-            transition_name = f"{pose_from_data.get('name', f'pose_{i}')} → {pose_to_data.get('name', f'pose_{i+1}')}"
-            
+            transition_name = f"{from_name} → {to_name}"
+
             # Analyze with CSV output
             results = self.analyze_pose_transition(
-                pose_from, pose_to, movement_time, 
-                csv_output=csv_output, 
+                pose_from, pose_to, movement_time,
+                csv_output=csv_output,
                 yaml_file=yaml_basename,
-                transition_name=transition_name
+                transition_name=transition_name,
+                cup=transition_cup
             )
-            
+
             all_results.append({
-                'from': pose_from_data.get('name', f'pose_{i}'),
-                'to': pose_to_data.get('name', f'pose_{i+1}'),
+                'from': from_name,
+                'to':   to_name,
+                'cup':  transition_cup,
                 'results': results
             })
         
@@ -976,19 +1313,22 @@ class LoadTester(Node):
         self.get_logger().info(f"\n{'='*80}")
         self.get_logger().info("SEQUENCE SUMMARY")
         self.get_logger().info(f"{'='*80}")
-        
+        self.get_logger().info(f"  {'#':>2}  {'From':<15} {'To':<15}  {'Cup':<22}  {'St':>2}  {'Worst joint':<16}  {'Util%':>6}")
+        self.get_logger().info(f"  {'-'*80}")
+
         for i, transition in enumerate(all_results, 1):
             worst = max(transition['results'].items(), key=lambda x: x[1]['utilization'])
             worst_name, worst_data = worst
-            
+            cup_t = transition['cup']
+            cup_str = f"{cup_t.mass_kg*1000:.0f}g {cup_t.label}" if not cup_t.is_empty() else "—"
+
             status = "✓" if worst_data['utilization'] < 50 else "⚠️" if worst_data['utilization'] < 80 else "❌"
-            
+
             self.get_logger().info(
-                f"{i:2d}. {transition['from']:15s} → {transition['to']:15s}  "
-                f"{status} {worst_name:15s} {worst_data['utilization']:5.1f}%"
+                f"  {i:>2}  {transition['from']:<15} {transition['to']:<15}  {cup_str:<22}  {status}   {worst_name:<16}  {worst_data['utilization']:>6.1f}%"
             )
     
-    def write_csv_results(self, csv_file, yaml_file, movement_time, transition_name, results):
+    def write_csv_results(self, csv_file, yaml_file, movement_time, transition_name, results, cup=None):
         """Append analysis results to CSV file for Excel graphing.
         
         Args:
@@ -1007,6 +1347,9 @@ class LoadTester(Node):
             'yaml_file',
             'movement_time_sec',
             'transition',
+            'cup_label',
+            'cup_mass_g',
+            'cup_offset_mm',
             'joint_name',
             'servo_type',
             'angle_from_rad',
@@ -1046,6 +1389,9 @@ class LoadTester(Node):
                         'yaml_file': yaml_file,
                         'movement_time_sec': movement_time,
                         'transition': transition_name,
+                        'cup_label':     cup.label if cup else '',
+                        'cup_mass_g':    f"{cup.mass_kg*1000:.1f}" if cup else '0',
+                        'cup_offset_mm': f"{cup.offset_m*1000:.1f}" if cup else '0',
                         'joint_name': joint_name,
                         'servo_type': data['servo_type'],
                         'angle_from_rad': f"{data['angle_from']:.4f}",
@@ -1506,11 +1852,34 @@ Examples:
                        help='Analyze complete pose sequence from YAML file')
     parser.add_argument('--csv-output', type=str, metavar='CSV_FILE',
                        help='Append analysis results to CSV file for Excel graphing')
+
+    # --- CUP / PAYLOAD ARGS (v9) ---
+    cup_group = parser.add_argument_group('Cup/Payload simulation (v9)')
+    cup_group.add_argument('--cup-mass', type=float, default=0.0, metavar='KG',
+                       help='Mass of held cup + contents in kg (e.g. 0.080 for 80g). '
+                            'Overrides YAML cup block.')
+    cup_group.add_argument('--cup-offset', type=float, default=0.040, metavar='M',
+                       help='Distance from hand-link tip to cup COM along tool axis, metres '
+                            '(default: 0.040 = 40mm). Tune to match your printed cup geometry.')
+    cup_group.add_argument('--cup-label', type=str, default='cup+ball', metavar='LABEL',
+                       help='Human-readable label shown in reports (default: cup+ball)')
+    cup_group.add_argument('--cup-scan', action='store_true',
+                       help='Sweep cup masses from 0 to --cup-scan-max and report safe limit. '
+                            'Use with --analyze-transition.')
+    cup_group.add_argument('--cup-scan-max', type=float, default=0.250, metavar='KG',
+                       help='Upper bound for --cup-scan mass sweep in kg (default: 0.250 = 250g)')
     
     args, unknown = parser.parse_known_args()
     
     rclpy.init()
     tester = LoadTester()
+
+    # Build cup payload from CLI args (will be overridden by YAML if mass==0)
+    cli_cup = CupPayload(
+        mass_kg  = args.cup_mass,
+        offset_m = args.cup_offset,
+        label    = args.cup_label
+    ) if args.cup_mass > 0 else CupPayload()  # empty if not specified
     
     try:
         if args.full_analysis:
@@ -1520,28 +1889,38 @@ Examples:
             tester.compare_servos()
         
         elif args.analyze_sequence:
-            # NEW: Analyze YAML pose sequence
-            tester.analyze_pose_sequence_from_yaml(args.analyze_sequence, args.movement_time, args.csv_output)
+            tester.analyze_pose_sequence_from_yaml(
+                args.analyze_sequence, args.movement_time, args.csv_output,
+                cli_cup=cli_cup
+            )
         
         elif args.analyze_transition:
-            # NEW: Analyze pose transition
             if not args.pose_from or not args.pose_to:
                 print("Error: --analyze-transition requires --pose-from and --pose-to")
                 parser.print_help()
             else:
-                # Parse pose arrays
                 try:
                     from_angles = [float(x.strip()) for x in args.pose_from.split(',')]
-                    to_angles = [float(x.strip()) for x in args.pose_to.split(',')]
+                    to_angles   = [float(x.strip()) for x in args.pose_to.split(',')]
                     
                     if len(from_angles) != 6 or len(to_angles) != 6:
                         print("Error: Poses must have 6 angles (shoulder_pan,shoulder_lift,elbow_flex,wrist_flex,wrist_roll,pen_holder)")
                     else:
-                        # Convert to dict
                         pose_from = dict(zip(tester.joint_names, from_angles))
-                        pose_to = dict(zip(tester.joint_names, to_angles))
-                        
-                        tester.analyze_pose_transition(pose_from, pose_to, args.movement_time, args.csv_output)
+                        pose_to   = dict(zip(tester.joint_names, to_angles))
+
+                        if args.cup_scan:
+                            tester.cup_scan(
+                                pose_from, pose_to,
+                                movement_time  = args.movement_time,
+                                cup_offset_m   = args.cup_offset,
+                                scan_max_kg    = args.cup_scan_max
+                            )
+                        else:
+                            tester.analyze_pose_transition(
+                                pose_from, pose_to, args.movement_time, args.csv_output,
+                                cup=cli_cup
+                            )
                 except ValueError as e:
                     print(f"Error parsing poses: {e}")
         
