@@ -312,6 +312,105 @@
   </link>
 
 
+  <!-- ============================================================ -->
+  <!--  CUP ASSEMBLY  -->
+  <!--  Attach to your end-effector link, e.g. "pen_link"   -->
+  <!-- ============================================================ -->
+
+  <!-- Fixed joint: end effector → cup plate -->
+  <joint name="cup_plate_joint" type="fixed">
+    <parent link="pen_link"/>
+    <child  link="cup_plate_link"/>
+    <!-- Adjust xyz to position plate center above the wrist face -->
+    <origin xyz="0.03 0.00 0.04" rpy="3.1416 1.5708 0"/>
+  </joint>
+
+  <link name="cup_plate_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <!-- Wide flat plate: ~120mm diameter, ~8mm tall -->
+        <cylinder radius="0.030" length="0.008"/>
+      </geometry>
+      <material name="dark_grey">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.060" length="0.008"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.050"/>
+      <inertia ixx="0.000045" iyy="0.000045" izz="0.000090" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- Fixed joint: plate → cup ring -->
+  <joint name="cup_ring_joint" type="fixed">
+    <parent link="cup_plate_link"/>
+    <child  link="cup_ring_link"/>
+    <!-- Cup ring sits centered on top of the plate -->
+    <origin xyz="0.000 0.0 0.03" rpy="0 0 0"/>
+  </joint>
+
+  <link name="cup_ring_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <!-- Narrower ring: ~70mm diameter, ~45mm tall -->
+        <cylinder radius="0.015" length="0.045"/>
+      </geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.035" length="0.045"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.030"/>
+      <inertia ixx="0.000008" iyy="0.000008" izz="0.000018" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- Fixed joint for nominal/resting position of ball -->
+  <!-- In reality ball position is dynamic, but for digital twin -->
+  <!-- visualization we park it at center-bottom of cup ring -->
+  <joint name="ball_joint" type="fixed">
+    <parent link="cup_ring_link"/>
+    <child  link="ball_link"/>
+    <!-- Sit ball at bottom of cup ring, centered -->
+    <origin xyz="0.0 0.0 -0.04" rpy="0 0 0"/>
+  </joint>
+
+  <link name="ball_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <!-- Typical steel ball bearing: ~15mm diameter -->
+        <sphere radius="0.0075"/>
+      </geometry>
+      <material name="steel_silver">
+        <color rgba="0.75 0.75 0.80 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.0075"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.014"/>  <!-- ~14g for a 15mm steel ball -->
+      <inertia ixx="3.15e-7" iyy="3.15e-7" izz="3.15e-7"
+               ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
   <!-- ROS2 Control - Following working 4-DOF pattern -->
   <!-- ros2_control for Dynamixel Hardware -->
   <ros2_control name="koch_v11_system" type="system">
