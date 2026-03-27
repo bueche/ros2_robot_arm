@@ -30,6 +30,7 @@ setup(
         'console_scripts': [
                'robot_description_publisher = writing_robot_description.robot_description_publisher:main',
                'drawing_visualizer = writing_robot_description.drawing_visualizer:main',
+	       'servo_config_node = writing_robot_description.servo_config_node:main',
         ],
     },
 )

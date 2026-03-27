@@ -28,6 +28,9 @@ setup(
             'power_monitor_node = writing_robot_control.power_monitor_node:main',
             'power_logger = writing_robot_control.power_logger:main',
             'imu_balance_node = writing_robot_control.imu_balance_node:main',
+            'balance_test_injector = writing_robot_control.balance_test_injector:main',
+            'wrist_balance_controller = writing_robot_control.wrist_balance_controller:main',
+            'joint_nudge = writing_robot_control.joint_nudge:main',
        ],
     },
 )

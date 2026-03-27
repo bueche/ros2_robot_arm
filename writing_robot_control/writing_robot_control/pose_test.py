@@ -28,6 +28,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from sensor_msgs.msg import JointState
 from dynamixel_interfaces.msg import DynamixelState
 from builtin_interfaces.msg import Duration
+from std_msgs.msg import String as StringMsg
 import yaml
 import time
 import xml.etree.ElementTree as ET
@@ -670,8 +671,10 @@ class PoseTestNode(Node):
         self.declare_parameter('telemetry', False)
         self.declare_parameter('delay', 2.0)
         self.declare_parameter('movement_time', 2.0)
-        self.declare_parameter('urdf_file', '')  # NEW: Load URDF from file
-        self.declare_parameter('power_monitoring', False)  # NEW: Power monitoring
+        self.declare_parameter('urdf_file', '')
+        self.declare_parameter('power_monitoring', False)
+        self.declare_parameter('wait_for_stable', False)   # wait for /imu/is_stable before next pose
+        self.declare_parameter('stable_timeout',  10.0)    # max seconds to wait for stability
         
         # Get parameters
         self.poses_file = self.get_parameter('poses_file').value
@@ -685,6 +688,8 @@ class PoseTestNode(Node):
         self.movement_time = self.get_parameter('movement_time').value
         urdf_file = self.get_parameter('urdf_file').value
         self.power_monitoring_requested = self.get_parameter('power_monitoring').value
+        self.wait_for_stable = self.get_parameter('wait_for_stable').value
+        self.stable_timeout  = self.get_parameter('stable_timeout').value
         
         # Joint names (Koch v1.1 - 6 DOF)
         self.joint_names = [
@@ -710,6 +715,21 @@ class PoseTestNode(Node):
         self.publisher = self.create_publisher(
             JointTrajectory,
             '/koch_v11_controller/joint_trajectory',
+            10
+        )
+
+        # Arm state publisher — signals imu_balance_node to enable/disable PID.
+        # Publishes 'MOVING' before each pose command, 'SETTLED' after movement
+        # + delay completes.  imu_balance_node subscribes to gate its PID loop.
+        self._arm_state_pub = self.create_publisher(StringMsg, '/arm_state', 10)
+
+        # Track stability signal from imu_balance_node (used when wait_for_stable=True).
+        # Gracefully absent if imu_balance_node is not running.
+        from std_msgs.msg import Bool as BoolMsg
+        self._is_stable = False
+        self.create_subscription(
+            BoolMsg, '/imu/is_stable',
+            lambda msg: setattr(self, '_is_stable', msg.data),
             10
         )
         
@@ -781,6 +801,10 @@ class PoseTestNode(Node):
             self.get_logger().info(f'Power Monitoring: Enabled')
         self.get_logger().info(f'Movement time: {self.movement_time}s')
         self.get_logger().info(f'Delay between poses: {self.delay}s')
+        if self.wait_for_stable:
+            self.get_logger().info(
+                f'Wait for stable: YES (timeout: {self.stable_timeout:.1f}s)'
+            )
         self.get_logger().info('='*60)
     
     def get_urdf_content(self, urdf_file=''):
@@ -817,6 +841,43 @@ class PoseTestNode(Node):
         while (time.time() - start) < duration:
             rclpy.spin_once(self, timeout_sec=0.01)
             time.sleep(0.01)
+
+    def _publish_arm_state(self, state: str):
+        """
+        Publish arm state to /arm_state for imu_balance_node.
+        state: 'MOVING' or 'SETTLED'
+        """
+        msg = StringMsg()
+        msg.data = state
+        self._arm_state_pub.publish(msg)
+
+    def _wait_for_stable(self):
+        """
+        Block until /imu/is_stable is True or stable_timeout expires.
+        Only called when wait_for_stable=True AND imu_balance_node is running.
+        Returns True if stable was achieved, False if timed out.
+        """
+        if not self.wait_for_stable:
+            return True
+
+        self.get_logger().info(
+            f'  ⏳ Waiting for cup stability (timeout: {self.stable_timeout:.1f}s)...'
+        )
+        start = time.time()
+        self._is_stable = False   # reset before waiting
+
+        while (time.time() - start) < self.stable_timeout:
+            rclpy.spin_once(self, timeout_sec=0.05)
+            if self._is_stable:
+                elapsed = time.time() - start
+                self.get_logger().info(f'  ✓ Cup stable after {elapsed:.2f}s')
+                return True
+
+        self.get_logger().warn(
+            f'  ⚠️  Stability timeout after {self.stable_timeout:.1f}s — '
+            f'proceeding anyway (cup may not be balanced)'
+        )
+        return False
     
     def validate_pose(self, pose_name, positions):
         """Validate pose against URDF limits."""
@@ -880,7 +941,9 @@ class PoseTestNode(Node):
                 return False
         
         self.send_pose('safe_position', self.safe_position, self.movement_time)
+        self._publish_arm_state('MOVING')
         self.spin_for_duration(self.movement_time + 1.0)
+        self._publish_arm_state('SETTLED')
         
         self.get_logger().info('✓ At safe position\n')
         return True
@@ -1068,6 +1131,9 @@ class PoseTestNode(Node):
                     self.get_logger().error('Validation failed - aborting sequence')
                     return False
             
+            # Signal imu_balance_node that arm is about to move
+            self._publish_arm_state('MOVING')
+
             # Start power tracking
             if self.power_monitor:
                 self.power_monitor.start_tracking(pose_name, idx)
@@ -1080,6 +1146,12 @@ class PoseTestNode(Node):
             
             # Wait for movement + delay (spin to allow callbacks)
             self.spin_for_duration(self.movement_time + self.delay)
+
+            # Signal imu_balance_node that arm has settled — PID may activate
+            self._publish_arm_state('SETTLED')
+
+            # Optionally wait for cup to stabilise before moving to next pose
+            self._wait_for_stable()
             
             # Stop power tracking
             if self.power_monitor:

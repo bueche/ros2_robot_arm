@@ -54,7 +54,9 @@ class PowerMonitorNode(Node):
                 
                 # Skip comment lines
                 if line.startswith('#'):
-                    return
+                   if line.count("fail") > 0 or line.count("Fail") > 0 or line.count("ERROR") > 0:
+                        self.get_logger().info("error: " + line)
+                   return
                 
                 # Parse CSV: t_us,bus12_v,shunt12_mv,current12_A,power12_W,bus5_v,shunt5_mv,current5_A,power5_W
                 parts = line.split(',')

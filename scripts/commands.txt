@@ -51,6 +51,9 @@ ros2 topic echo /joint_states
 ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/delivery_poses.yaml -p validate:=true -p telemetry:=true \
 -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf -p power_monitoring:=true -p delay:=1.0
 
+ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/balance_v1.yaml -p validate:=true -p telemetry:=true \
+-p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real_for_balance.urdf -p power_monitoring:=true -p delay:=1.0
+
 ros2 run writing_robot_control power_monitor_node
 
  ros2 run writing_robot_control power_logger
@@ -64,3 +67,20 @@ ros2 topic echo /imu/raw
 
 screen /dev/ttyIMU 115200
 # Ctrl+A then K to exit
+
+python3 -c "
+import serial, time
+s = serial.Serial('/dev/ttyIMU', 115200, timeout=2)
+for _ in range(20):
+    print(repr(s.readline()))
+"
+
+# holding a cup nearly level
+
+ros2 topic pub --once /koch_v11_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "{
+  joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, pen_holder],
+  points: [
+    {positions: [1.50, 2.5635, 1.0705, 2.485, 1.5999,  1.463], time_from_start: {sec: 6}}
+  ]
+}"
+

@@ -20,7 +20,7 @@ def generate_launch_description():
 
     # Get paths
     pkg_path = get_package_share_directory('writing_robot_description')
-    urdf_file        = os.path.join(pkg_path, 'urdf',   'koch_v11_arm_real.urdf')
+    urdf_file        = os.path.join(pkg_path, 'urdf',   'koch_v11_arm_real_for_balance.urdf')
     controllers_file = os.path.join(pkg_path, 'config', 'koch_v11_controllers_real.yaml')
     #servo_config_node = os.path.join(pkg_path, 'scripts', 'servo_config_node.py')
 
