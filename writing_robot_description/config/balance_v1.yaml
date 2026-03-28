@@ -49,8 +49,8 @@ poses:
   - name: pose 6 - back 
     positions:
       shoulder_pan: 1.50
-      shoulder_lift: 2.5635
-      elbow_flex: 1.0705
+      shoulder_lift: 2.7635
+      elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.5999
       pen_holder: 0.977
@@ -86,8 +86,17 @@ poses:
   - name: pose 9 - back 
     positions:
       shoulder_pan: 1.50
+      shoulder_lift: 2.7635
+      elbow_flex: 1.4705
+      wrist_flex: 2.7
+      wrist_roll: 1.5999
+      pen_holder: 0.977
+
+  - name: pose 10 - center 
+    positions:
+      shoulder_pan: 1.50
       shoulder_lift: 2.5635
-      elbow_flex: 1.0705
+      elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.5999
       pen_holder: 0.977
