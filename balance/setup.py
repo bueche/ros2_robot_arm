@@ -21,7 +21,7 @@ setup(
     entry_points={
        'console_scripts': [
             'ball_detector_node = balance.ball_detector_node:main',
-            'ball_marker_node = balance.marker_node:main',
+            'ball_marker_node = balance.ball_marker_node:main',
        ],
     },
 )

@@ -83,7 +83,7 @@ class BallDetectorNode(Node):
         self.declare_parameter('roi_h', 0)
 
         # Cup
-        self.declare_parameter('cup_min_area',          3000.0)
+        self.declare_parameter('cup_min_area',         10000.0)
         self.declare_parameter('cup_max_area',        200000.0)
         self.declare_parameter('cup_dark_thresh',         80)
         self.declare_parameter('cup_min_ellipse_ratio',    0.3)
@@ -165,9 +165,7 @@ class BallDetectorNode(Node):
                 self.get_logger().warn(f'Cannot read {path}')
                 return
             self._test_idx = (self._test_idx + 1) % len(self._test_images)
-            # Reset ellipse smoothing on each new image so static
-            # images don't bleed into each other
-            self._ellipse = None
+            # Don't reset ellipse between images — keeps marker stable
             self.get_logger().info(
                 f'Test image {self._test_idx}/{len(self._test_images)}: '
                 f'{path.split("/")[-1]}',

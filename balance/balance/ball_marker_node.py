@@ -43,12 +43,12 @@ class BallMarkerNode(Node):
         super().__init__('ball_marker_node')
 
         # ── parameters ────────────────────────────────────────────────────
-        self.declare_parameter('hand_link_frame',  'hand_link')
-        self.declare_parameter('cup_radius_m',     0.05)
+        self.declare_parameter('hand_link_frame',  'cup_plate_link')
+        self.declare_parameter('cup_radius_m',     0.02965)  # 29.65mm plate radius
         self.declare_parameter('cup_depth_m',      0.02)
         self.declare_parameter('ball_radius_m',    0.006)
         self.declare_parameter('tilt_arrow_scale', 0.10)
-        self.declare_parameter('marker_lifetime',  0.15)
+        self.declare_parameter('marker_lifetime',  0.5)
 
         # ── state ─────────────────────────────────────────────────────────
         self._ball_pos     = None   # Point (normalised, z=-1 if not detected)
@@ -90,7 +90,10 @@ class BallMarkerNode(Node):
         arr_scale = p('tilt_arrow_scale')
         lifetime  = p('marker_lifetime')
 
-        now = self.get_clock().now().to_msg()
+        # Use zero timestamp so RViz uses latest TF rather than
+        # trying to match a specific time (prevents transform errors)
+        from builtin_interfaces.msg import Time as RosTime
+        now = RosTime()  # zero time = use latest available transform
         markers = MarkerArray()
 
         # ── ID 2: Cup ring (always shown if we have a frame) ──────────────
@@ -103,11 +106,15 @@ class BallMarkerNode(Node):
         cup_marker.action          = Marker.ADD
         cup_marker.pose.position.x = 0.0
         cup_marker.pose.position.y = 0.0
-        cup_marker.pose.position.z = -cup_d
+        cup_marker.pose.position.z = 0.0   # plate surface in cup_plate_link frame
+        # Identity — cup_plate_link Z already points up out of plate
+        cup_marker.pose.orientation.x = 0.0
+        cup_marker.pose.orientation.y = 0.0
+        cup_marker.pose.orientation.z = 0.0
         cup_marker.pose.orientation.w = 1.0
         cup_marker.scale.x         = cup_r * 2.0   # diameter
         cup_marker.scale.y         = cup_r * 2.0
-        cup_marker.scale.z         = 0.002          # thin disc
+        cup_marker.scale.z         = 0.003          # thin disc (3mm)
         # Green if cup detected, grey if lost
         if self._cup_detected:
             cup_marker.color = ColorRGBA(r=0.0, g=0.9, b=0.2, a=0.4)
@@ -135,70 +142,65 @@ class BallMarkerNode(Node):
                          self._ball_pos.z >= 0.0)
 
         if ball_detected:
-            # Map normalised camera coords to 3D cup frame
-            # Camera x → robot y (lateral), camera y → robot x (forward)
-            # Flip y because image y increases downward
-            bx = -self._ball_pos.y * cup_r   # image y → -X in cup frame
-            by =  self._ball_pos.x * cup_r   # image x →  Y in cup frame
+            # Map normalised camera coords to cup_plate_link frame
+            # cup_plate_link: X=forward, Y=left, Z=up out of plate
+            # Camera norm_x and norm_y mapping determined empirically:
+            #   norm_x (+right on screen) → plate X
+            #   norm_y (+down on screen)  → plate Y (negated)
+            # These signs can be flipped with invert_x/invert_y parameters
+            bx =  self._ball_pos.x * cup_r
+            by = -self._ball_pos.y * cup_r
             ball_marker.pose.position.x = bx
             ball_marker.pose.position.y = by
-            ball_marker.pose.position.z = -cup_d + ball_r
+            ball_marker.pose.position.z = ball_r   # sits on plate surface
             ball_marker.color = ColorRGBA(r=0.9, g=0.1, b=0.1, a=0.9)
         else:
             # Park ball marker at centre, ghost it out
             ball_marker.pose.position.x = 0.0
             ball_marker.pose.position.y = 0.0
-            ball_marker.pose.position.z = -cup_d + ball_r
+            ball_marker.pose.position.z = ball_r
             ball_marker.color = ColorRGBA(r=0.5, g=0.5, b=0.5, a=0.2)
 
         ball_marker.pose.orientation.w = 1.0
         markers.markers.append(ball_marker)
 
-        # ── ID 1: Tilt arrow (from IMU) ───────────────────────────────────
+        # ── ID 1: Tilt arrow (from IMU) — always published, invisible if no IMU
+        arrow = Marker()
+        arrow.header.frame_id = frame
+        arrow.header.stamp    = now
+        arrow.ns              = 'ball_tracking'
+        arrow.id              = 1
+        arrow.type            = Marker.ARROW
+        arrow.action          = Marker.ADD
+        arrow.lifetime        = rclpy.duration.Duration(
+            seconds=lifetime).to_msg()
+
+        from geometry_msgs.msg import Point as GPoint
+        start = GPoint()
+        start.x = 0.0; start.y = 0.0; start.z = ball_r
+
+        end = GPoint()
+
         if self._tilt is not None:
-            arrow = Marker()
-            arrow.header.frame_id = frame
-            arrow.header.stamp    = now
-            arrow.ns              = 'ball_tracking'
-            arrow.id              = 1
-            arrow.type            = Marker.ARROW
-            arrow.action          = Marker.ADD
-            arrow.lifetime        = rclpy.duration.Duration(
-                seconds=lifetime).to_msg()
-
-            # Arrow: from cup centre, pointing in direction of tilt
-            # pitch_err (x) → tilt in robot X direction
-            # roll_err  (y) → tilt in robot Y direction
-            pitch = self._tilt.x   # rad
-            roll  = self._tilt.y   # rad
-
+            pitch    = self._tilt.x
+            roll     = self._tilt.y
             tilt_mag = math.sqrt(pitch**2 + roll**2)
-
-            from geometry_msgs.msg import Point as GPoint
-            start = GPoint()
-            start.x = 0.0
-            start.y = 0.0
-            start.z = -cup_d
-
-            end = GPoint()
-            end.x = -pitch * arr_scale  # pitch forward → arrow forward
-            end.y = -roll  * arr_scale  # roll right   → arrow right
-            end.z = -cup_d
-
-            arrow.points = [start, end]
-            arrow.scale.x = 0.004   # shaft diameter
-            arrow.scale.y = 0.008   # head diameter
-            arrow.scale.z = 0.010   # head length
-
-            # Colour: green when level, orange when tilted
-            intensity = min(tilt_mag / 0.2, 1.0)   # saturates at ~11°
+            end.x = -pitch * arr_scale
+            end.y = -roll  * arr_scale
+            end.z = ball_r
+            intensity = min(tilt_mag / 0.2, 1.0)
             arrow.color = ColorRGBA(
-                r=intensity,
-                g=1.0 - intensity * 0.5,
-                b=0.0,
-                a=0.9)
+                r=intensity, g=1.0 - intensity * 0.5, b=0.0, a=0.9)
+        else:
+            # No IMU — publish zero-length invisible arrow to keep array size constant
+            end.x = 0.0; end.y = 0.0; end.z = ball_r
+            arrow.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
 
-            markers.markers.append(arrow)
+        arrow.points = [start, end]
+        arrow.scale.x = 0.004
+        arrow.scale.y = 0.008
+        arrow.scale.z = 0.010
+        markers.markers.append(arrow)
 
         # ── ID 3: Status text ─────────────────────────────────────────────
         text = Marker()

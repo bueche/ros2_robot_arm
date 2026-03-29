@@ -84,3 +84,10 @@ ros2 topic pub --once /koch_v11_controller/joint_trajectory trajectory_msgs/msg/
   ]
 }"
 
+ros2 run balance ball_detector_node \
+  --ros-args \
+  -p test_image_dir:=src/balance/tests/ball_test_images \
+  -p test_image_hz:=1.0 \
+  -p roi_x:=150 -p roi_y:=100 \
+  -p roi_w:=350 -p roi_h:=400 \
+  -p ball_bright_thresh:=220
