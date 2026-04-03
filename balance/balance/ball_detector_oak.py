@@ -120,24 +120,17 @@ class BallDetectorOakNode(Node):
         self._running      = True
         self._host_model   = None
 
-        # ── build pipeline ─────────────────────────────────────────────────
+        # ── build pipeline (depthai v3 API) ───────────────────────────────
         mode = self.get_parameter('inference_mode').value
         self.get_logger().info(f'Inference mode: {mode}')
 
         if mode == 'myriadx':
-            pipeline = self._build_myriadx_pipeline()
+            self._q_rgb, self._q_depth, self._q_det = \
+                self._build_myriadx_pipeline_v3()
         else:
-            pipeline = self._build_host_pipeline()
+            self._q_rgb, self._q_depth = self._build_host_pipeline_v3()
+            self._q_det = None
             self._host_model = self._load_host_model()
-
-        self._device = dai.Device(pipeline)
-        self._q_rgb   = self._device.getOutputQueue(
-            'rgb',   maxSize=1, blocking=False)
-        self._q_depth = self._device.getOutputQueue(
-            'depth', maxSize=1, blocking=False)
-        self._q_det = (self._device.getOutputQueue(
-            'detections', maxSize=1, blocking=False)
-            if mode == 'myriadx' else None)
 
         # ── grab thread ────────────────────────────────────────────────────
         self._grab_thread = threading.Thread(
@@ -148,115 +141,102 @@ class BallDetectorOakNode(Node):
         self._timer = self.create_timer(1.0 / hz, self._tick)
         self.get_logger().info('ball_detector_oak v2 ready')
 
-    # ── Pipeline builders ──────────────────────────────────────────────────
+    # ── Pipeline builders (depthai v3 API) ────────────────────────────────
 
-    def _build_myriadx_pipeline(self):
+    def _build_myriadx_pipeline_v3(self):
+        """
+        depthai v3 pipeline using Camera node (replaces ColorCamera/MonoCamera).
+        DetectionNetwork replaces YoloDetectionNetwork.
+        No XLinkOut nodes — createOutputQueue() on node outputs directly.
+        """
         blob_path  = self.get_parameter('blob_path').value
         input_size = self.get_parameter('input_size').value
 
         if not blob_path or not os.path.exists(blob_path):
             raise RuntimeError(
                 f'blob_path not found: "{blob_path}"\n'
-                f'Copy ball_detector.blob to your package/models/ '
-                f'and set blob_path parameter.')
+                f'Set blob_path parameter to your .blob file.')
 
         pipeline = dai.Pipeline()
 
-        # RGB camera
-        cam = pipeline.create(dai.node.ColorCamera)
-        cam.setBoardSocket(dai.CameraBoardSocket.CAM_A)
-        cam.setResolution(
-            dai.ColorCameraProperties.SensorResolution.THE_720_P)
-        cam.setInterleaved(False)
-        cam.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
-        cam.setPreviewSize(input_size, input_size)
-        cam.setFps(self.get_parameter('rgb_fps').value)
-        exp_us = self.get_parameter('exposure_us').value
-        if exp_us > 0:
-            cam.initialControl.setManualExposure(
-                exp_us, self.get_parameter('iso').value)
+        # v3 Camera node replaces ColorCamera
+        cam = pipeline.create(dai.node.Camera).build(
+            dai.CameraBoardSocket.CAM_A)
 
-        # YOLO detection on MyriadX
-        det = pipeline.create(dai.node.YoloDetectionNetwork)
+        # Full-res RGB output for debug image — STRETCH handles AR mismatch
+        rgb_out = cam.requestOutput(
+            (1280, 720),
+            type=dai.ImgFrame.Type.BGR888p,
+            resizeMode=dai.ImgResizeMode.STRETCH)
+        q_rgb = rgb_out.createOutputQueue(maxSize=1, blocking=False)
+
+        # Resized output for NN input
+        nn_out = cam.requestOutput(
+            (input_size, input_size),
+            type=dai.ImgFrame.Type.BGR888p,
+            resizeMode=dai.ImgResizeMode.STRETCH)
+
+        # DetectionNetwork replaces YoloDetectionNetwork in v3
+        det = pipeline.create(dai.node.DetectionNetwork)
         det.setBlobPath(blob_path)
         det.setConfidenceThreshold(
             self.get_parameter('conf_threshold').value)
-        det.setNumClasses(len(CLASS_NAMES))
-        det.setCoordinateSize(4)
-        det.setAnchors([])
-        det.setAnchorMasks({})
-        det.setIouThreshold(self.get_parameter('iou_threshold').value)
-        det.input.setBlocking(False)
-        det.input.setQueueSize(1)
-        cam.preview.link(det.input)
+        nn_out.link(det.input)
 
-        # Full-res video out for debug image
-        xout_rgb = pipeline.create(dai.node.XLinkOut)
-        xout_rgb.setStreamName('rgb')
-        xout_rgb.input.setBlocking(False)
-        xout_rgb.input.setQueueSize(1)
-        cam.video.link(xout_rgb.input)
+        q_det   = det.out.createOutputQueue(maxSize=1, blocking=False)
+        q_depth = self._add_stereo_v3(pipeline)
 
-        # Detection results out
-        xout_det = pipeline.create(dai.node.XLinkOut)
-        xout_det.setStreamName('detections')
-        xout_det.input.setBlocking(False)
-        xout_det.input.setQueueSize(1)
-        det.out.link(xout_det.input)
+        pipeline.start()
+        self._pipeline = pipeline
+        return q_rgb, q_depth, q_det
 
-        # Stereo depth
-        self._add_stereo(pipeline, cam)
-        return pipeline
-
-    def _build_host_pipeline(self):
+    def _build_host_pipeline_v3(self):
+        """depthai v3 host pipeline — RGB + depth, inference on host GPU."""
         pipeline = dai.Pipeline()
 
-        cam = pipeline.create(dai.node.ColorCamera)
-        cam.setBoardSocket(dai.CameraBoardSocket.CAM_A)
-        cam.setResolution(
-            dai.ColorCameraProperties.SensorResolution.THE_720_P)
-        cam.setInterleaved(False)
-        cam.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
-        cam.setFps(self.get_parameter('rgb_fps').value)
-        exp_us = self.get_parameter('exposure_us').value
-        if exp_us > 0:
-            cam.initialControl.setManualExposure(
-                exp_us, self.get_parameter('iso').value)
+        cam = pipeline.create(dai.node.Camera).build(
+            dai.CameraBoardSocket.CAM_A)
+        rgb_out = cam.requestOutput(
+            (1280, 720),
+            type=dai.ImgFrame.Type.BGR888p,
+            resizeMode=dai.ImgResizeMode.STRETCH)
+        q_rgb   = rgb_out.createOutputQueue(maxSize=1, blocking=False)
+        q_depth = self._add_stereo_v3(pipeline)
 
-        xout_rgb = pipeline.create(dai.node.XLinkOut)
-        xout_rgb.setStreamName('rgb')
-        xout_rgb.input.setBlocking(False)
-        xout_rgb.input.setQueueSize(1)
-        cam.video.link(xout_rgb.input)
+        pipeline.start()
+        self._pipeline = pipeline
+        return q_rgb, q_depth
 
-        self._add_stereo(pipeline, cam)
-        return pipeline
-
-    def _add_stereo(self, pipeline, cam_rgb):
-        mono_l = pipeline.create(dai.node.MonoCamera)
-        mono_r = pipeline.create(dai.node.MonoCamera)
-        stereo  = pipeline.create(dai.node.StereoDepth)
-
-        mono_l.setBoardSocket(dai.CameraBoardSocket.CAM_B)
-        mono_r.setBoardSocket(dai.CameraBoardSocket.CAM_C)
+    def _add_stereo_v3(self, pipeline):
+        """Add stereo depth to pipeline using v3 Camera node."""
         fps = self.get_parameter('rgb_fps').value
-        mono_l.setFps(fps)
-        mono_r.setFps(fps)
 
+        # v3: Camera node replaces MonoCamera
+        cam_left  = pipeline.create(dai.node.Camera).build(
+            dai.CameraBoardSocket.CAM_B)
+        cam_right = pipeline.create(dai.node.Camera).build(
+            dai.CameraBoardSocket.CAM_C)
+
+        # OAK-D Lite mono cameras (OV7251) only support 480p or 400p
+        left_out  = cam_left.requestOutput(
+            (640, 400), type=dai.ImgFrame.Type.GRAY8)
+        right_out = cam_right.requestOutput(
+            (640, 400), type=dai.ImgFrame.Type.GRAY8)
+
+        stereo = pipeline.create(dai.node.StereoDepth)
+        # v3: FAST_DENSITY replaces HIGH_DENSITY
         stereo.setDefaultProfilePreset(
-            dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+            dai.node.StereoDepth.PresetMode.FAST_DENSITY)
         stereo.setLeftRightCheck(True)
         stereo.setExtendedDisparity(True)
         stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
+        # Must be multiple of 16 — 640x400 matches mono camera output
+        stereo.setOutputSize(640, 400)
 
-        mono_l.out.link(stereo.left)
-        mono_r.out.link(stereo.right)
+        left_out.link(stereo.left)
+        right_out.link(stereo.right)
 
-        xout_depth = pipeline.create(dai.node.XLinkOut)
-        xout_depth.setStreamName('depth')
-        xout_depth.input.setBlocking(False)
-        xout_depth.input.setQueueSize(1)
-        stereo.depth.link(xout_depth.input)
+        return stereo.depth.createOutputQueue(maxSize=1, blocking=False)
 
     def _load_host_model(self):
         engine_path = self.get_parameter('engine_path').value
@@ -447,8 +427,11 @@ class BallDetectorOakNode(Node):
 
     def destroy_node(self):
         self._running = False
-        if hasattr(self, '_device'):
-            self._device.close()
+        if hasattr(self, '_pipeline'):
+            try:
+                self._pipeline.stop()
+            except Exception:
+                pass
         super().destroy_node()
 
 
