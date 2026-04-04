@@ -239,20 +239,178 @@ class BallDetectorOakNode(Node):
         return stereo.depth.createOutputQueue(maxSize=1, blocking=False)
 
     def _load_host_model(self):
+        """
+        Load inference model. Priority: TensorRT engine > ONNX CPU.
+        TensorRT uses the Orin GPU via host-mounted tensorrt libs.
+        ONNX Runtime (CPU) is the fallback — no GPU needed.
+        """
         engine_path = self.get_parameter('engine_path').value
         onnx_path   = self.get_parameter('onnx_path').value
-        from ultralytics import YOLO
+
         if engine_path and os.path.exists(engine_path):
-            self.get_logger().info(f'Loading TensorRT: {engine_path}')
-            return YOLO(engine_path)
+            self.get_logger().info(f'Loading TensorRT engine: {engine_path}')
+            return self._load_trt_engine(engine_path)
         elif onnx_path and os.path.exists(onnx_path):
-            self.get_logger().info(f'Loading ONNX: {onnx_path}')
-            return YOLO(onnx_path)
+            self.get_logger().info(f'Loading ONNX (CPU fallback): {onnx_path}')
+            return self._load_onnx_model(onnx_path)
         else:
             raise RuntimeError(
-                'host mode requires engine_path or onnx_path')
+                'host mode requires engine_path (TensorRT .engine) '
+                'or onnx_path (ONNX .onnx).\n'
+                f'engine_path="{engine_path}" onnx_path="{onnx_path}"')
 
-    # ── Grab loop ──────────────────────────────────────────────────────────
+    def _load_trt_engine(self, engine_path):
+        """Load TensorRT engine and allocate CUDA buffers."""
+        import tensorrt as trt
+        logger  = trt.Logger(trt.Logger.WARNING)
+        runtime = trt.Runtime(logger)
+        with open(engine_path, 'rb') as f:
+            engine = runtime.deserialize_cuda_engine(f.read())
+        context = engine.create_execution_context()
+
+        # TensorRT 10.x named tensor I/O
+        input_name   = engine.get_tensor_name(0)
+        output_name  = engine.get_tensor_name(1)
+        input_shape  = tuple(engine.get_tensor_shape(input_name))
+        output_shape = tuple(engine.get_tensor_shape(output_name))
+
+        self.get_logger().info(
+            f'TensorRT loaded. In:{input_name}{input_shape} '
+            f'Out:{output_name}{output_shape}')
+
+        import ctypes
+        # Try cuda-bindings (available via tensorrt package)
+        try:
+            import cuda.bindings.runtime as cudart
+            input_nbytes  = int(np.prod(input_shape))  * 4
+            output_nbytes = int(np.prod(output_shape)) * 4
+            _, d_in  = cudart.cudaMalloc(input_nbytes)
+            _, d_out = cudart.cudaMalloc(output_nbytes)
+            context.set_tensor_address(input_name,  int(d_in))
+            context.set_tensor_address(output_name, int(d_out))
+            use_cuda_bindings = True
+        except Exception as e:
+            self.get_logger().warn(f'cuda-bindings not available: {e}. '
+                                   f'Falling back to numpy pinned memory.')
+            use_cuda_bindings = False
+            d_in = d_out = None
+            input_nbytes = output_nbytes = 0
+
+        return {
+            'type':              'trt',
+            'context':           context,
+            'input_name':        input_name,
+            'output_name':       output_name,
+            'input_shape':       input_shape,
+            'output_shape':      output_shape,
+            'use_cuda_bindings': use_cuda_bindings,
+            'd_in':  d_in,  'd_out': d_out,
+            'input_nbytes':  input_nbytes,
+            'output_nbytes': output_nbytes,
+        }
+
+    def _load_onnx_model(self, onnx_path):
+        """Load ONNX model using onnxruntime CPU."""
+        import onnxruntime as ort
+        session = ort.InferenceSession(
+            onnx_path, providers=['CPUExecutionProvider'])
+        self.get_logger().info(
+            f'ONNX CPU ready: {session.get_inputs()[0].name} '
+            f'{session.get_inputs()[0].shape}')
+        return {'type': 'onnx', 'session': session}
+
+    def _run_host(self, frame):
+        """Dispatch to TensorRT or ONNX inference."""
+        if self._host_model['type'] == 'trt':
+            preds = self._infer_trt(frame)
+        else:
+            preds = self._infer_onnx(frame)
+        return self._decode_yolov8(preds, frame.shape)
+
+    def _preprocess(self, frame):
+        """Resize + normalize frame to model input blob."""
+        sz = self.get_parameter('input_size').value
+        resized = cv2.resize(frame, (sz, sz))
+        blob    = resized.astype(np.float32) / 255.0
+        return np.ascontiguousarray(blob.transpose(2, 0, 1)[np.newaxis])
+
+    def _infer_trt(self, frame):
+        """Run TensorRT inference on Orin GPU."""
+        blob  = self._preprocess(frame)
+        model = self._host_model
+        ctx   = model['context']
+
+        if model['use_cuda_bindings']:
+            import cuda.bindings.runtime as cudart
+            cudart.cudaMemcpy(
+                model['d_in'], blob.ctypes.data,
+                model['input_nbytes'],
+                cudart.cudaMemcpyKind.cudaMemcpyHostToDevice)
+            ctx.execute_async_v3(0)
+            cudart.cudaStreamSynchronize(0)
+            h_out = np.empty(model['output_shape'], dtype=np.float32)
+            cudart.cudaMemcpy(
+                h_out.ctypes.data, model['d_out'],
+                model['output_nbytes'],
+                cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost)
+            return h_out
+        else:
+            # Fallback: use numpy arrays as pinned memory via TRT execute
+            h_out = np.empty(model['output_shape'], dtype=np.float32)
+            ctx.set_tensor_address(model['input_name'],
+                                   blob.ctypes.data_as(
+                                       __import__('ctypes').c_void_p).value)
+            ctx.set_tensor_address(model['output_name'],
+                                   h_out.ctypes.data_as(
+                                       __import__('ctypes').c_void_p).value)
+            ctx.execute_async_v3(0)
+            return h_out
+
+    def _infer_onnx(self, frame):
+        """Run ONNX Runtime CPU inference."""
+        blob    = self._preprocess(frame)
+        session = self._host_model['session']
+        name    = session.get_inputs()[0].name
+        return session.run(None, {name: blob})[0]
+
+    def _decode_yolov8(self, preds, frame_shape):
+        """
+        Decode YOLOv8 anchor-free output tensor.
+        Shape: (1, 4+num_classes, N) — cx,cy,w,h,class_scores...
+        """
+        conf_thresh = self.get_parameter('conf_threshold').value
+        input_size  = self.get_parameter('input_size').value
+        h, w = frame_shape[:2]
+
+        p = preds[0] if preds.ndim == 3 else preds   # (6, N)
+        p = p.T                                        # (N, 6)
+
+        scores    = p[:, 4:]
+        class_ids = np.argmax(scores, axis=1)
+        confs     = scores[np.arange(len(scores)), class_ids]
+
+        mask = confs > conf_thresh
+        if not np.any(mask):
+            return None, None
+
+        p = p[mask]; class_ids = class_ids[mask]; confs = confs[mask]
+
+        sx = w / input_size; sy = h / input_size
+        x1s = np.clip(((p[:,0]-p[:,2]/2)*sx), 0, w).astype(int)
+        y1s = np.clip(((p[:,1]-p[:,3]/2)*sy), 0, h).astype(int)
+        x2s = np.clip(((p[:,0]+p[:,2]/2)*sx), 0, w).astype(int)
+        y2s = np.clip(((p[:,1]+p[:,3]/2)*sy), 0, h).astype(int)
+
+        best_ball = None; best_ball_c = 0.0
+        best_cup  = None; best_cup_c  = 0.0
+        for i in range(len(confs)):
+            c    = int(class_ids[i]); conf = float(confs[i])
+            box  = (int(x1s[i]), int(y1s[i]), int(x2s[i]), int(y2s[i]))
+            if c == BALL_IDX and conf > best_ball_c:
+                best_ball_c = conf; best_ball = box
+            elif c == CUP_IDX and conf > best_cup_c:
+                best_cup_c  = conf; best_cup  = box
+        return best_ball, best_cup
 
     def _grab_loop(self):
         while self._running:
@@ -357,22 +515,7 @@ class BallDetectorOakNode(Node):
                 best_cup_c = conf;  best_cup  = (x1,y1,x2,y2)
         return best_ball, best_cup
 
-    def _run_host(self, frame):
-        conf    = self.get_parameter('conf_threshold').value
-        imgsz   = self.get_parameter('input_size').value
-        results = self._host_model.predict(
-            frame, imgsz=imgsz, conf=conf, verbose=False)
-        best_ball = None; best_ball_c = 0.0
-        best_cup  = None; best_cup_c  = 0.0
-        for r in results:
-            for box in r.boxes:
-                label = int(box.cls); bconf = float(box.conf)
-                x1,y1,x2,y2 = [int(v) for v in box.xyxy[0]]
-                if label == BALL_IDX and bconf > best_ball_c:
-                    best_ball_c = bconf; best_ball = (x1,y1,x2,y2)
-                elif label == CUP_IDX and bconf > best_cup_c:
-                    best_cup_c = bconf;  best_cup  = (x1,y1,x2,y2)
-        return best_ball, best_cup
+    # _run_host is now defined above in _load_host_model section
 
     def _publish_3d(self, bx, by, depth_frame):
         dh, dw = depth_frame.shape
