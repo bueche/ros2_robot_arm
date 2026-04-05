@@ -148,8 +148,9 @@ class BallMarkerNode(Node):
             #   norm_x (+right on screen) → plate X
             #   norm_y (+down on screen)  → plate Y (negated)
             # These signs can be flipped with invert_x/invert_y parameters
-            bx =  self._ball_pos.x * cup_r
-            by = -self._ball_pos.y * cup_r
+            # Camera X maps to robot Y, camera Y maps to robot X
+            bx = -self._ball_pos.y * cup_r
+            by = -self._ball_pos.x * cup_r
             ball_marker.pose.position.x = bx
             ball_marker.pose.position.y = by
             ball_marker.pose.position.z = ball_r   # sits on plate surface

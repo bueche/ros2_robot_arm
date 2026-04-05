@@ -35,6 +35,7 @@ ros2 launch writing_robot_description koch_sim_fixed.launch.py
 
 ros2 launch writing_robot_description koch_v11_real_robot.launch.py
 
+ros2 launch writing_robot_description koch_v11_real_robot_for_balance.launch.py
 
 ros2 topic pub --once /koch_v11_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "{
   joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, pen_holder],

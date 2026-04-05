@@ -61,18 +61,18 @@ OP_MODE_CURRENT_POSITION = 5  # current-based position control
 # D gain damps oscillation if servo hunts after P increase.
 
 SERVO_CONFIG = {
-    1: dict(name='shoulder_pan   [XL430]',
-            operating_mode=OP_MODE_POSITION,
-            P=800,  I=0, D=0, FF1=0, FF2=0,
-            prof_vel=200, prof_acc=50,
-            goal_current=0),
-
-    2: dict(name='shoulder_lift  [XL430]',
-            operating_mode=OP_MODE_POSITION,
-            P=800,  I=0, D=0, FF1=0, FF2=0,
-            prof_vel=200, prof_acc=50,
-            goal_current=0),
-
+    #1: dict(name='shoulder_pan   [XL430]',
+    #        operating_mode=OP_MODE_POSITION,
+    #        P=800,  I=0, D=0, FF1=0, FF2=0,
+    #        prof_vel=200, prof_acc=50,
+    #        goal_current=0),
+#
+    #2: dict(name='shoulder_lift  [XL430]',
+    #        operating_mode=OP_MODE_POSITION,
+    #        P=800,  I=0, D=0, FF1=0, FF2=0,
+    #        prof_vel=200, prof_acc=50,
+    #        goal_current=0),
+#
     3: dict(name='elbow_flex     [XL330]',
             operating_mode=OP_MODE_CURRENT_POSITION,
             P=2000, I=0, D=0, FF1=0, FF2=0,
