@@ -260,54 +260,72 @@ class BallDetectorOakNode(Node):
                 f'engine_path="{engine_path}" onnx_path="{onnx_path}"')
 
     def _load_trt_engine(self, engine_path):
-        """Load TensorRT engine and allocate CUDA buffers."""
+        """
+        Attempt to load TensorRT engine.
+        Falls back to ONNX CPU if CUDA memory allocation fails.
+        """
         import tensorrt as trt
         logger  = trt.Logger(trt.Logger.WARNING)
         runtime = trt.Runtime(logger)
         with open(engine_path, 'rb') as f:
             engine = runtime.deserialize_cuda_engine(f.read())
+        if engine is None:
+            raise RuntimeError('TensorRT failed to deserialize engine')
         context = engine.create_execution_context()
 
-        # TensorRT 10.x named tensor I/O
         input_name   = engine.get_tensor_name(0)
         output_name  = engine.get_tensor_name(1)
         input_shape  = tuple(engine.get_tensor_shape(input_name))
         output_shape = tuple(engine.get_tensor_shape(output_name))
 
         self.get_logger().info(
-            f'TensorRT loaded. In:{input_name}{input_shape} '
-            f'Out:{output_name}{output_shape}')
+            f'TensorRT engine parsed. '
+            f'In:{input_name}{input_shape} Out:{output_name}{output_shape}')
 
-        import ctypes
-        # Try cuda-bindings (available via tensorrt package)
+        # Try allocating CUDA buffers
         try:
             import cuda.bindings.runtime as cudart
             input_nbytes  = int(np.prod(input_shape))  * 4
             output_nbytes = int(np.prod(output_shape)) * 4
-            _, d_in  = cudart.cudaMalloc(input_nbytes)
-            _, d_out = cudart.cudaMalloc(output_nbytes)
-            context.set_tensor_address(input_name,  int(d_in))
-            context.set_tensor_address(output_name, int(d_out))
-            use_cuda_bindings = True
+            err, d_in  = cudart.cudaMalloc(input_nbytes)
+            if err.value != 0:
+                raise RuntimeError(f'cudaMalloc input failed: {err}')
+            err, d_out = cudart.cudaMalloc(output_nbytes)
+            if err.value != 0:
+                raise RuntimeError(f'cudaMalloc output failed: {err}')
+            # Verify pointers are valid
+            if d_in is None or d_out is None:
+                raise RuntimeError('cudaMalloc returned None pointer')
+            ptr_in  = int(d_in)
+            ptr_out = int(d_out)
+            context.set_tensor_address(input_name,  ptr_in)
+            context.set_tensor_address(output_name, ptr_out)
+            self.get_logger().info('TensorRT GPU inference ready')
+            return {
+                'type':         'trt',
+                'context':      context,
+                'input_name':   input_name,
+                'output_name':  output_name,
+                'input_shape':  input_shape,
+                'output_shape': output_shape,
+                'd_in':         d_in,
+                'd_out':        d_out,
+                'input_nbytes':  input_nbytes,
+                'output_nbytes': output_nbytes,
+            }
         except Exception as e:
-            self.get_logger().warn(f'cuda-bindings not available: {e}. '
-                                   f'Falling back to numpy pinned memory.')
-            use_cuda_bindings = False
-            d_in = d_out = None
-            input_nbytes = output_nbytes = 0
-
-        return {
-            'type':              'trt',
-            'context':           context,
-            'input_name':        input_name,
-            'output_name':       output_name,
-            'input_shape':       input_shape,
-            'output_shape':      output_shape,
-            'use_cuda_bindings': use_cuda_bindings,
-            'd_in':  d_in,  'd_out': d_out,
-            'input_nbytes':  input_nbytes,
-            'output_nbytes': output_nbytes,
-        }
+            self.get_logger().warn(
+                f'TensorRT GPU init failed: {e}\n'
+                f'Falling back to ONNX CPU inference.')
+            # Find ONNX file alongside engine
+            onnx_path = self.get_parameter('onnx_path').value
+            if not onnx_path:
+                engine_dir = os.path.dirname(engine_path)
+                onnx_path  = os.path.join(engine_dir, 'best.onnx')
+            if os.path.exists(onnx_path):
+                return self._load_onnx_model(onnx_path)
+            raise RuntimeError(
+                f'TensorRT GPU failed and no ONNX fallback found at {onnx_path}')
 
     def _load_onnx_model(self, onnx_path):
         """Load ONNX model using onnxruntime CPU."""
@@ -336,35 +354,23 @@ class BallDetectorOakNode(Node):
 
     def _infer_trt(self, frame):
         """Run TensorRT inference on Orin GPU."""
+        import cuda.bindings.runtime as cudart
         blob  = self._preprocess(frame)
         model = self._host_model
         ctx   = model['context']
 
-        if model['use_cuda_bindings']:
-            import cuda.bindings.runtime as cudart
-            cudart.cudaMemcpy(
-                model['d_in'], blob.ctypes.data,
-                model['input_nbytes'],
-                cudart.cudaMemcpyKind.cudaMemcpyHostToDevice)
-            ctx.execute_async_v3(0)
-            cudart.cudaStreamSynchronize(0)
-            h_out = np.empty(model['output_shape'], dtype=np.float32)
-            cudart.cudaMemcpy(
-                h_out.ctypes.data, model['d_out'],
-                model['output_nbytes'],
-                cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost)
-            return h_out
-        else:
-            # Fallback: use numpy arrays as pinned memory via TRT execute
-            h_out = np.empty(model['output_shape'], dtype=np.float32)
-            ctx.set_tensor_address(model['input_name'],
-                                   blob.ctypes.data_as(
-                                       __import__('ctypes').c_void_p).value)
-            ctx.set_tensor_address(model['output_name'],
-                                   h_out.ctypes.data_as(
-                                       __import__('ctypes').c_void_p).value)
-            ctx.execute_async_v3(0)
-            return h_out
+        cudart.cudaMemcpy(
+            model['d_in'], blob.ctypes.data,
+            model['input_nbytes'],
+            cudart.cudaMemcpyKind.cudaMemcpyHostToDevice)
+        ctx.execute_async_v3(0)
+        cudart.cudaStreamSynchronize(0)
+        h_out = np.empty(model['output_shape'], dtype=np.float32)
+        cudart.cudaMemcpy(
+            h_out.ctypes.data, model['d_out'],
+            model['output_nbytes'],
+            cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost)
+        return h_out
 
     def _infer_onnx(self, frame):
         """Run ONNX Runtime CPU inference."""
