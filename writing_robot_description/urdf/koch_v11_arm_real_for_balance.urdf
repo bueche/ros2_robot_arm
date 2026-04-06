@@ -382,37 +382,6 @@
     </inertial>
   </link>
  
-  <!-- Fixed joint: plate → ball (resting at plate center surface) -->
-  <joint name="ball_joint" type="fixed">
-    <parent link="cup_plate_link"/>
-    <child  link="ball_link"/>
-    <!-- Ball sits on top face of plate: half plate thickness + ball radius -->
-    <origin xyz="0.0 0.0 0.0115" rpy="0 0 0"/>
-  </joint>
-  
-  <link name="ball_link">
-    <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0075"/>
-      </geometry>
-      <material name="steel_silver">
-        <color rgba="0.75 0.75 0.80 1.0"/>
-      </material>
-    </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0075"/>
-      </geometry>
-    </collision>
-    <inertial>
-      <mass value="0.014"/>
-      <inertia ixx="3.15e-7" iyy="3.15e-7" izz="3.15e-7"
-               ixy="0" ixz="0" iyz="0"/>
-    </inertial>
-  </link>
-
   <!-- ROS2 Control - Following working 4-DOF pattern -->
   <!-- ros2_control for Dynamixel Hardware -->
   <ros2_control name="koch_v11_system" type="system">
