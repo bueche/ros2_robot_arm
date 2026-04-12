@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ball_detector_oak.py (v3 - depthai v2 API, MyriadX inference)
+ball_detector_oak.py (v7 - depthai v2 API, MyriadX inference)
 
 Detects ball and cup using YOLOv8n blob running on OAK-D Lite MyriadX VPU.
 Inference runs on the camera hardware at ~25-30fps, zero CPU/GPU load on host.
@@ -17,14 +17,18 @@ Parameters:
   blob_path         Path to YOLOv8n .blob file         default: ''
   conf_threshold    Detection confidence threshold      default: 0.5
   iou_threshold     NMS IoU threshold                   default: 0.45
-  input_size        Model input size (px)               default: 416
+  input_size        Model input size (px)               default: 640
   rgb_fps           Camera framerate                    default: 30
-  exposure_us       Manual exposure us (0=auto)         default: 8000
-  iso               Manual ISO                          default: 400
+  exposure_us       Manual exposure us (0=auto)         default: 25000
+  iso               Manual ISO                          default: 800
+  enable_depth      Enable stereo depth pipeline        default: False
   camera_frame_id   TF frame for 3D output             default: 'oak_rgb_camera_optical_frame'
   depth_min_mm      Min valid depth                     default: 100
   depth_max_mm      Max valid depth                     default: 2000
   show_debug        Annotate published image            default: True
+  publish_image     Publish /ball/image topic           default: True
+  debug_width       Debug image width (px)              default: 320
+  debug_height      Debug image height (px)             default: 180
   publish_hz        ROS publish rate                    default: 30.0
 """
 
@@ -36,6 +40,8 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import Point, PointStamped
 from std_msgs.msg import Bool
 from sensor_msgs.msg import Image
@@ -67,16 +73,20 @@ class BallDetectorOakNode(Node):
         self.declare_parameter('blob_path',       '')
         self.declare_parameter('conf_threshold',   0.5)
         self.declare_parameter('iou_threshold',    0.45)
-        self.declare_parameter('input_size',       416)
+        self.declare_parameter('input_size',       640)
         self.declare_parameter('rgb_fps',          30)
-        self.declare_parameter('exposure_us',      8000)
-        self.declare_parameter('iso',              400)
+        self.declare_parameter('exposure_us',      25000)
+        self.declare_parameter('iso',              800)
+        self.declare_parameter('enable_depth',     False)
         self.declare_parameter('camera_frame_id',
                                'oak_rgb_camera_optical_frame')
         self.declare_parameter('depth_min_mm',    100)
         self.declare_parameter('depth_max_mm',   2000)
-        self.declare_parameter('show_debug',  True)
-        self.declare_parameter('publish_hz',  30.0)
+        self.declare_parameter('show_debug',    True)
+        self.declare_parameter('publish_image', True)
+        self.declare_parameter('debug_width',   320)
+        self.declare_parameter('debug_height',  180)
+        self.declare_parameter('publish_hz',    30.0)
 
         # Publishers
         self._pub_pos   = self.create_publisher(
@@ -97,6 +107,21 @@ class BallDetectorOakNode(Node):
         self._det_lock     = threading.Lock()
         self._running      = True
 
+        # Drop / resource tracking
+        self._last_rgb_seq   = -1
+        self._last_det_seq   = -1
+        self._rgb_drops      = 0
+        self._det_drops      = 0
+        self._resource_tick  = 0
+
+        # Temporal size tracking for bbox sanity filter
+        # Stores last accepted normalized (w, h) for cup and ball.
+        # Detections that jump >max_jump_frac in one frame are rejected.
+        self._last_cup_wh    = None   # (w_norm, h_norm)
+        self._last_ball_wh   = None
+        self._cup_jump_frac  = 0.35   # reject if cup size changes >35% in one frame
+        self._ball_jump_frac = 0.50   # ball can move faster, more lenient
+
         # Build pipeline and connect device
         blob_path = self.get_parameter('blob_path').value
         if not blob_path or not os.path.exists(blob_path):
@@ -111,8 +136,9 @@ class BallDetectorOakNode(Node):
             'rgb',        maxSize=4, blocking=False)
         self._q_det   = self._device.getOutputQueue(
             'detections', maxSize=4, blocking=False)
-        self._q_depth = self._device.getOutputQueue(
-            'depth',      maxSize=4, blocking=False)
+        self._q_depth = (
+            self._device.getOutputQueue('depth', maxSize=4, blocking=False)
+            if self.get_parameter('enable_depth').value else None)
 
         # Grab thread
         self._grab_thread = threading.Thread(
@@ -120,10 +146,20 @@ class BallDetectorOakNode(Node):
         self._grab_thread.start()
 
         hz = self.get_parameter('publish_hz').value
-        self._timer = self.create_timer(1.0 / hz, self._tick)
+        pub_img    = self.get_parameter('publish_image').value
+        dbg_w      = self.get_parameter('debug_width').value
+        dbg_h      = self.get_parameter('debug_height').value
+        ena_depth  = self.get_parameter('enable_depth').value
+        # Use ReentrantCallbackGroup so _tick() runs in its own thread,
+        # isolated from DDS discovery/deserialization traffic on the spin thread.
+        self._tick_cb_group = ReentrantCallbackGroup()
+        self._timer = self.create_timer(
+            1.0 / hz, self._tick,
+            callback_group=self._tick_cb_group)
         self.get_logger().info(
             f'ball_detector_oak ready (depthai {dai.__version__}, '
-            f'MyriadX YoloDetectionNetwork, {hz}Hz)')
+            f'MyriadX YoloDetectionNetwork, {hz}Hz  '
+            f'image={pub_img} {dbg_w}x{dbg_h}  depth={ena_depth})')
 
     def _build_pipeline(self, blob_path):
         input_size = self.get_parameter('input_size').value
@@ -191,9 +227,11 @@ class BallDetectorOakNode(Node):
         cam.preview.link(det.input)
 
         # RGB video output for debug image — downscaled to save USB bandwidth
-        # Detection runs on 416x416 preview; debug image uses full video downscaled
+        # Detection runs on input_size preview; debug image uses video downscaled
+        dbg_w = self.get_parameter('debug_width').value
+        dbg_h = self.get_parameter('debug_height').value
         manip = pipeline.create(dai.node.ImageManip)
-        manip.initialConfig.setResize(640, 360)
+        manip.initialConfig.setResize(dbg_w, dbg_h)
         manip.initialConfig.setFrameType(
             dai.RawImgFrame.Type.BGR888p)
         manip.inputImage.setBlocking(False)
@@ -213,30 +251,31 @@ class BallDetectorOakNode(Node):
         xout_det.input.setQueueSize(1)
         det.out.link(xout_det.input)
 
-        # Stereo depth
-        mono_l = pipeline.create(dai.node.MonoCamera)
-        mono_r = pipeline.create(dai.node.MonoCamera)
-        stereo  = pipeline.create(dai.node.StereoDepth)
+        # Stereo depth — optional, burns significant USB bandwidth
+        if self.get_parameter('enable_depth').value:
+            mono_l = pipeline.create(dai.node.MonoCamera)
+            mono_r = pipeline.create(dai.node.MonoCamera)
+            stereo  = pipeline.create(dai.node.StereoDepth)
 
-        mono_l.setBoardSocket(dai.CameraBoardSocket.CAM_B)
-        mono_r.setBoardSocket(dai.CameraBoardSocket.CAM_C)
-        mono_l.setFps(fps)
-        mono_r.setFps(fps)
+            mono_l.setBoardSocket(dai.CameraBoardSocket.CAM_B)
+            mono_r.setBoardSocket(dai.CameraBoardSocket.CAM_C)
+            mono_l.setFps(fps)
+            mono_r.setFps(fps)
 
-        stereo.setDefaultProfilePreset(
-            dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-        stereo.setLeftRightCheck(True)
-        stereo.setExtendedDisparity(True)
-        stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
+            stereo.setDefaultProfilePreset(
+                dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+            stereo.setLeftRightCheck(True)
+            stereo.setExtendedDisparity(True)
+            stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
 
-        mono_l.out.link(stereo.left)
-        mono_r.out.link(stereo.right)
+            mono_l.out.link(stereo.left)
+            mono_r.out.link(stereo.right)
 
-        xout_depth = pipeline.create(dai.node.XLinkOut)
-        xout_depth.setStreamName('depth')
-        xout_depth.input.setBlocking(False)
-        xout_depth.input.setQueueSize(1)
-        stereo.depth.link(xout_depth.input)
+            xout_depth = pipeline.create(dai.node.XLinkOut)
+            xout_depth.setStreamName('depth')
+            xout_depth.input.setBlocking(False)
+            xout_depth.input.setQueueSize(1)
+            stereo.depth.link(xout_depth.input)
 
         device = dai.Device(pipeline)
         self.get_logger().info(
@@ -249,16 +288,51 @@ class BallDetectorOakNode(Node):
             try:
                 rgb   = self._q_rgb.tryGet()
                 det   = self._q_det.tryGet()
-                depth = self._q_depth.tryGet()
+                depth = self._q_depth.tryGet() if self._q_depth else None
 
                 with self._frame_lock:
-                    if rgb   is not None:
-                        self._latest_rgb   = rgb.getCvFrame()
+                    if rgb is not None:
+                        seq = rgb.getSequenceNum()
+                        if self._last_rgb_seq >= 0:
+                            skip = seq - self._last_rgb_seq - 1
+                            if skip > 0:
+                                self._rgb_drops += skip
+                        self._last_rgb_seq = seq
+                        self._latest_rgb = rgb.getCvFrame()
+
                     if depth is not None:
                         self._latest_depth = depth.getFrame()
+
                 if det is not None:
+                    seq = det.getSequenceNum()
+                    if self._last_det_seq >= 0:
+                        skip = seq - self._last_det_seq - 1
+                        if skip > 0:
+                            self._det_drops += skip
+                    self._last_det_seq = seq
                     with self._det_lock:
                         self._latest_dets = det.detections
+
+                # Resource + drop log every ~2 seconds (2000 * 1ms sleep)
+                self._resource_tick += 1
+                if self._resource_tick % 2000 == 0:
+                    try:
+                        temp     = self._device.getChipTemperature()
+                        css_heap = self._device.getLeonCssHeapUsage()
+                        mss_heap = self._device.getLeonMssHeapUsage()
+                        self.get_logger().info(
+                            f'[OAK] temp={temp.average:.1f}C  '
+                            f'CSS heap: {css_heap.used//1024}/{css_heap.total//1024} KB  '
+                            f'MSS heap: {mss_heap.used//1024}/{mss_heap.total//1024} KB  '
+                            f'rgb_drops={self._rgb_drops}  '
+                            f'det_drops={self._det_drops}  '
+                            f'rgb_seq={self._last_rgb_seq}  '
+                            f'det_seq={self._last_det_seq}')
+                    except Exception as e:
+                        self.get_logger().warn(
+                            f'Resource query failed: {e}',
+                            throttle_duration_sec=5.0)
+
             except Exception as e:
                 self.get_logger().warn(
                     str(e), throttle_duration_sec=2.0)
@@ -278,44 +352,106 @@ class BallDetectorOakNode(Node):
 
         h, w = frame.shape[:2]
 
-        # Pick best ball and cup by confidence
-        best_ball = None; best_ball_c = 0.0
-        best_cup  = None; best_cup_c  = 0.0
+        # --- Detection selection ---
+        # Store normalized coords (0-1) from VPU — these are in square inference
+        # space and are aspect-ratio correct regardless of debug frame dimensions.
+        # Pixel coords are derived separately for drawing only.
+        best_ball_norm = None;  best_ball_c = 0.0   # (xmin,ymin,xmax,ymax) 0-1
+        best_cup_norm  = None;  best_cup_c  = 0.0
 
         for d in dets:
-            x1 = int(d.xmin * w); y1 = int(d.ymin * h)
-            x2 = int(d.xmax * w); y2 = int(d.ymax * h)
+            dw = d.xmax - d.xmin
+            dh = d.ymax - d.ymin
+
             if d.label == BALL_IDX and d.confidence > best_ball_c:
-                best_ball_c = d.confidence
-                best_ball = (x1, y1, x2, y2)
+                # Temporal size sanity: reject if bbox jumped too much from last frame
+                if self._last_ball_wh is not None:
+                    lw, lh = self._last_ball_wh
+                    if lw > 0 and lh > 0:
+                        jump = max(abs(dw - lw) / lw, abs(dh - lh) / lh)
+                        if jump > self._ball_jump_frac:
+                            self.get_logger().warn(
+                                f'Ball size jump {jump:.0%} — rejected '
+                                f'({int(dw*w)}x{int(dh*h)}px)',
+                                throttle_duration_sec=1.0)
+                            continue
+                best_ball_c    = d.confidence
+                best_ball_norm = (d.xmin, d.ymin, d.xmax, d.ymax)
+                bw = int(dw * w)
+                bh = int(dh * h)
+                self.get_logger().info(
+                    f'Ball bbox: {bw}x{bh}px  conf={d.confidence:.3f}',
+                    throttle_duration_sec=1.0)
+
             elif d.label == CUP_IDX and d.confidence > best_cup_c:
-                best_cup_c = d.confidence
-                best_cup = (x1, y1, x2, y2)
+                # Temporal size sanity: reject if bbox jumped too much from last frame
+                if self._last_cup_wh is not None:
+                    lw, lh = self._last_cup_wh
+                    if lw > 0 and lh > 0:
+                        jump = max(abs(dw - lw) / lw, abs(dh - lh) / lh)
+                        if jump > self._cup_jump_frac:
+                            self.get_logger().warn(
+                                f'Cup  size jump {jump:.0%} — rejected '
+                                f'({int(dw*w)}x{int(dh*h)}px)',
+                                throttle_duration_sec=1.0)
+                            continue
+                best_cup_c    = d.confidence
+                best_cup_norm = (d.xmin, d.ymin, d.xmax, d.ymax)
+                cw = int(dw * w)
+                ch = int(dh * h)
+                self.get_logger().info(
+                    f'Cup  bbox: {cw}x{ch}px  conf={d.confidence:.3f}',
+                    throttle_duration_sec=1.0)
 
-        cup_found  = best_cup  is not None
-        ball_found = best_ball is not None
+        # Update temporal size trackers with accepted detections
+        if best_cup_norm is not None:
+            xmin, ymin, xmax, ymax = best_cup_norm
+            self._last_cup_wh = (xmax - xmin, ymax - ymin)
+        if best_ball_norm is not None:
+            xmin, ymin, xmax, ymax = best_ball_norm
+            self._last_ball_wh = (xmax - xmin, ymax - ymin)
 
-        cup_cx = cup_cy = cup_r = None
+        cup_found  = best_cup_norm  is not None
+        ball_found = best_ball_norm is not None
+
+        # Log when either object is missing — throttled to avoid spam
+        if not cup_found and not ball_found:
+            self.get_logger().warn(
+                'No detections', throttle_duration_sec=2.0)
+        elif not cup_found:
+            self.get_logger().warn(
+                f'Ball found (conf={best_ball_c:.3f}) but NO CUP — '
+                f'position invalid (z=-1)',
+                throttle_duration_sec=2.0)
+        elif not ball_found:
+            self.get_logger().warn(
+                f'Cup found (conf={best_cup_c:.3f}) but NO BALL',
+                throttle_duration_sec=2.0)
+
+        # --- Position calculation in normalized space ---
+        # All math done in 0-1 coords from the square inference frame.
+        # This is aspect-ratio correct and independent of debug image dimensions.
+        cup_cx_n = cup_cy_n = cup_r_n = None
         if cup_found:
-            x1, y1, x2, y2 = best_cup
-            cup_cx = (x1 + x2) / 2.0
-            cup_cy = (y1 + y2) / 2.0
-            cup_r  = max(x2 - x1, y2 - y1) / 2.0
+            xmin, ymin, xmax, ymax = best_cup_norm
+            cup_cx_n = (xmin + xmax) / 2.0
+            cup_cy_n = (ymin + ymax) / 2.0
+            cup_r_n  = max(xmax - xmin, ymax - ymin) / 2.0
 
-        ball_px = ball_py = None
+        ball_cx_n = ball_cy_n = None
         if ball_found:
-            x1, y1, x2, y2 = best_ball
-            ball_px = int((x1 + x2) / 2.0)
-            ball_py = int((y1 + y2) / 2.0)
+            xmin, ymin, xmax, ymax = best_ball_norm
+            ball_cx_n = (xmin + xmax) / 2.0
+            ball_cy_n = (ymin + ymax) / 2.0
 
         # Publish cup detected
         self._pub_cup.publish(Bool(data=cup_found))
 
         # Publish normalised 2D position
         pos_msg = Point()
-        if ball_found and cup_found and cup_r and cup_r > 0:
-            pos_msg.x = (ball_px - cup_cx) / cup_r
-            pos_msg.y = (ball_py - cup_cy) / cup_r
+        if ball_found and cup_found and cup_r_n and cup_r_n > 0:
+            pos_msg.x = (ball_cx_n - cup_cx_n) / cup_r_n
+            pos_msg.y = (ball_cy_n - cup_cy_n) / cup_r_n
             pos_msg.z = 0.0
         else:
             pos_msg.x = 0.0
@@ -323,20 +459,31 @@ class BallDetectorOakNode(Node):
             pos_msg.z = -1.0
         self._pub_pos.publish(pos_msg)
 
-        # 3D position from depth
-        if ball_found and depth is not None and ball_px is not None:
+        # 3D position from depth — convert normalized to debug frame pixels
+        if ball_found and depth is not None:
+            ball_px = int(ball_cx_n * w)
+            ball_py = int(ball_cy_n * h)
             self._publish_3d(ball_px, ball_py, depth)
 
-        # Debug image
-        if self.get_parameter('show_debug').value:
-            debug = self._draw_debug(frame, best_ball, best_cup, pos_msg)
-        else:
-            debug = frame
+        # --- Debug image — pixel coords derived from normalized, scaled to frame ---
+        if self.get_parameter('publish_image').value:
+            # Convert normalized bboxes to pixel coords in debug frame
+            def norm_to_px(n):
+                xmin, ymin, xmax, ymax = n
+                return (int(xmin*w), int(ymin*h),
+                        int(xmax*w), int(ymax*h))
 
-        img_msg = self._bridge.cv2_to_imgmsg(debug, encoding='bgr8')
-        img_msg.header.stamp    = self.get_clock().now().to_msg()
-        img_msg.header.frame_id = 'camera_frame'
-        self._pub_img.publish(img_msg)
+            ball_px_box = norm_to_px(best_ball_norm) if ball_found else None
+            cup_px_box  = norm_to_px(best_cup_norm)  if cup_found  else None
+
+            if self.get_parameter('show_debug').value:
+                debug = self._draw_debug(frame, ball_px_box, cup_px_box, pos_msg)
+            else:
+                debug = frame
+            img_msg = self._bridge.cv2_to_imgmsg(debug, encoding='bgr8')
+            img_msg.header.stamp    = self.get_clock().now().to_msg()
+            img_msg.header.frame_id = 'camera_frame'
+            self._pub_img.publish(img_msg)
 
     def _publish_3d(self, bx, by, depth_frame):
         dh, dw = depth_frame.shape
@@ -399,8 +546,14 @@ class BallDetectorOakNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = BallDetectorOakNode()
+    # MultiThreadedExecutor with 3 threads:
+    #   - thread 1: DDS spin / discovery traffic
+    #   - thread 2: _tick() timer callback (camera publish)
+    #   - thread 3: headroom for service/param callbacks
+    executor = MultiThreadedExecutor(num_threads=3)
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:

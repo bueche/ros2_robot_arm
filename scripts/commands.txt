@@ -92,3 +92,26 @@ ros2 run balance ball_detector_node \
   -p roi_x:=150 -p roi_y:=100 \
   -p roi_w:=350 -p roi_h:=400 \
   -p ball_bright_thresh:=220
+
+# best with canera model
+ros2 run balance ball_detector_oak --ros-args \
+  -p blob_path:=src/balance/models/ball_detector_v4.blob \
+  -p rgb_fps:=15 \
+  -p publish_image:=false \
+  -p enable_depth:=false
+
+# debug
+
+export PYTHONPATH=/usr/lib/python3/dist-packages:/usr/lib/python3.10/dist-packages:/usr/host_dist_packages:$PYTHONPATH
+
+ros2 run balance ball_detector_oak --ros-args \
+  -p blob_path:=src/balance/models/ball_detector_v4.blob \
+  -p rgb_fps:=15 \
+  -p publish_image:=true \
+  -p enable_depth:=false \
+  -p show_debug:=true
+
+ros2 run balance ball_detector_oak --ros-args   -p blob_path:=src/balance/models/ball_detector_v4.blob   -p rgb_fps:=15   -p publish_image:=true   -p enable_depth:=false -p show_debug:=true
+
+
+
