@@ -55,6 +55,14 @@ ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_r
 ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/balance_v1.yaml -p validate:=true -p telemetry:=true \
 -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real_for_balance.urdf -p power_monitoring:=true -p delay:=1.0
 
+ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/balance_v1.yaml -p validate:=true -p telemetry:=true \
+-p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real_for_balance.urdf -p power_monitoring:=true -p delay:=1.0 -p wait_for_stable:=true
+
+
+ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/balance_v1.yaml -p validate:=true -p telemetry:=true \
+-p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real_for_balance.urdf -p power_monitoring:=true -p delay:=8.0 -p wait_for_stable:=true
+
+
 ros2 run writing_robot_control power_monitor_node
 
  ros2 run writing_robot_control power_logger
@@ -114,4 +122,14 @@ ros2 run balance ball_detector_oak --ros-args \
 ros2 run balance ball_detector_oak --ros-args   -p blob_path:=src/balance/models/ball_detector_v4.blob   -p rgb_fps:=15   -p publish_image:=true   -p enable_depth:=false -p show_debug:=true
 
 
+ros2 run balance ball_detector_oak --ros-args \
+  -p blob_path:=src/balance/models/ball_detector_v4.blob \
+  -p rgb_fps:=10 \
+  -p publish_image:=true \
+  -p show_debug:=true \
+  -p conf_threshold:=0.35
 
+
+ros2 run writing_robot_control ball_balance_node --ros-args \
+  -p dry_run:=true \
+  -p attempt_timeout:=7.0 

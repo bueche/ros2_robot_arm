@@ -50,6 +50,8 @@ Parameters:
   settle_delay    Seconds after SETTLED before PID default: 0.5
   camera_timeout  Seconds before camera stale      default: 2.0
   imu_timeout     Seconds before IMU stale         default: 0.5
+  ball_lost_timeout  Seconds ball undetected before suspend  default: 1.0
+  attempt_timeout    Seconds before giving up balancing      default: 5.0
   dry_run         Log only, don't publish cmd      default: False
   use_imu         Use IMU derivative term          default: True
 
@@ -91,17 +93,23 @@ class BallBalanceNode(Node):
         self.declare_parameter('stable_thresh',  0.15)
         self.declare_parameter('publish_hz',     10.0)
         self.declare_parameter('settle_delay',   0.5)
-        self.declare_parameter('camera_timeout', 2.0)
-        self.declare_parameter('imu_timeout',    0.5)
-        self.declare_parameter('dry_run',        False)
-        self.declare_parameter('use_imu',        True)
+        self.declare_parameter('camera_timeout',    2.0)
+        self.declare_parameter('imu_timeout',       0.5)
+        self.declare_parameter('ball_lost_timeout', 1.0)
+        self.declare_parameter('attempt_timeout',   5.0)
+        self.declare_parameter('dry_run',           False)
+        self.declare_parameter('use_imu',           True)
 
         # State
         self._lock              = threading.Lock()
 
         # Camera
-        self._ball_pos          = None   # Point (x, y, z)
-        self._ball_time         = None   # monotonic timestamp
+        self._ball_pos              = None   # Point (x, y, z)
+        self._ball_time             = None   # monotonic timestamp of last fresh frame
+        self._last_valid_ball_time  = None   # monotonic timestamp of last z>=0 detection
+
+        # Attempt tracking
+        self._pid_started_at        = None   # when PID became active this session
 
         # IMU
         self._imu_pitch         = 0.0   # rad
@@ -161,10 +169,13 @@ class BallBalanceNode(Node):
         """Camera ball position callback."""
         with self._lock:
             if msg.z < 0:
-                # z = -1 means ball not detected — don't update
+                # z = -1 means ball not detected — don't update position
+                # but DO update ball_time so camera_timeout doesn't fire
+                self._ball_time = time.monotonic()
                 return
-            self._ball_pos  = msg
-            self._ball_time = time.monotonic()
+            self._ball_pos             = msg
+            self._ball_time            = time.monotonic()
+            self._last_valid_ball_time = time.monotonic()
 
     def _imu_cb(self, msg: Vector3):
         """IMU balance error callback (pitch, roll from imu_balance_node)."""
@@ -180,10 +191,12 @@ class BallBalanceNode(Node):
             self._arm_state = state
             self.get_logger().info(f'Arm state → {state}')
             if state == 'MOVING':
-                self._pid_active    = False
-                self._settled_at    = None
-                self._integral_flex = 0.0
-                self._integral_roll = 0.0
+                self._pid_active           = False
+                self._settled_at           = None
+                self._pid_started_at       = None
+                self._last_valid_ball_time = None
+                self._integral_flex        = 0.0
+                self._integral_roll        = 0.0
                 self._pub_enabled.publish(Bool(data=False))
             elif state == 'SETTLED':
                 self._settled_at = time.monotonic()
@@ -203,7 +216,8 @@ class BallBalanceNode(Node):
                 and self._settled_at is not None):
             delay = self.get_parameter('settle_delay').value
             if now - self._settled_at >= delay:
-                self._pid_active = True
+                self._pid_active     = True
+                self._pid_started_at = now
                 self.get_logger().info('PID active — ball balancing started.')
                 self._pub_enabled.publish(Bool(data=True))
 
@@ -228,6 +242,33 @@ class BallBalanceNode(Node):
             self.get_logger().warn(
                 f'Camera data stale ({now - ball_time:.1f}s) — skipping.',
                 throttle_duration_sec=2.0)
+            return
+
+        # Ball-lost check — ball undetected for too long
+        ball_lost_timeout = self.get_parameter('ball_lost_timeout').value
+        if (self._last_valid_ball_time is not None and
+                now - self._last_valid_ball_time > ball_lost_timeout):
+            self.get_logger().warn(
+                f'Ball lost for {now - self._last_valid_ball_time:.1f}s '
+                f'(>{ball_lost_timeout:.1f}s) — suspending PID.',
+                throttle_duration_sec=1.0)
+            return
+
+        # Attempt timeout — give up if not achieved within limit.
+        # IMPORTANT: clear _settled_at so the settle_delay check cannot
+        # immediately restart PID while the arm is still in SETTLED state.
+        attempt_timeout = self.get_parameter('attempt_timeout').value
+        if (self._pid_started_at is not None and
+                now - self._pid_started_at > attempt_timeout):
+            self._pid_active     = False
+            self._pid_started_at = None
+            self._settled_at     = None   # prevents immediate PID restart
+            self._integral_flex  = 0.0
+            self._integral_roll  = 0.0
+            self._pub_enabled.publish(Bool(data=False))
+            self.get_logger().warn(
+                f'Attempt timeout ({attempt_timeout:.0f}s) — '
+                f'PID suspended. Waiting for next SETTLED transition.')
             return
 
         # Compute errors
