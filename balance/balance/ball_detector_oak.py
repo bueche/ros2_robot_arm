@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ball_detector_oak.py (v7 - depthai v2 API, MyriadX inference)
+ball_detector_oak.py (v8 - depthai v2 API, MyriadX inference)
 
 Detects ball and cup using YOLOv8n blob running on OAK-D Lite MyriadX VPU.
 Inference runs on the camera hardware at ~25-30fps, zero CPU/GPU load on host.
@@ -208,10 +208,19 @@ class BallDetectorOakNode(Node):
         num_classes  = meta.get('classes',    len(CLASS_NAMES))
         anchors      = meta.get('anchors',    [])
         anchor_masks = meta.get('anchor_masks', {})
-        iou_thresh   = meta.get('iou_threshold',
-                       self.get_parameter('iou_threshold').value)
-        conf_thresh  = meta.get('confidence_threshold',
-                       self.get_parameter('conf_threshold').value)
+
+        # ROS parameters always win over JSON config values.
+        # JSON may contain thresholds from blob conversion time which are
+        # not suitable for runtime tuning. Log both so discrepancies are visible.
+        iou_thresh  = self.get_parameter('iou_threshold').value
+        conf_thresh = self.get_parameter('conf_threshold').value
+        json_iou    = meta.get('iou_threshold',    None)
+        json_conf   = meta.get('confidence_threshold', None)
+        self.get_logger().info(
+            f'Thresholds — using: conf={conf_thresh:.2f}  iou={iou_thresh:.2f}'
+            + (f'  (JSON had: conf={json_conf}  iou={json_iou})' 
+               if json_conf is not None or json_iou is not None else
+               '  (no threshold overrides in JSON)'))
 
         # YoloDetectionNetwork runs blob on MyriadX
         det = pipeline.create(dai.node.YoloDetectionNetwork)

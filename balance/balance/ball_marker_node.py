@@ -32,6 +32,8 @@ Parameters:
 import math
 import rclpy
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import Point, Vector3
 from std_msgs.msg import Bool, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
@@ -55,19 +57,27 @@ class BallMarkerNode(Node):
         self._cup_detected = False
         self._tilt         = None   # Vector3 (pitch, roll errors in rad)
 
+        # ── callback group — isolates callbacks from DDS discovery traffic ──
+        self._cb_group = ReentrantCallbackGroup()
+
         # ── subscribers ───────────────────────────────────────────────────
         self.create_subscription(Point,   '/ball/position',
-                                 self._ball_cb,  10)
+                                 self._ball_cb,  10,
+                                 callback_group=self._cb_group)
         self.create_subscription(Bool,    '/ball/cup_detected',
-                                 self._cup_cb,   10)
+                                 self._cup_cb,   10,
+                                 callback_group=self._cb_group)
         self.create_subscription(Vector3, '/imu/balance_error',
-                                 self._imu_cb,   10)
+                                 self._imu_cb,   10,
+                                 callback_group=self._cb_group)
 
         # ── publisher ─────────────────────────────────────────────────────
         self._pub = self.create_publisher(MarkerArray, '/ball/markers', 10)
 
         # Publish at 30Hz regardless of incoming message rate
-        self._timer = self.create_timer(1.0 / 30.0, self._publish_markers)
+        self._timer = self.create_timer(
+            1.0 / 30.0, self._publish_markers,
+            callback_group=self._cb_group)
         self.get_logger().info('ball_marker_node ready')
 
     # ── callbacks ─────────────────────────────────────────────────────────
@@ -239,8 +249,10 @@ class BallMarkerNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = BallMarkerNode()
+    executor = MultiThreadedExecutor(num_threads=3)
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
