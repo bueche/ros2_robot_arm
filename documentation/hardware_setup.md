@@ -81,6 +81,18 @@ Koch v1.1 6-DOF Robotic Arm — Bill of Materials
 |-----|-----------|-------------|------|-----------|-------|
 | 2 | C-Clamps | Secure robot base to work surface; size depends on your table | Local hardware store | ~$10 | ~$10 |
 
+## Balance Related Hardware
+The following are the components added to support the cup balancing effort.
+| Qty | Component | Description | Link | Unit Price | Total |
+|-----|-----------|-------------|------|-----------|-------|
+| 1 | IMU sensor | HiLetgo 3pcs GY-521 MPU-6050 MPU6050 3 Axis Accelerometer Gyroscope Module 6 DOF 6-axis Accelerometer Gyroscope Sensor Module 16 Bit AD Converter Data Output IIC I2C for Arduino | Amazon | ~$10 | ~$10 |
+| 1 | ESP32 controller | HiLetgo ESP-WROOM-32 ESP32 ESP-32S Development Board 2.4GHz Dual-Mode WiFi + Bluetooth Dual Cores Microcontroller Processor Integrated with Antenna RF AMP Filter AP STA | Amazon | ~$10 | ~$10 |
+| 1 | USB hub with external power | Atolla 4-Port USB 3.0 Hub with 4 Data Ports, 1 Smart Charging Port, Individual On/Off Switches and 5V/3A Adapter | Amazon | ~$20 | ~$20 |
+| 1 | Luxonis Oak-D lite | 3d camera with inferencing capability | https://shop.luxonis.com/products/oak-d-lite-1 | https://www.luxonis.com | $150 | $150 |
+| 1 | camera stand  | SMALLRIG 22" Magic Arm Clamp, Overhead Phone Mount Holder Stand, Flexible Desk Camera Mount, Articulating Friction Boom Arm, for POV Shot, Filming, Light, Webcam, Action Camera | Amazon | ~$10 | ~$10 |
+
+
+
 ---
 
 
