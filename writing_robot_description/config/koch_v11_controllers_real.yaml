@@ -32,7 +32,7 @@ koch_v11_controller:
     action_monitor_rate: 20.0
     
     # Trajectory execution settings
-    allow_partial_joints_goal: false
+    allow_partial_joints_goal: true
     open_loop_control: false
     allow_integration_in_goal_trajectories: true
 

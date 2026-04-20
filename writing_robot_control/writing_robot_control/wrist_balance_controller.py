@@ -129,8 +129,15 @@ class WristBalanceController(Node):
         self._action_client = ActionClient(
             self,
             FollowJointTrajectory,
-            '/joint_trajectory_controller/follow_joint_trajectory'
+            '/koch_v11_controller/follow_joint_trajectory'
         )
+
+        # Action server availability — checked via ROS timer
+        # Using a timer (not a thread) so it runs within the executor
+        # and has access to DDS discovery callbacks
+        self._action_server_ready = False
+        self._action_check_timer = self.create_timer(
+            2.0, self._check_action_server)
 
         # Human-readable intended action report (published in dry_run mode)
         self._pub_intended = self.create_publisher(String, '/balance/intended_action', 10)
@@ -143,6 +150,22 @@ class WristBalanceController(Node):
         self._goal_in_flight = False
         self._goal_lock = threading.Lock()
 
+        # Cache parameters used in hot loop
+        self._p_enabled      = self.get_parameter('enabled').value
+        self._p_dry_run      = self.get_parameter('dry_run').value
+        self._p_update_hz    = self.get_parameter('update_hz').value
+        self._p_max_delta    = self.get_parameter('max_delta_rad').value
+        self._p_flex_scale   = self.get_parameter('flex_scale').value
+        self._p_roll_scale   = self.get_parameter('roll_scale').value
+        self._p_move_dur     = self.get_parameter('move_duration').value
+        self._p_flex_joint   = self.get_parameter('wrist_flex_joint').value
+        self._p_roll_joint   = self.get_parameter('wrist_roll_joint').value
+        self._p_flex_min     = self.get_parameter('flex_min_rad').value
+        self._p_flex_max     = self.get_parameter('flex_max_rad').value
+        self._p_roll_min     = self.get_parameter('roll_min_rad').value
+        self._p_roll_max     = self.get_parameter('roll_max_rad').value
+        self._p_cmd_timeout  = 2.0   # seconds before cmd considered stale (was 0.5)
+
         self.get_logger().info('Wrist balance controller started.')
         self.get_logger().info(
             f'Joints: {self.get_parameter("wrist_flex_joint").value} (pitch), '
@@ -151,11 +174,23 @@ class WristBalanceController(Node):
         self.get_logger().info(
             "Disable with: ros2 param set /wrist_balance_controller enabled false"
         )
-        if self.get_parameter('dry_run').value:
+        if self._p_dry_run:
             self.get_logger().info(
                 'DRY RUN MODE — no trajectories will be sent.\n'
                 '  Monitor intended actions: ros2 topic echo /balance/intended_action'
             )
+
+    # ────────────────────────────────────────────────────────────────────
+    def _check_action_server(self):
+        """Timer callback (2s): check action server availability.
+        Runs in executor context so DDS discovery works correctly."""
+        available = self._action_client.server_is_ready()
+        if available != self._action_server_ready:
+            self._action_server_ready = available
+            if available:
+                self.get_logger().info('Action server connected.')
+            else:
+                self.get_logger().warn('Action server lost.')
 
     # ────────────────────────────────────────────────────────────────────
     def _cmd_callback(self, msg: Vector3):
@@ -190,7 +225,7 @@ class WristBalanceController(Node):
 
         # 'enabled' param is a manual override (e.g. for debugging).
         # _balance_active is driven automatically by imu_balance_node.
-        if not self.get_parameter('enabled').value:
+        if not self._p_enabled:
             return
         if not self._balance_active:
             return
@@ -203,13 +238,13 @@ class WristBalanceController(Node):
         # Safety: ignore stale commands (> 0.5s old)
         if cmd is None or last_cmd_time is None:
             return
-        if time.monotonic() - last_cmd_time > 0.5:
-            self.get_logger().warn('IMU command stale (>0.5s), skipping correction.',
+        if time.monotonic() - last_cmd_time > self._p_cmd_timeout:
+            self.get_logger().warn(f'IMU command stale (>{self._p_cmd_timeout}s), skipping correction.',
                                    throttle_duration_sec=5.0)
             return
 
-        flex_joint = self.get_parameter('wrist_flex_joint').value
-        roll_joint = self.get_parameter('wrist_roll_joint').value
+        flex_joint = self._p_flex_joint
+        roll_joint = self._p_roll_joint
 
         if flex_joint not in joint_pos or roll_joint not in joint_pos:
             self.get_logger().warn(
@@ -222,11 +257,11 @@ class WristBalanceController(Node):
             if self._goal_in_flight:
                 return
 
-        dt           = 1.0 / self.get_parameter('update_hz').value
-        max_delta    = self.get_parameter('max_delta_rad').value
-        flex_scale   = self.get_parameter('flex_scale').value
-        roll_scale   = self.get_parameter('roll_scale').value
-        move_dur     = self.get_parameter('move_duration').value
+        dt           = 1.0 / self._p_update_hz
+        max_delta    = self._p_max_delta
+        flex_scale   = self._p_flex_scale
+        roll_scale   = self._p_roll_scale
+        move_dur     = self._p_move_dur
 
         # cmd.x = pitch correction (rad/s) → wrist_flex
         # cmd.y = roll  correction (rad/s) → wrist_roll
@@ -246,10 +281,10 @@ class WristBalanceController(Node):
         new_roll = joint_pos[roll_joint] + roll_delta
 
         # Clamp to joint limits — warn if clamping fires (sign of over-aggressive gains)
-        flex_min = self.get_parameter('flex_min_rad').value
-        flex_max = self.get_parameter('flex_max_rad').value
-        roll_min = self.get_parameter('roll_min_rad').value
-        roll_max = self.get_parameter('roll_max_rad').value
+        flex_min = self._p_flex_min
+        flex_max = self._p_flex_max
+        roll_min = self._p_roll_min
+        roll_max = self._p_roll_max
 
         clamped_flex = max(flex_min, min(flex_max, new_flex))
         clamped_roll = max(roll_min, min(roll_max, new_roll))
@@ -301,7 +336,7 @@ class WristBalanceController(Node):
         cup_lines = _cup_effect(flex_delta, roll_delta)
 
         # ── Dry run: log and publish intended action, do not actuate ────
-        if self.get_parameter('dry_run').value:
+        if self._p_dry_run:
             report_lines = [
                 '=== Wrist Balance Controller — DRY RUN ===',
                 f'  {flex_joint}: {joint_pos[flex_joint]:.4f} → {new_flex:.4f} rad  '
@@ -324,8 +359,8 @@ class WristBalanceController(Node):
                          flex_pos, roll_pos, duration_sec):
         """Send a 2-joint trajectory goal for the wrist joints only."""
 
-        if not self._action_client.wait_for_server(timeout_sec=0.0):
-            self.get_logger().warn('Action server not available', 
+        if not self._action_server_ready:
+            self.get_logger().warn('Action server not available',
                                    throttle_duration_sec=5.0)
             return
 
@@ -333,11 +368,15 @@ class WristBalanceController(Node):
         traj = JointTrajectory()
         traj.joint_names = [flex_joint, roll_joint]
 
+        # Header stamp must be set — controller rejects goals with zero stamp
+        traj.header.stamp = self.get_clock().now().to_msg()
+
         point = JointTrajectoryPoint()
         point.positions = [flex_pos, roll_pos]
         point.velocities = [0.0, 0.0]   # let controller interpolate
 
-        # Duration as builtin_interfaces/Duration
+        # time_from_start: minimum 0.1s to avoid controller rejecting as too fast
+        duration_sec = max(duration_sec, 0.1)
         secs     = int(duration_sec)
         nanosecs = int((duration_sec - secs) * 1e9)
         point.time_from_start = Duration(sec=secs, nanosec=nanosecs)

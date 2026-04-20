@@ -32,6 +32,7 @@ setup(
             'wrist_balance_controller = writing_robot_control.wrist_balance_controller:main',
             'joint_nudge = writing_robot_control.joint_nudge:main',
             'ball_balance_node = writing_robot_control.ball_balance_node:main',
+            'system_watchdog = writing_robot_control.system_watchdog:main',
        ],
     },
 )

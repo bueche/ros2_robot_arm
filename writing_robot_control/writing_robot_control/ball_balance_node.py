@@ -91,12 +91,12 @@ class BallBalanceNode(Node):
         self.declare_parameter('max_cmd',        0.3)
         self.declare_parameter('deadband',       0.05)
         self.declare_parameter('stable_thresh',  0.15)
-        self.declare_parameter('publish_hz',     10.0)
+        self.declare_parameter('publish_hz',     15.0)
         self.declare_parameter('settle_delay',   0.5)
         self.declare_parameter('camera_timeout',    2.0)
         self.declare_parameter('imu_timeout',       0.5)
         self.declare_parameter('ball_lost_timeout', 1.0)
-        self.declare_parameter('attempt_timeout',   5.0)
+        self.declare_parameter('attempt_timeout',   30.0)
         self.declare_parameter('dry_run',           False)
         self.declare_parameter('use_imu',           True)
 
@@ -110,6 +110,10 @@ class BallBalanceNode(Node):
 
         # Attempt tracking
         self._pid_started_at        = None   # when PID became active this session
+
+        # Initialize ball time to now so ball-lost timer doesn't fire immediately
+        # on first detection after a long startup period
+        self._last_valid_ball_time  = time.monotonic()
 
         # IMU
         self._imu_pitch         = 0.0   # rad
@@ -271,6 +275,18 @@ class BallBalanceNode(Node):
                 f'PID suspended. Waiting for next SETTLED transition.')
             return
 
+        # Latency monitoring — time since each message arrived
+        cam_age_ms = (now - ball_time) * 1000
+        imu_age_ms = (now - imu_time) * 1000 if imu_time else 0.0
+        if cam_age_ms > 150:   # >2 frames at 15Hz
+            self.get_logger().warn(
+                f'CAM LAG: {cam_age_ms:.0f}ms since last ball position',
+                throttle_duration_sec=1.0)
+        if imu_age_ms > 60:    # >3 frames at 50Hz
+            self.get_logger().warn(
+                f'IMU LAG: {imu_age_ms:.0f}ms since last IMU reading',
+                throttle_duration_sec=1.0)
+
         # Compute errors
         error_x = float(ball_pos.x)   # positive = ball right
         error_y = float(ball_pos.y)   # positive = ball toward robot
@@ -368,6 +384,11 @@ class BallBalanceNode(Node):
         cmd.y = roll_cmd   # → wrist_roll in wrist_balance_controller
         cmd.z = 0.0
         self._pub_cmd.publish(cmd)
+        self.get_logger().info(
+            f'CMD | ball=({error_x:+.3f},{error_y:+.3f}) '
+            f'flex={flex_cmd:+.4f} roll={roll_cmd:+.4f} '
+            f'stable={is_stable}',
+            throttle_duration_sec=1.0)
 
 
 def main(args=None):

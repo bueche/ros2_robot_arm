@@ -194,11 +194,9 @@ class ImuBalanceNode(Node):
         # Publishers 
         self._pub_imu = self.create_publisher(Imu,     '/imu/raw',           10)
         self._pub_err = self.create_publisher(Vector3, '/imu/balance_error', 10)
-        self._pub_cmd = self.create_publisher(Vector3, '/imu/balance_cmd',   10)
-        # Publish True while balance error is within deadband
-        self._pub_stable = self.create_publisher(Bool, '/imu/is_stable',     10)
-        # Tell wrist_balance_controller whether to apply corrections
-        self._pub_balance_enabled = self.create_publisher(Bool, '/balance_enabled', 10)
+        # Note: /imu/balance_cmd and /balance_enabled are NOT published here.
+        # ball_balance_node owns those topics when camera+IMU fusion is active.
+        self._pub_stable = self.create_publisher(Bool, '/imu/is_stable', 10)
         # Human-readable debug diagnosis — always created, only published when debug_mode=True
         self._pub_diagnosis = self.create_publisher(String, '/imu/balance_diagnosis', 10)
 
@@ -273,15 +271,10 @@ class ImuBalanceNode(Node):
             self._settled_at = None
             self._pid_pitch.reset()
             self._pid_roll.reset()
-            self.get_logger().info('Arm MOVING — PID suspended, integrals reset.')
-            # Tell wrist_balance_controller to stand down
-            self._pub_balance_enabled.publish(Bool(data=False))
+            self.get_logger().info('Arm MOVING — IMU publishing continues.')
         elif new_state == 'SETTLED':
             self._settled_at = time.monotonic()
-            self.get_logger().info(
-                f'Arm SETTLED — PID activates in '
-                f'{self.get_parameter("settle_delay").value:.2f}s.'
-            )
+            self.get_logger().info('Arm SETTLED — IMU publishing continues.')
 
     def _joint_state_callback(self, msg: JointState):
         """Cache latest joint positions for FK setpoint computation."""
@@ -461,49 +454,8 @@ class ImuBalanceNode(Node):
         err_msg.z = 0.0
         self._pub_err.publish(err_msg)
 
-        # State machine: check settle delay 
-        if (not self._pid_active
-                and self._arm_state == 'SETTLED'
-                and self._settled_at is not None):
-            settle_delay = self.get_parameter('settle_delay').value
-            if time.monotonic() - self._settled_at >= settle_delay:
-                self._pid_active = True
-                self.get_logger().info('PID now active — balancing cup.')
-                self._pub_balance_enabled.publish(Bool(data=True))
-
-        # PID correction commands 
-        # Unified 2D error: compute tilt magnitude and direction, then project
-        # onto joint axes. This prevents independent-axis corrections from
-        # fighting each other when the tilt is diagonal.
-        if self._pid_active:
-            tilt_magnitude = math.sqrt(pitch_err ** 2 + roll_err ** 2)
-            tilt_direction = math.atan2(roll_err, pitch_err)  # angle in error plane
-
-            # Single PID on the magnitude (use pitch gains as the unified gains)
-            magnitude_cmd = self._pid_pitch.update(tilt_magnitude, now_sec)
-
-            # Project correction back onto pitch and roll axes
-            pitch_cmd = magnitude_cmd * math.cos(tilt_direction)
-            roll_cmd  = magnitude_cmd * math.sin(tilt_direction)
-
-            # Keep roll PID integral in sync (reset it since we're not using it directly)
-            self._pid_roll.reset()
-        else:
-            pitch_cmd = 0.0
-            roll_cmd  = 0.0
-
-        if self._inv_pitch:
-            pitch_cmd = -pitch_cmd
-        if self._inv_roll:
-            roll_cmd  = -roll_cmd
-
-        # pitch_cmd → wrist_flex joint delta (rad/s)
-        # roll_cmd  → wrist_roll  joint delta (rad/s)
-        cmd_msg = Vector3()
-        cmd_msg.x = pitch_cmd   # wrist_flex
-        cmd_msg.y = roll_cmd    # wrist_roll
-        cmd_msg.z = 0.0
-        self._pub_cmd.publish(cmd_msg)
+        # PID and balance_cmd are handled by ball_balance_node.
+        # imu_balance_node only publishes IMU data (/imu/raw, /imu/balance_error, /imu/is_stable).
 
         # Stability flag 
         # True when average error over rolling window is within deadband
@@ -521,6 +473,8 @@ class ImuBalanceNode(Node):
             fk_flex_str = f'{fk_flex_setpoint:.4f} rad' if fk_flex_setpoint is not None else 'unavailable'
             tilt_magnitude = math.sqrt(pitch_err ** 2 + roll_err ** 2)
             tilt_direction_deg = math.degrees(math.atan2(roll_err, pitch_err)) % 360.0
+            pitch_cmd = 0.0
+            roll_cmd  = 0.0
 
             # Map tilt direction to cup quadrant description.
             # 0° = robot-side edge of cup, 90° = right, 180° = far side, 270° = left.
