@@ -68,6 +68,7 @@ from rclpy.parameter import Parameter
 from sensor_msgs.msg import Imu, JointState
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import Bool, String
+from std_srvs.srv import Trigger
 
 import serial
 import json
@@ -200,6 +201,11 @@ class ImuBalanceNode(Node):
         # Human-readable debug diagnosis — always created, only published when debug_mode=True
         self._pub_diagnosis = self.create_publisher(String, '/imu/balance_diagnosis', 10)
 
+        # Calibration service — sends "c" to ESP32 to zero the IMU
+        self._cal_lock = threading.Lock()   # protect serial write from reader thread
+        self.create_service(
+            Trigger, '/imu/calibrate', self._calibrate_callback)
+
         # State 
         self._latest = None          # most recent parsed JSON dict
         self._lock   = threading.Lock()
@@ -246,7 +252,7 @@ class ImuBalanceNode(Node):
             'Topics: /imu/raw  /imu/balance_error  /imu/balance_cmd  /imu/is_stable'
         )
         self.get_logger().info(
-            'Tip: recalibrate IMU by sending "c" to ESP32 serial when arm is level.'
+            'Calibrate IMU: ros2 service call /imu/calibrate std_srvs/srv/Trigger "{}"'
         )
         if self.get_parameter('debug_mode').value:
             self.get_logger().info(
@@ -255,6 +261,35 @@ class ImuBalanceNode(Node):
             )
 
     # 
+    def _calibrate_callback(self, request, response):
+        """
+        ROS2 service: send calibration command to ESP32.
+        Zeros the IMU pitch/roll reference at the current arm position.
+
+        Usage:
+          ros2 service call /imu/calibrate std_srvs/srv/Trigger "{}"
+        """
+        with self._cal_lock:
+            if self._serial is None or not self._serial.is_open:
+                msg = 'Calibration failed: serial port not open'
+                self.get_logger().error(msg)
+                response.success = False
+                response.message = msg
+                return response
+            try:
+                self._serial.write(b'c')
+                self._serial.flush()
+                self.get_logger().info(
+                    'IMU calibration triggered — ESP32 zeroing pitch/roll.')
+                response.success = True
+                response.message = 'Calibration command sent to ESP32'
+            except Exception as e:
+                msg = f'Calibration failed: {e}'
+                self.get_logger().error(msg)
+                response.success = False
+                response.message = msg
+        return response
+
     def _arm_state_callback(self, msg: String):
         """
         Receive arm state from pose_test ('MOVING' or 'SETTLED').

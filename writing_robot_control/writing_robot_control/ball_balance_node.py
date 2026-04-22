@@ -356,11 +356,11 @@ class BallBalanceNode(Node):
         d_roll = imu_roll  if imu_fresh else 0.0
 
         # Control law (validated signs from balance_v1.yaml):
-        #   ball right (+x) → roll left → +wrist_roll → roll_cmd positive
-        #   ball near  (+y) → flex fwd  → -wrist_flex → flex_cmd negative
-        flex_cmd = (-kp_flex * error_y
-                    - ki_flex * self._integral_flex
-                    - kd_flex * d_flex)
+        #   ball right (+x) → roll left  → +wrist_roll → roll_cmd positive
+        #   ball near  (+y) → flex back → +wrist_flex → flex_cmd positive
+        flex_cmd = (+kp_flex * error_y
+                    + ki_flex * self._integral_flex
+                    + kd_flex * d_flex)
         roll_cmd = (+kp_roll * error_x
                     + ki_roll * self._integral_roll
                     + kd_roll * d_roll)
@@ -386,7 +386,10 @@ class BallBalanceNode(Node):
         self._pub_cmd.publish(cmd)
         self.get_logger().info(
             f'CMD | ball=({error_x:+.3f},{error_y:+.3f}) '
-            f'flex={flex_cmd:+.4f} roll={roll_cmd:+.4f} '
+            f'Pflex={+kp_flex*error_y:+.4f} Proll={+kp_roll*error_x:+.4f} '
+            f'Dflex={-kd_flex*d_flex:+.4f} Droll={+kd_roll*d_roll:+.4f} '
+            f'→ flex={flex_cmd:+.4f} roll={roll_cmd:+.4f} '
+            f'imu_pitch={d_flex:+.3f} imu_roll={d_roll:+.3f} '
             f'stable={is_stable}',
             throttle_duration_sec=1.0)
 

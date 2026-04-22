@@ -1,80 +1,45 @@
 #!/usr/bin/env python3
 """
-wrist_balance_controller.py — Cup balancing controller for Koch v1.1
+wrist_balance_controller.py — Wrist correction controller for ball balancing
 
-Subscribes to /imu/balance_cmd (geometry_msgs/Vector3) from imu_balance_node
-and translates the PID corrections into wrist joint position adjustments,
-sent via the JointTrajectory action to ros2_control.
+Uses JointTrajectory topic (not action) for safe, non-flooding corrections.
 
-Architecture:
-  /imu/balance_cmd  →  this node  →  /joint_trajectory_controller/follow_joint_trajectory
-  /imu/is_stable    →  logged / available for state machine use
-  /joint_states     →  read current wrist positions as the base for corrections
+Key safety design:
+  - correction_hz=2Hz: one correction every 500ms, giving joints time to move
+  - max_step_rad=0.05: max 2.9 degrees per correction
+  - max_total_rad=0.3: max 17 degrees total displacement from start pose
+  - move_duration=0.3s: 300ms to reach each target
 
-Control loop:
-  1. Receive balance_cmd (x=wrist_flex correction, y=wrist_roll correction) in rad/s
-  2. Multiply by dt to get a position delta (rad)
-  3. Clamp delta to max_delta_per_step to prevent jerky motion
-  4. Add delta to current joint position from /joint_states
-  5. Clamp result to joint limits
-  6. Send as a short-duration JointTrajectory goal
-
-Parameters (all tunable via ros2 param set at runtime):
-  enabled            bool    Enable/disable corrections         default: True
-  update_hz          float   Control loop rate (Hz)            default: 50.0
-  max_delta_rad      float   Max position change per step (rad) default: 0.02  (~1.1°)
-  move_duration      float   Trajectory point duration (s)     default: 0.05
-  wrist_flex_joint   str     Joint name for pitch correction    default: wrist_flex
-  wrist_roll_joint   str     Joint name for roll correction     default: wrist_roll
-  flex_scale         float   Scale factor for flex correction   default: 1.0
-  roll_scale         float   Scale factor for roll correction   default: 1.0
-  flex_min_rad       float   wrist_flex lower limit (rad)       default: -1.57
-  flex_max_rad       float   wrist_flex upper limit (rad)       default:  1.57
-  roll_min_rad       float   wrist_roll lower limit (rad)       default: -1.57
-  roll_max_rad       float   wrist_roll upper limit (rad)       default:  1.57
-
-Topics subscribed:
-  /imu/balance_cmd         geometry_msgs/Vector3   PID corrections (rad/s)
-  /imu/is_stable           std_msgs/Bool           Stability flag
-  /joint_states            sensor_msgs/JointState  Current joint positions
-
-Topics/actions used:
-  /joint_trajectory_controller/follow_joint_trajectory   (action, SendGoal)
-
-Usage:
-  ros2 run writing_robot_control wrist_balance_controller
-
-  # Disable corrections while arm is moving to a new pose:
-  ros2 param set /wrist_balance_controller enabled false
-
-  # Re-enable:
-  ros2 param set /wrist_balance_controller enabled true
-
-  # Reduce aggressiveness if oscillating:
-  ros2 param set /wrist_balance_controller max_delta_rad 0.01
-
-Tuning guide:
-  - If the arm oscillates: reduce max_delta_rad or reduce PID gains in imu_balance_node
-  - If the arm is slow to respond: increase max_delta_rad or increase Kp in imu_balance_node
-  - If one axis is inverted: set flex_scale or roll_scale to -1.0
-  - The PID gains live in imu_balance_node, not here — tune there first
+Parameters:
+  enabled            Master enable                           default: True
+  dry_run            Log only, don't publish                 default: False
+  correction_hz      Correction rate (Hz)                    default: 2.0
+  move_duration      Trajectory duration per step (s)        default: 0.3
+  max_step_rad       Max per-correction displacement (rad)   default: 0.05
+  max_total_rad      Max total displacement from start (rad) default: 0.3
+  cmd_timeout        Stale command threshold (s)             default: 2.0
+  wrist_flex_joint   Flex joint name                         default: wrist_flex
+  wrist_roll_joint   Roll joint name                         default: wrist_roll
+  flex_scale         Flex correction scale                   default: 1.0
+  roll_scale         Roll correction scale                   default: 1.0
+  flex_min_rad       Flex hard minimum                       default: 0.297
+  flex_max_rad       Flex hard maximum                       default: 2.700
+  roll_min_rad       Roll hard minimum                       default: -1.448
+  roll_max_rad       Roll hard maximum                       default: 1.900
 """
-
-import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionClient
-from rclpy.parameter import Parameter
-
-from geometry_msgs.msg import Vector3
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool, String
-from control_msgs.action import FollowJointTrajectory
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from builtin_interfaces.msg import Duration
 
 import math
 import threading
 import time
+
+import rclpy
+from rclpy.node import Node
+
+from geometry_msgs.msg import Vector3
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Bool, String
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from builtin_interfaces.msg import Duration
 
 
 class WristBalanceController(Node):
@@ -82,120 +47,95 @@ class WristBalanceController(Node):
     def __init__(self):
         super().__init__('wrist_balance_controller')
 
-        # ── Parameters ──────────────────────────────────────────────────
-        self.declare_parameter('enabled',           True)
-        self.declare_parameter('update_hz',         50.0)
-        self.declare_parameter('max_delta_rad',     0.02)
-        self.declare_parameter('move_duration',     0.05)
-        self.declare_parameter('wrist_flex_joint',  'wrist_flex')
-        self.declare_parameter('wrist_roll_joint',  'wrist_roll')
-        self.declare_parameter('flex_scale',        1.0)
-        self.declare_parameter('roll_scale',        1.0)
-        self.declare_parameter('flex_min_rad',      0.297)   # wrist_flex lower bound
-        self.declare_parameter('flex_max_rad',      2.700)   # wrist_flex upper bound
-        self.declare_parameter('roll_min_rad',     -1.448)   # wrist_roll lower bound
-        self.declare_parameter('roll_max_rad',      1.900)   # wrist_roll upper bound
-        self.declare_parameter('dry_run',           False)  # log intended actions, don't actuate
+        # Parameters
+        self.declare_parameter('enabled',          True)
+        self.declare_parameter('dry_run',          False)
+        self.declare_parameter('correction_hz',    2.0)
+        self.declare_parameter('move_duration',    0.3)
+        self.declare_parameter('max_step_rad',     0.05)
+        self.declare_parameter('max_total_rad',    0.3)
+        self.declare_parameter('cmd_timeout',      2.0)
+        self.declare_parameter('wrist_flex_joint', 'wrist_flex')
+        self.declare_parameter('wrist_roll_joint', 'wrist_roll')
+        self.declare_parameter('flex_scale',       1.0)
+        self.declare_parameter('roll_scale',       1.0)
+        self.declare_parameter('flex_min_rad',     0.297)
+        self.declare_parameter('flex_max_rad',     2.700)
+        self.declare_parameter('roll_min_rad',    -1.448)
+        self.declare_parameter('roll_max_rad',     1.900)
 
-        # ── State ────────────────────────────────────────────────────────
-        self._joint_positions = {}   # name → current position (rad)
-        self._latest_cmd      = None # most recent Vector3 from /imu/balance_cmd
-        self._is_stable       = False
-        self._balance_active  = False  # set by /balance_enabled from imu_balance_node
+        # Cache hot-loop parameters
+        self._p_enabled     = self.get_parameter('enabled').value
+        self._p_dry_run     = self.get_parameter('dry_run').value
+        self._p_corr_hz     = self.get_parameter('correction_hz').value
+        self._p_move_dur    = self.get_parameter('move_duration').value
+        self._p_max_step    = self.get_parameter('max_step_rad').value
+        self._p_max_total   = self.get_parameter('max_total_rad').value
+        self._p_cmd_timeout = self.get_parameter('cmd_timeout').value
+        self._p_flex_joint  = self.get_parameter('wrist_flex_joint').value
+        self._p_roll_joint  = self.get_parameter('wrist_roll_joint').value
+        self._p_flex_scale  = self.get_parameter('flex_scale').value
+        self._p_roll_scale  = self.get_parameter('roll_scale').value
+        self._p_flex_min    = self.get_parameter('flex_min_rad').value
+        self._p_flex_max    = self.get_parameter('flex_max_rad').value
+        self._p_roll_min    = self.get_parameter('roll_min_rad').value
+        self._p_roll_max    = self.get_parameter('roll_max_rad').value
+
+        # State
         self._lock            = threading.Lock()
+        self._joint_positions = {}
+        self._latest_cmd      = None
         self._last_cmd_time   = None
+        self._balance_active  = False
 
-        # ── Subscribers ──────────────────────────────────────────────────
+        # Displacement tracking — reset each time balance activates
+        self._start_flex  = None
+        self._start_roll  = None
+        self._total_flex  = 0.0
+        self._total_roll  = 0.0
+
+        # Publishers
+        self._traj_pub = self.create_publisher(
+            JointTrajectory,
+            '/koch_v11_controller/joint_trajectory',
+            10)
+        self._pub_intended = self.create_publisher(
+            String, '/balance/intended_action', 10)
+
+        # Subscribers
         self.create_subscription(
             Vector3, '/imu/balance_cmd',
             self._cmd_callback, 10)
-
         self.create_subscription(
             JointState, '/joint_states',
             self._joint_state_callback, 10)
-
         self.create_subscription(
             Bool, '/imu/is_stable',
-            self._stable_callback, 10)
-
-        # imu_balance_node publishes True when arm is SETTLED and PID is active,
-        # False when arm is MOVING.  This takes priority over the 'enabled' param
-        # so pose_test drives the gate automatically without manual param-sets.
+            lambda msg: None, 10)
         self.create_subscription(
             Bool, '/balance_enabled',
             self._balance_enabled_callback, 10)
 
-        # ── Action client ────────────────────────────────────────────────
-        self._action_client = ActionClient(
-            self,
-            FollowJointTrajectory,
-            '/koch_v11_controller/follow_joint_trajectory'
-        )
-
-        # Action server availability — checked via ROS timer
-        # Using a timer (not a thread) so it runs within the executor
-        # and has access to DDS discovery callbacks
-        self._action_server_ready = False
-        self._action_check_timer = self.create_timer(
-            2.0, self._check_action_server)
-
-        # Human-readable intended action report (published in dry_run mode)
-        self._pub_intended = self.create_publisher(String, '/balance/intended_action', 10)
-
-        # ── Control timer ────────────────────────────────────────────────
-        hz = self.get_parameter('update_hz').value
-        self._timer = self.create_timer(1.0 / hz, self._control_loop)
-
-        # Track in-flight action goal to avoid flooding
-        self._goal_in_flight = False
-        self._goal_lock = threading.Lock()
-
-        # Cache parameters used in hot loop
-        self._p_enabled      = self.get_parameter('enabled').value
-        self._p_dry_run      = self.get_parameter('dry_run').value
-        self._p_update_hz    = self.get_parameter('update_hz').value
-        self._p_max_delta    = self.get_parameter('max_delta_rad').value
-        self._p_flex_scale   = self.get_parameter('flex_scale').value
-        self._p_roll_scale   = self.get_parameter('roll_scale').value
-        self._p_move_dur     = self.get_parameter('move_duration').value
-        self._p_flex_joint   = self.get_parameter('wrist_flex_joint').value
-        self._p_roll_joint   = self.get_parameter('wrist_roll_joint').value
-        self._p_flex_min     = self.get_parameter('flex_min_rad').value
-        self._p_flex_max     = self.get_parameter('flex_max_rad').value
-        self._p_roll_min     = self.get_parameter('roll_min_rad').value
-        self._p_roll_max     = self.get_parameter('roll_max_rad').value
-        self._p_cmd_timeout  = 2.0   # seconds before cmd considered stale (was 0.5)
+        # Control timer
+        self._timer = self.create_timer(
+            1.0 / self._p_corr_hz, self._control_loop)
 
         self.get_logger().info('Wrist balance controller started.')
         self.get_logger().info(
-            f'Joints: {self.get_parameter("wrist_flex_joint").value} (pitch), '
-            f'{self.get_parameter("wrist_roll_joint").value} (roll)'
-        )
+            f'Joints: {self._p_flex_joint} (pitch), {self._p_roll_joint} (roll)')
         self.get_logger().info(
-            "Disable with: ros2 param set /wrist_balance_controller enabled false"
-        )
+            f'Rate={self._p_corr_hz}Hz  '
+            f'step={math.degrees(self._p_max_step):.1f}deg  '
+            f'total_limit={math.degrees(self._p_max_total):.1f}deg  '
+            f'move_dur={self._p_move_dur}s')
+        self.get_logger().info(
+            'Disable: ros2 param set /wrist_balance_controller enabled false')
         if self._p_dry_run:
-            self.get_logger().info(
-                'DRY RUN MODE — no trajectories will be sent.\n'
-                '  Monitor intended actions: ros2 topic echo /balance/intended_action'
-            )
+            self.get_logger().info('DRY RUN — no trajectories sent.')
 
-    # ────────────────────────────────────────────────────────────────────
-    def _check_action_server(self):
-        """Timer callback (2s): check action server availability.
-        Runs in executor context so DDS discovery works correctly."""
-        available = self._action_client.server_is_ready()
-        if available != self._action_server_ready:
-            self._action_server_ready = available
-            if available:
-                self.get_logger().info('Action server connected.')
-            else:
-                self.get_logger().warn('Action server lost.')
-
-    # ────────────────────────────────────────────────────────────────────
     def _cmd_callback(self, msg: Vector3):
         with self._lock:
-            self._latest_cmd   = msg
+            self._latest_cmd    = msg
             self._last_cmd_time = time.monotonic()
 
     def _joint_state_callback(self, msg: JointState):
@@ -203,213 +143,144 @@ class WristBalanceController(Node):
             for name, pos in zip(msg.name, msg.position):
                 self._joint_positions[name] = pos
 
-    def _stable_callback(self, msg: Bool):
-        self._is_stable = msg.data
-
     def _balance_enabled_callback(self, msg: Bool):
-        """
-        Driven by imu_balance_node when arm transitions MOVING↔SETTLED.
-        Overrides the 'enabled' parameter so pose_test controls the gate
-        automatically without requiring manual ros2 param set calls.
-        """
-        if msg.data != self._balance_active:
-            self._balance_active = msg.data
-            self.get_logger().info(
-                f'Balance {"ENABLED" if msg.data else "DISABLED"} '
-                f'(from /balance_enabled topic)'
-            )
-
-    # ────────────────────────────────────────────────────────────────────
-    def _control_loop(self):
-        """Main control loop — runs at update_hz."""
-
-        # 'enabled' param is a manual override (e.g. for debugging).
-        # _balance_active is driven automatically by imu_balance_node.
-        if not self._p_enabled:
+        if msg.data == self._balance_active:
             return
-        if not self._balance_active:
+        self._balance_active = msg.data
+        self.get_logger().info(
+            f'Balance {"ENABLED" if msg.data else "DISABLED"}')
+
+        if msg.data:
+            # Record starting pose
+            with self._lock:
+                self._start_flex = self._joint_positions.get(
+                    self._p_flex_joint)
+                self._start_roll = self._joint_positions.get(
+                    self._p_roll_joint)
+            self._total_flex = 0.0
+            self._total_roll = 0.0
+            self.get_logger().info(
+                f'Start pose: flex={self._start_flex:.4f}  '
+                f'roll={self._start_roll:.4f}')
+        else:
+            self.get_logger().info(
+                f'Total displacement: '
+                f'flex={math.degrees(self._total_flex):+.1f}deg  '
+                f'roll={math.degrees(self._total_roll):+.1f}deg')
+
+    def _control_loop(self):
+        if not self._p_enabled or not self._balance_active:
             return
 
         with self._lock:
-            cmd            = self._latest_cmd
-            joint_pos      = dict(self._joint_positions)
-            last_cmd_time  = self._last_cmd_time
+            cmd           = self._latest_cmd
+            joint_pos     = dict(self._joint_positions)
+            last_cmd_time = self._last_cmd_time
 
-        # Safety: ignore stale commands (> 0.5s old)
         if cmd is None or last_cmd_time is None:
+            self.get_logger().warn(
+                'No command yet', throttle_duration_sec=5.0)
             return
         if time.monotonic() - last_cmd_time > self._p_cmd_timeout:
-            self.get_logger().warn(f'IMU command stale (>{self._p_cmd_timeout}s), skipping correction.',
-                                   throttle_duration_sec=5.0)
+            self.get_logger().warn(
+                f'Command stale', throttle_duration_sec=5.0)
             return
 
-        flex_joint = self._p_flex_joint
-        roll_joint = self._p_roll_joint
-
-        if flex_joint not in joint_pos or roll_joint not in joint_pos:
+        fj = self._p_flex_joint
+        rj = self._p_roll_joint
+        if fj not in joint_pos or rj not in joint_pos:
             self.get_logger().warn(
-                f'Joint positions not yet available for {flex_joint} / {roll_joint}',
-                throttle_duration_sec=5.0)
+                'Joint positions unavailable', throttle_duration_sec=5.0)
             return
 
-        # Don't send a new goal if one is already in flight
-        with self._goal_lock:
-            if self._goal_in_flight:
-                return
+        # Desired step
+        dt         = 1.0 / self._p_corr_hz
+        flex_delta = float(cmd.x) * self._p_flex_scale * dt
+        roll_delta = float(cmd.y) * self._p_roll_scale * dt
 
-        dt           = 1.0 / self._p_update_hz
-        max_delta    = self._p_max_delta
-        flex_scale   = self._p_flex_scale
-        roll_scale   = self._p_roll_scale
-        move_dur     = self._p_move_dur
+        # Clamp step size
+        flex_delta = max(-self._p_max_step,
+                         min(self._p_max_step, flex_delta))
+        roll_delta = max(-self._p_max_step,
+                         min(self._p_max_step, roll_delta))
 
-        # cmd.x = pitch correction (rad/s) → wrist_flex
-        # cmd.y = roll  correction (rad/s) → wrist_roll
-        flex_delta = float(cmd.x) * flex_scale * dt
-        roll_delta = float(cmd.y) * roll_scale * dt
-
-        # Clamp per-step delta
-        flex_delta = max(-max_delta, min(max_delta, flex_delta))
-        roll_delta = max(-max_delta, min(max_delta, roll_delta))
-
-        # Skip if both deltas are negligible (within 10% of max_delta)
-        if abs(flex_delta) < max_delta * 0.1 and abs(roll_delta) < max_delta * 0.1:
+        if abs(flex_delta) < 1e-4 and abs(roll_delta) < 1e-4:
             return
 
-        # Compute new target positions
-        new_flex = joint_pos[flex_joint] + flex_delta
-        new_roll = joint_pos[roll_joint] + roll_delta
+        # Total displacement limit
+        projected_flex = self._total_flex + flex_delta
+        projected_roll = self._total_roll + roll_delta
 
-        # Clamp to joint limits — warn if clamping fires (sign of over-aggressive gains)
-        flex_min = self._p_flex_min
-        flex_max = self._p_flex_max
-        roll_min = self._p_roll_min
-        roll_max = self._p_roll_max
-
-        clamped_flex = max(flex_min, min(flex_max, new_flex))
-        clamped_roll = max(roll_min, min(roll_max, new_roll))
-
-        if clamped_flex != new_flex:
+        if abs(projected_flex) > self._p_max_total:
+            remaining = self._p_max_total - abs(self._total_flex)
+            flex_delta = math.copysign(max(0.0, remaining), flex_delta)
             self.get_logger().warn(
-                f'wrist_flex clamped: requested {new_flex:.4f} rad, '
-                f'limited to {clamped_flex:.4f} rad  '
-                f'(limit: [{flex_min:.2f}, {flex_max:.2f}]) — consider reducing gains.',
-                throttle_duration_sec=2.0)
-        if clamped_roll != new_roll:
-            self.get_logger().warn(
-                f'wrist_roll clamped: requested {new_roll:.4f} rad, '
-                f'limited to {clamped_roll:.4f} rad  '
-                f'(limit: [{roll_min:.2f}, {roll_max:.2f}]) — consider reducing gains.',
+                f'Flex total limit reached '
+                f'({math.degrees(self._total_flex):+.1f}deg) — clamping',
                 throttle_duration_sec=2.0)
 
-        new_flex = clamped_flex
-        new_roll = clamped_roll
+        if abs(projected_roll) > self._p_max_total:
+            remaining = self._p_max_total - abs(self._total_roll)
+            roll_delta = math.copysign(max(0.0, remaining), roll_delta)
+            self.get_logger().warn(
+                f'Roll total limit reached '
+                f'({math.degrees(self._total_roll):+.1f}deg) — clamping',
+                throttle_duration_sec=2.0)
 
-        # ── Cup quadrant effect report ───────────────────────────────────
-        # Coordinate convention (facing the robot head-on):
-        #   0°  = robot-side edge of cup
-        #   90° = right edge
-        #   180° = far edge
-        #   270° = left edge
-        #
-        # wrist_flex increasing → 0° edge moves UP,  180° edge moves DOWN
-        # wrist_roll increasing → 90° edge moves UP,  270° edge moves DOWN
-        # (Signs may need inversion after physical validation.)
-        def _cup_effect(flex_d, roll_d):
-            lines = []
-            if abs(flex_d) > 1e-5:
-                if flex_d > 0:
-                    lines.append(f'  0° (robot-side) UP   by {math.degrees(abs(flex_d)):.3f}°')
-                    lines.append(f'  180° (far side) DOWN by {math.degrees(abs(flex_d)):.3f}°')
-                else:
-                    lines.append(f'  0° (robot-side) DOWN by {math.degrees(abs(flex_d)):.3f}°')
-                    lines.append(f'  180° (far side) UP   by {math.degrees(abs(flex_d)):.3f}°')
-            if abs(roll_d) > 1e-5:
-                if roll_d > 0:
-                    lines.append(f'  90° (your right) UP   by {math.degrees(abs(roll_d)):.3f}°')
-                    lines.append(f'  270° (your left) DOWN by {math.degrees(abs(roll_d)):.3f}°')
-                else:
-                    lines.append(f'  90° (your right) DOWN by {math.degrees(abs(roll_d)):.3f}°')
-                    lines.append(f'  270° (your left) UP   by {math.degrees(abs(roll_d)):.3f}°')
-            return lines if lines else ['  (no significant correction)']
+        if abs(flex_delta) < 1e-4 and abs(roll_delta) < 1e-4:
+            self.get_logger().warn(
+                'Both axes at total limit', throttle_duration_sec=2.0)
+            return
 
-        cup_lines = _cup_effect(flex_delta, roll_delta)
+        # Target positions
+        new_flex = max(self._p_flex_min,
+                       min(self._p_flex_max,
+                           joint_pos[fj] + flex_delta))
+        new_roll = max(self._p_roll_min,
+                       min(self._p_roll_max,
+                           joint_pos[rj] + roll_delta))
 
-        # ── Dry run: log and publish intended action, do not actuate ────
+        actual_flex_delta = new_flex - joint_pos[fj]
+        actual_roll_delta = new_roll - joint_pos[rj]
+
+        self._total_flex += actual_flex_delta
+        self._total_roll += actual_roll_delta
+
+        self.get_logger().info(
+            f'CORR | '
+            f'flex {joint_pos[fj]:.4f}→{new_flex:.4f} '
+            f'(Δ{math.degrees(actual_flex_delta):+.2f}deg)  '
+            f'roll {joint_pos[rj]:.4f}→{new_roll:.4f} '
+            f'(Δ{math.degrees(actual_roll_delta):+.2f}deg)  '
+            f'cumul: flex={math.degrees(self._total_flex):+.1f}deg '
+            f'roll={math.degrees(self._total_roll):+.1f}deg')
+
         if self._p_dry_run:
-            report_lines = [
-                '=== Wrist Balance Controller — DRY RUN ===',
-                f'  {flex_joint}: {joint_pos[flex_joint]:.4f} → {new_flex:.4f} rad  '
-                f'(Δ {flex_delta:+.4f} rad)',
-                f'  {roll_joint}: {joint_pos[roll_joint]:.4f} → {new_roll:.4f} rad  '
-                f'(Δ {roll_delta:+.4f} rad)',
-                'Cup edge motion (positive = edge rises):',
-            ] + cup_lines
-            report = '\n'.join(report_lines)
-            self.get_logger().info(report, throttle_duration_sec=0.5)
-            msg = String()
-            msg.data = report
-            self._pub_intended.publish(msg)
-            return   # ← do not actuate
-
-        self._send_trajectory(flex_joint, roll_joint, new_flex, new_roll, move_dur)
-
-    # ────────────────────────────────────────────────────────────────────
-    def _send_trajectory(self, flex_joint, roll_joint,
-                         flex_pos, roll_pos, duration_sec):
-        """Send a 2-joint trajectory goal for the wrist joints only."""
-
-        if not self._action_server_ready:
-            self.get_logger().warn('Action server not available',
-                                   throttle_duration_sec=5.0)
+            msg_out      = String()
+            msg_out.data = (
+                f'DRY flex {joint_pos[fj]:.4f}→{new_flex:.4f}  '
+                f'roll {joint_pos[rj]:.4f}→{new_roll:.4f}')
+            self._pub_intended.publish(msg_out)
             return
 
-        # Build trajectory message
-        traj = JointTrajectory()
-        traj.joint_names = [flex_joint, roll_joint]
-
-        # Header stamp must be set — controller rejects goals with zero stamp
+        # Publish trajectory (topic, non-blocking, replaces previous)
+        traj              = JointTrajectory()
+        traj.joint_names  = [fj, rj]
         traj.header.stamp = self.get_clock().now().to_msg()
 
-        point = JointTrajectoryPoint()
-        point.positions = [flex_pos, roll_pos]
-        point.velocities = [0.0, 0.0]   # let controller interpolate
+        pt             = JointTrajectoryPoint()
+        pt.positions   = [new_flex, new_roll]
+        pt.velocities  = [0.0, 0.0]
 
-        # time_from_start: minimum 0.1s to avoid controller rejecting as too fast
-        duration_sec = max(duration_sec, 0.1)
-        secs     = int(duration_sec)
-        nanosecs = int((duration_sec - secs) * 1e9)
-        point.time_from_start = Duration(sec=secs, nanosec=nanosecs)
+        dur      = self._p_move_dur
+        secs     = int(dur)
+        nanosecs = int((dur - secs) * 1e9)
+        pt.time_from_start = Duration(sec=secs, nanosec=nanosecs)
 
-        traj.points = [point]
-
-        goal = FollowJointTrajectory.Goal()
-        goal.trajectory = traj
-
-        with self._goal_lock:
-            self._goal_in_flight = True
-
-        future = self._action_client.send_goal_async(goal)
-        future.add_done_callback(self._goal_response_callback)
-
-    # ────────────────────────────────────────────────────────────────────
-    def _goal_response_callback(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            self.get_logger().warn('Trajectory goal rejected')
-            with self._goal_lock:
-                self._goal_in_flight = False
-            return
-
-        result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self._goal_result_callback)
-
-    def _goal_result_callback(self, future):
-        with self._goal_lock:
-            self._goal_in_flight = False
+        traj.points = [pt]
+        self._traj_pub.publish(traj)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 def main(args=None):
     rclpy.init(args=args)
     node = WristBalanceController()
