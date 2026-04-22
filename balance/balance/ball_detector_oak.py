@@ -87,6 +87,7 @@ class BallDetectorOakNode(Node):
         self.declare_parameter('debug_width',   320)
         self.declare_parameter('debug_height',  320)
         self.declare_parameter('publish_hz',    30.0)
+        self.declare_parameter('log_spikes',   True)   # log publish time spikes >half budget
 
         # Publishers
         self._pub_pos   = self.create_publisher(
@@ -110,14 +111,33 @@ class BallDetectorOakNode(Node):
         self._last_rgb_seq   = -1
         self._last_det_seq   = -1
         self._rgb_drops      = 0
-        self._det_drops      = 0
+        self._det_drops_dev  = 0   # device-side: MyriadX produced but XLink dropped
+        self._det_drops_host = 0   # host-side: arrived via USB but Python queue full
         self._resource_tick  = 0
 
         # Temporal size tracking for bbox sanity filter
-        self._last_cup_wh    = None
-        self._last_ball_wh   = None
-        self._cup_jump_frac  = 0.35
-        self._ball_jump_frac = 0.50
+        # _warmup_count: don't apply size filter until we have N stable detections
+        self._last_cup_wh     = None
+        self._last_ball_wh    = None
+        self._cup_jump_frac   = 0.35
+        self._ball_jump_frac  = 0.50
+        self._ball_det_count  = 0   # number of accepted ball detections so far
+        self._cup_det_count   = 0
+        self._warmup_frames   = 10  # ignore size jumps for first N detections
+
+        # Cached parameters — read once at startup to avoid get_parameter()
+        # calls in the hot publish loop (each call involves a ROS2 service
+        # round-trip which can block for 100s of ms under DDS contention)
+        self._p_publish_image  = self.get_parameter('publish_image').value
+        self._p_show_debug     = self.get_parameter('show_debug').value
+        self._p_debug_width    = self.get_parameter('debug_width').value
+        self._p_debug_height   = self.get_parameter('debug_height').value
+        self._p_rgb_fps        = self.get_parameter('rgb_fps').value
+        self._p_log_spikes     = self.get_parameter('log_spikes').value
+        self._p_conf_threshold = self.get_parameter('conf_threshold').value
+        self._p_depth_min_mm   = self.get_parameter('depth_min_mm').value
+        self._p_depth_max_mm   = self.get_parameter('depth_max_mm').value
+        self._p_camera_frame   = self.get_parameter('camera_frame_id').value
 
         # Build pipeline and connect device
         blob_path = self.get_parameter('blob_path').value
@@ -128,10 +148,10 @@ class BallDetectorOakNode(Node):
 
         self._device = self._build_pipeline(blob_path)
 
-        # Detection queue — non-blocking, maxSize=4 to absorb bursts
-        # We always process the latest detection, older ones are discarded
+        # Detection queue — device-side maxSize=30 to absorb bursts before USB transfer
+        # Larger buffer reduces device-side drops when USB is momentarily busy
         self._q_det = self._device.getOutputQueue(
-            'detections', maxSize=4, blocking=False)
+            'detections', maxSize=30, blocking=False)
 
         # RGB queue — non-blocking, just want latest frame for debug image
         self._q_rgb = self._device.getOutputQueue(
@@ -327,13 +347,15 @@ class BallDetectorOakNode(Node):
 
                 seq = det.getSequenceNum()
                 if self._last_det_seq >= 0:
-                    self._det_drops += max(0, seq - self._last_det_seq - 1)
+                    gap = max(0, seq - self._last_det_seq - 1)
+                    self._det_drops_dev += gap   # dropped on device before USB
                 self._last_det_seq = seq
 
-                # Put detection in queue — discard oldest if full
+                # Put detection in host queue — track host-side drops separately
                 try:
                     self._det_queue.put_nowait(det.detections)
                 except queue.Full:
+                    self._det_drops_host += 1    # arrived via USB but queue full
                     try:
                         self._det_queue.get_nowait()  # discard oldest
                         self._det_queue.put_nowait(det.detections)
@@ -352,7 +374,8 @@ class BallDetectorOakNode(Node):
                             f'CSS heap: {css_heap.used//1024}/{css_heap.total//1024} KB  '
                             f'MSS heap: {mss_heap.used//1024}/{mss_heap.total//1024} KB  '
                             f'rgb_drops={self._rgb_drops}  '
-                            f'det_drops={self._det_drops}  '
+                            f'det_drops_dev={self._det_drops_dev}  '
+                            f'det_drops_host={self._det_drops_host}  '
                             f'det_seq={self._last_det_seq}')
                     except Exception as e:
                         self.get_logger().warn(
@@ -369,7 +392,7 @@ class BallDetectorOakNode(Node):
         Runs at rgb_fps rate. Decoupled from grab loop so publishing never
         blocks queue draining. Tracks processing time for diagnostics.
         """
-        fps      = self.get_parameter('rgb_fps').value
+        fps      = self._p_rgb_fps
         interval = 1.0 / fps
         proc_ms  = 0.0
         while self._running:
@@ -389,10 +412,16 @@ class BallDetectorOakNode(Node):
             self._process_and_publish(dets, frame, depth_frame)
             proc_ms = (time.monotonic() - t_proc) * 1000
 
+            # Spike detection — log immediately if enabled and over half budget
+            budget_ms = interval * 1000
+            log_spikes = self._p_log_spikes
+            if log_spikes and proc_ms > budget_ms * 0.5:
+                self.get_logger().warn(
+                    f'[publish] SPIKE proc={proc_ms:.1f}ms  budget={budget_ms:.1f}ms')
+
             # Log processing time every ~100 publishes
             self._pub_tick = getattr(self, '_pub_tick', 0) + 1
             if self._pub_tick % 100 == 0:
-                budget_ms = interval * 1000
                 self.get_logger().info(
                     f'[publish] proc={proc_ms:.1f}ms  '
                     f'budget={budget_ms:.1f}ms  '
@@ -407,8 +436,7 @@ class BallDetectorOakNode(Node):
     def _process_and_publish(self, dets, frame, depth_frame):
         """Process one detection result and publish all topics."""
         h, w = (frame.shape[:2] if frame is not None
-                else (self.get_parameter('debug_height').value,
-                      self.get_parameter('debug_width').value))
+                else (self._p_debug_height, self._p_debug_width))
 
         # Detection selection with temporal size sanity filter
         best_ball_norm = None;  best_ball_c = 0.0
@@ -419,7 +447,8 @@ class BallDetectorOakNode(Node):
             dh_d = d.ymax - d.ymin
 
             if d.label == BALL_IDX and d.confidence > best_ball_c:
-                if self._last_ball_wh is not None:
+                # Only apply size jump filter after warmup period
+                if self._last_ball_wh is not None and self._ball_det_count >= self._warmup_frames:
                     lw, lh = self._last_ball_wh
                     if lw > 0 and lh > 0:
                         jump = max(abs(dw - lw) / lw, abs(dh_d - lh) / lh)
@@ -430,6 +459,7 @@ class BallDetectorOakNode(Node):
                             continue
                 best_ball_c    = d.confidence
                 best_ball_norm = (d.xmin, d.ymin, d.xmax, d.ymax)
+                self._ball_det_count += 1
                 self.get_logger().info(
                     f'Ball bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={d.confidence:.3f}',
                     throttle_duration_sec=1.0)
@@ -443,7 +473,8 @@ class BallDetectorOakNode(Node):
                         f'Cup rejected by ROI: cx={cx_n:.2f} cy={cy_n:.2f}',
                         throttle_duration_sec=2.0)
                     continue
-                if self._last_cup_wh is not None:
+                # Only apply size jump filter after warmup period
+                if self._last_cup_wh is not None and self._cup_det_count >= self._warmup_frames:
                     lw, lh = self._last_cup_wh
                     if lw > 0 and lh > 0:
                         jump = max(abs(dw - lw) / lw, abs(dh_d - lh) / lh)
@@ -454,6 +485,7 @@ class BallDetectorOakNode(Node):
                             continue
                 best_cup_c    = d.confidence
                 best_cup_norm = (d.xmin, d.ymin, d.xmax, d.ymax)
+                self._cup_det_count += 1
                 self.get_logger().info(
                     f'Cup  bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={d.confidence:.3f}',
                     throttle_duration_sec=1.0)
@@ -515,24 +547,30 @@ class BallDetectorOakNode(Node):
             ball_py = int(ball_cy_n * h)
             self._publish_3d(ball_px, ball_py, depth_frame)
 
-        # Debug image
-        if frame is not None and self.get_parameter('publish_image').value:
-            def norm_to_px(n):
-                xmin, ymin, xmax, ymax = n
-                return (int(xmin*w), int(ymin*h),
-                        int(xmax*w), int(ymax*h))
+        # Debug image — rate-limited to max 5Hz to reduce GIL contention
+        # Full detection rate still published on /ball/position
+        if frame is not None and self._p_publish_image:
+            now_img = time.monotonic()
+            if not hasattr(self, '_last_img_pub'):
+                self._last_img_pub = 0.0
+            if now_img - self._last_img_pub >= 0.2:  # 5Hz max
+                self._last_img_pub = now_img
+                def norm_to_px(n):
+                    xmin, ymin, xmax, ymax = n
+                    return (int(xmin*w), int(ymin*h),
+                            int(xmax*w), int(ymax*h))
 
-            ball_px_box = norm_to_px(best_ball_norm) if ball_found else None
-            cup_px_box  = norm_to_px(best_cup_norm)  if cup_found  else None
+                ball_px_box = norm_to_px(best_ball_norm) if ball_found else None
+                cup_px_box  = norm_to_px(best_cup_norm)  if cup_found  else None
 
-            if self.get_parameter('show_debug').value:
-                debug = self._draw_debug(frame, ball_px_box, cup_px_box, pos_msg)
-            else:
-                debug = frame
-            img_msg = self._bridge.cv2_to_imgmsg(debug, encoding='bgr8')
-            img_msg.header.stamp    = self.get_clock().now().to_msg()
-            img_msg.header.frame_id = 'camera_frame'
-            self._pub_img.publish(img_msg)
+                if self._p_show_debug:
+                    debug = self._draw_debug(frame, ball_px_box, cup_px_box, pos_msg)
+                else:
+                    debug = frame
+                img_msg = self._bridge.cv2_to_imgmsg(debug, encoding='bgr8')
+                img_msg.header.stamp    = self.get_clock().now().to_msg()
+                img_msg.header.frame_id = 'camera_frame'
+                self._pub_img.publish(img_msg)
 
     def _publish_3d(self, bx, by, depth_frame):
         dh, dw = depth_frame.shape
@@ -541,8 +579,8 @@ class BallDetectorOakNode(Node):
         r   = 5
         roi = depth_frame[max(0,by-r):min(dh,by+r),
                           max(0,bx-r):min(dw,bx+r)].astype(float)
-        mn  = self.get_parameter('depth_min_mm').value
-        mx  = self.get_parameter('depth_max_mm').value
+        mn  = self._p_depth_min_mm
+        mx  = self._p_depth_max_mm
         valid = roi[(roi > mn) & (roi < mx)]
         if valid.size == 0:
             return
@@ -550,7 +588,7 @@ class BallDetectorOakNode(Node):
         fx = 1078.0; fy = 1078.0; cx = 640.0; cy = 360.0
         msg = PointStamped()
         msg.header.stamp    = self.get_clock().now().to_msg()
-        msg.header.frame_id = self.get_parameter('camera_frame_id').value
+        msg.header.frame_id = self._p_camera_frame
         msg.point.x = (bx - cx) * dm / fx
         msg.point.y = (by - cy) * dm / fy
         msg.point.z = dm
