@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ball_detector_oak.py (v8 - depthai v2 API, MyriadX inference)
+ball_detector_oak.py (v9 - depthai v2 API, MyriadX inference)
 
 Detects ball and cup using YOLOv8n blob running on OAK-D Lite MyriadX VPU.
 Inference runs on the camera hardware at ~25-30fps, zero CPU/GPU load on host.
@@ -43,7 +43,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import Point, PointStamped
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String as StringMsg
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
@@ -100,6 +100,11 @@ class BallDetectorOakNode(Node):
             Image,        '/ball/image',        10)
         self._bridge    = CvBridge()
 
+        # Arm state subscriber — resets size filter on MOVING→SETTLED
+        self._arm_state = ''
+        self._arm_state_sub = self.create_subscription(
+            StringMsg, '/arm_state', self._on_arm_state, 10)
+
         # Shared state
         self._latest_rgb   = None
         self._latest_depth = None
@@ -117,6 +122,8 @@ class BallDetectorOakNode(Node):
 
         # Temporal size tracking for bbox sanity filter
         # _warmup_count: don't apply size filter until we have N stable detections
+        # References are also reset on MOVING→SETTLED arm state transitions so
+        # that post-move scale changes don't permanently block detection.
         self._last_cup_wh     = None
         self._last_ball_wh    = None
         self._cup_jump_frac   = 0.35
@@ -181,6 +188,25 @@ class BallDetectorOakNode(Node):
             f'ball_detector_oak ready (depthai {dai.__version__}, '
             f'MyriadX event-driven  '
             f'image={pub_img} {dbg_w}x{dbg_h}  depth={ena_depth})')
+
+    def _on_arm_state(self, msg):
+        """Reset bbox size references when arm transitions MOVING → SETTLED.
+
+        After an arm move the cup appears at a different scale in the frame.
+        Keeping the pre-move size reference would cause every post-move ball
+        detection to be rejected as a 'size jump'.  Clearing the references
+        re-triggers the warmup window so the first _warmup_frames detections
+        are accepted unconditionally and seed the new correct reference size.
+        """
+        prev = self._arm_state
+        self._arm_state = msg.data
+        if prev == 'MOVING' and msg.data == 'SETTLED':
+            self._last_ball_wh   = None
+            self._last_cup_wh    = None
+            self._ball_det_count = 0
+            self._cup_det_count  = 0
+            self.get_logger().info(
+                'Arm SETTLED — ball/cup size reference reset')
 
     def _build_pipeline(self, blob_path):
         input_size = self.get_parameter('input_size').value
