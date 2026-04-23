@@ -1,32 +1,39 @@
 #!/usr/bin/env python3
 """
-ball_marker_node.py
--------------------
-Subscribes to ball position (from ball_detector_node) and IMU tilt error
-(from imu_balance_node) and publishes RViz MarkerArray for visualisation.
+ball_marker_node.py (v10)
+-------------------------
+Subscribes to ball position, IMU tilt, arm state, PID enable flag, and PID
+correction commands and publishes an RViz MarkerArray for visualisation.
 
 Markers published on /ball/markers (visualization_msgs/MarkerArray):
-  ID 0 — Ball sphere    : red sphere at ball position within cup frame
-  ID 1 — Tilt arrow     : orange arrow showing IMU tilt direction/magnitude
-  ID 2 — Cup ring       : green circle showing cup boundary
-  ID 3 — Status text    : detection status overlay
+  ID 0 — Ball sphere         : red sphere at ball position within cup frame
+  ID 1 — Tilt arrow          : orange/yellow arrow showing IMU tilt direction
+  ID 2 — Cup ring            : green disc showing cup boundary
+  ID 3 — Status text         : multi-line overlay: arm state, PID state,
+                               ball offset, PID command, IMU angles
+  ID 4 — PID correction arrow: blue arrow showing flex+roll correction vector
 
-The ball marker is positioned relative to the hand_link frame so it moves
-with the arm in RViz. The tilt arrow is attached to the same frame.
+The ball marker is positioned relative to cup_plate_link so it moves with
+the arm in RViz. All markers share the same frame.
 
 Subscribes:
-  /ball/position        (geometry_msgs/Point)     from ball_detector_node
-  /ball/cup_detected    (std_msgs/Bool)            from ball_detector_node
+  /ball/position        (geometry_msgs/Point)     from ball_detector_oak
+  /ball/cup_detected    (std_msgs/Bool)            from ball_detector_oak
   /imu/balance_error    (geometry_msgs/Vector3)    from imu_balance_node
                                                    x=pitch_err, y=roll_err (rad)
+  /arm_state            (std_msgs/String)          MOVING | SETTLED
+  /balance_enabled      (std_msgs/Bool)            PID active flag
+  /imu/balance_cmd      (geometry_msgs/Vector3)    PID correction output
+                                                   x=flex_cmd, y=roll_cmd
 
 Parameters:
-  hand_link_frame   TF frame to attach markers to   default: hand_link
-  cup_radius_m      Physical cup radius in metres    default: 0.05  (5cm)
+  hand_link_frame   TF frame to attach markers to   default: cup_plate_link
+  cup_radius_m      Physical cup radius in metres    default: 0.02965
   cup_depth_m       Cup depth offset below hand_link default: 0.02
-  ball_radius_m     Ball bearing radius in metres    default: 0.006 (6mm)
-  tilt_arrow_scale  Scale tilt arrow length          default: 0.1
-  marker_lifetime   Seconds before marker expires    default: 0.1
+  ball_radius_m     Ball bearing radius in metres    default: 0.006
+  tilt_arrow_scale  Scale tilt arrow length          default: 0.10
+  cmd_arrow_scale   Scale PID cmd arrow length       default: 0.15
+  marker_lifetime   Seconds before marker expires    default: 0.5
 """
 
 import math
@@ -35,7 +42,7 @@ from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import Point, Vector3
-from std_msgs.msg import Bool, ColorRGBA
+from std_msgs.msg import Bool, ColorRGBA, String
 from visualization_msgs.msg import Marker, MarkerArray
 
 
@@ -50,12 +57,16 @@ class BallMarkerNode(Node):
         self.declare_parameter('cup_depth_m',      0.02)
         self.declare_parameter('ball_radius_m',    0.006)
         self.declare_parameter('tilt_arrow_scale', 0.10)
+        self.declare_parameter('cmd_arrow_scale',  0.15)
         self.declare_parameter('marker_lifetime',  0.5)
 
         # ── state ─────────────────────────────────────────────────────────
-        self._ball_pos     = None   # Point (normalised, z=-1 if not detected)
-        self._cup_detected = False
-        self._tilt         = None   # Vector3 (pitch, roll errors in rad)
+        self._ball_pos        = None   # Point (normalised, z=-1 if not detected)
+        self._cup_detected    = False
+        self._tilt            = None   # Vector3 (pitch, roll errors in rad)
+        self._arm_state       = 'UNKNOWN'   # MOVING | SETTLED
+        self._balance_enabled = False       # PID active
+        self._balance_cmd     = None        # Vector3 (flex_cmd, roll_cmd)
 
         # ── callback group — isolates callbacks from DDS discovery traffic ──
         self._cb_group = ReentrantCallbackGroup()
@@ -69,6 +80,15 @@ class BallMarkerNode(Node):
                                  callback_group=self._cb_group)
         self.create_subscription(Vector3, '/imu/balance_error',
                                  self._imu_cb,   10,
+                                 callback_group=self._cb_group)
+        self.create_subscription(String,  '/arm_state',
+                                 self._arm_state_cb, 10,
+                                 callback_group=self._cb_group)
+        self.create_subscription(Bool,    '/balance_enabled',
+                                 self._balance_enabled_cb, 10,
+                                 callback_group=self._cb_group)
+        self.create_subscription(Vector3, '/imu/balance_cmd',
+                                 self._balance_cmd_cb, 10,
                                  callback_group=self._cb_group)
 
         # ── publisher ─────────────────────────────────────────────────────
@@ -90,6 +110,15 @@ class BallMarkerNode(Node):
     def _imu_cb(self, msg: Vector3):
         self._tilt = msg
 
+    def _arm_state_cb(self, msg: String):
+        self._arm_state = msg.data
+
+    def _balance_enabled_cb(self, msg: Bool):
+        self._balance_enabled = msg.data
+
+    def _balance_cmd_cb(self, msg: Vector3):
+        self._balance_cmd = msg
+
     # ── marker publishing ─────────────────────────────────────────────────
     def _publish_markers(self):
         p         = lambda name: self.get_parameter(name).value
@@ -98,6 +127,7 @@ class BallMarkerNode(Node):
         cup_d     = p('cup_depth_m')
         ball_r    = p('ball_radius_m')
         arr_scale = p('tilt_arrow_scale')
+        cmd_scale = p('cmd_arrow_scale')
         lifetime  = p('marker_lifetime')
 
         # Use zero timestamp so RViz uses latest TF rather than
@@ -229,19 +259,90 @@ class BallMarkerNode(Node):
         text.lifetime        = rclpy.duration.Duration(
             seconds=lifetime).to_msg()
 
-        status_parts = []
-        if not self._cup_detected:
-            status_parts.append('cup: LOST')
-        if not ball_detected:
-            status_parts.append('ball: LOST')
+        # Line 1: arm state and PID state
+        if self._arm_state == 'MOVING':
+            state_str = 'MOVING'
+            state_color = ColorRGBA(r=1.0, g=0.6, b=0.0, a=0.9)  # orange
+        elif self._balance_enabled:
+            state_str = 'SETTLED | PID ACTIVE'
+            state_color = ColorRGBA(r=0.2, g=1.0, b=0.2, a=0.9)  # green
+        else:
+            state_str = 'SETTLED | PID OFF'
+            state_color = ColorRGBA(r=0.8, g=0.8, b=0.8, a=0.9)  # grey
+
+        # Line 2: ball position
+        if ball_detected:
+            ball_str = (f'ball: ({self._ball_pos.x:+.2f}, '
+                        f'{self._ball_pos.y:+.2f})')
+        else:
+            ball_str = 'ball: LOST'
+
+        # Line 3: PID command
+        if self._balance_cmd is not None and self._balance_enabled:
+            cmd_str = (f'cmd:  flex={self._balance_cmd.x:+.3f} '
+                       f'roll={self._balance_cmd.y:+.3f}')
+        else:
+            cmd_str = 'cmd:  --'
+
+        # Line 4: IMU angles
         if self._tilt is not None:
             pitch_deg = math.degrees(self._tilt.x)
             roll_deg  = math.degrees(self._tilt.y)
-            status_parts.append(f'P:{pitch_deg:+.1f}° R:{roll_deg:+.1f}°')
+            imu_str = f'IMU:  P:{pitch_deg:+.1f}deg R:{roll_deg:+.1f}deg'
+        else:
+            imu_str = 'IMU:  --'
 
-        text.text  = '  '.join(status_parts) if status_parts else 'OK'
-        text.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=0.9)
+        text.text  = '\n'.join([state_str, ball_str, cmd_str, imu_str])
+        text.color = state_color
         markers.markers.append(text)
+
+        # ── ID 4: PID correction arrow ────────────────────────────────────
+        # Shows the flex+roll correction vector being sent to wrist controller.
+        # Blue when PID active, invisible when off.
+        # flex_cmd maps to plate X, roll_cmd maps to plate Y
+        # (same axis mapping as ball position above)
+        cmd_arrow = Marker()
+        cmd_arrow.header.frame_id = frame
+        cmd_arrow.header.stamp    = now
+        cmd_arrow.ns              = 'ball_tracking'
+        cmd_arrow.id              = 4
+        cmd_arrow.type            = Marker.ARROW
+        cmd_arrow.action          = Marker.ADD
+        cmd_arrow.lifetime        = rclpy.duration.Duration(
+            seconds=lifetime).to_msg()
+
+        from geometry_msgs.msg import Point as GPoint
+        cmd_start = GPoint()
+        cmd_start.x = 0.0
+        cmd_start.y = 0.0
+        cmd_start.z = ball_r * 2.0   # slightly above tilt arrow base
+
+        cmd_end = GPoint()
+
+        if self._balance_cmd is not None and self._balance_enabled:
+            # flex_cmd (x in balance_cmd) tilts cup forward/back → plate X
+            # roll_cmd (y in balance_cmd) tilts cup left/right  → plate Y
+            cmd_end.x = -self._balance_cmd.x * cmd_scale
+            cmd_end.y = -self._balance_cmd.y * cmd_scale
+            cmd_end.z = ball_r * 2.0
+            cmd_mag   = math.sqrt(self._balance_cmd.x**2 +
+                                  self._balance_cmd.y**2)
+            intensity = min(cmd_mag / 0.3, 1.0)
+            cmd_arrow.color = ColorRGBA(
+                r=0.0, g=0.3 * (1.0 - intensity),
+                b=0.8 + 0.2 * intensity, a=0.9)
+        else:
+            # PID off — invisible zero-length arrow
+            cmd_end.x = 0.0
+            cmd_end.y = 0.0
+            cmd_end.z = ball_r * 2.0
+            cmd_arrow.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0)
+
+        cmd_arrow.points = [cmd_start, cmd_end]
+        cmd_arrow.scale.x = 0.004   # shaft diameter
+        cmd_arrow.scale.y = 0.010   # head diameter
+        cmd_arrow.scale.z = 0.012   # head length
+        markers.markers.append(cmd_arrow)
 
         self._pub.publish(markers)
 
