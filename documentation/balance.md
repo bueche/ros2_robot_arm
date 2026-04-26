@@ -7,7 +7,7 @@ attached to the arm end-effector along with a ball bearing that will roll into t
 when it is balanced. The image and IMU sensor provide input to a special purpose [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) that makes fine motor adjustments for two of the six Dynamixel servos in the arm (the wrist_flex and wrist_roll joints). The PID input kicks in after the current pose has been set (using the the [pose test driver](./pose_test.md)). The poses, defined in the [balance_v1.yaml](../writing_robot_description/config/balance_v1.yaml) file as input to the [pose_test utility](./pose_test.md), essentially tip the cup and ball to different sides. Once a step is completed then the PID controller (in this case [wrist_balance_controller](./balance_pid_controller.md)) will make fine-level adjustments to try to bring the cup level and the ball into its center. The PID adjustments are based on the ball position and on the IMU feedback. The PID controller times out  after 5+ seconds and ceases tryng to achieve balance (in order to prevent hardware burnout).
 
 <p align="center">
-  <img src="../images/balance_high_level_architecture.jpg" alt="high level balance architecture" width="600">
+  <img src="../images/balance_high_level_architecture.jpg" alt="high level balance architecture" width="700">
   
 </p>
 
@@ -19,7 +19,7 @@ those measurements becomes clearer as fine adjustments and error correction coul
 The video below shows the rviz output for a portion of the test (as of 04/24/2026). Currrently the ball never makes it to the center but tuning is underway.
 
 <p align="center">
-  <img src="../images/balance_video_camera_inference.gif" alt="using the camera's inferencing ability to detect cup and ball" width="600">
+  <img src="../images/balance_video_camera_inference.gif" alt="using the camera's inferencing ability to detect cup and ball" width="700">
   
 </p>
 
@@ -120,7 +120,7 @@ Discussion on the Koch v1.1 and:
 This section should outline the steps and services used in training and building the cup and ball detection and tracking model. 
 The workflow for building the model to run on the Luxonis camera is outlined below. 
 <p align="center">
-  <img src="../images/model_training_workflow.jpg" alt="lmodel training workflow" width="600">
+  <img src="../images/model_training_workflow.jpg" alt="lmodel training workflow" width="800">
 </p>
 The detailed steps are provided in the [model training workflow steps](./retraining_workflow.md#ball-detector-training-and-retraining-workflow).
 
