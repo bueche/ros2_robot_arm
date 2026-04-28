@@ -37,6 +37,7 @@ ros-jazzy-nav2-common
 ros-jazzy-ros2-control
 ros-jazzy-ros2-controllers
 ros-jazzy-controller-manager
+ros-jazzy-rmw-cyclonedds-cpp
 software-properties-common
 sudo
 tar

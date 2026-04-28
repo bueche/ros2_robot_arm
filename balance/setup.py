@@ -46,6 +46,8 @@ setup(
             # OAK-D Lite detector (Humble / Orin Nano or Pi 5)
             # Safe to install on both — depthai import is guarded
             'ball_detector_oak = balance.ball_detector_oak:main',
+            # nvidia inference approach (needs special hybrid container)
+            'ball_detector_nvidia = balance.ball_detector_nvidia:main',
             # Marker node (any platform)
             'ball_marker_node = balance.ball_marker_node:main',
         ],

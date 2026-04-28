@@ -37,6 +37,7 @@ ros-humble-nav2-common
 ros-humble-ros2-control
 ros-humble-ros2-controllers
 ros-humble-controller-manager
+ros-humble-rmw-cyclonedds-cpp
 software-properties-common
 sudo
 tar

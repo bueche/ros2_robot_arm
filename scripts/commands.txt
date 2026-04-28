@@ -129,7 +129,9 @@ ros2 run balance ball_detector_oak --ros-args \
   -p show_debug:=true \
   -p conf_threshold:=0.35
 
-ros2 run balance ball_detector_oak   --ros-args   -p blob_path:=/home/ubuntu/robot_ws/src/balance/models/ball_detector_v4.blob   -p input_size:=640   -p conf_threshold:=0.30   -p rgb_fps:=15
+ros2 run balance ball_detector_oak   --ros-args   -p blob_path:=/home/ubuntu/robot_ws/src/balance/models/ball_detector_v4.blob   -p input_size:=640   -p conf_threshold:=0.30   -p rgb_fps:=12
+
+ros2 run balance ball_detector_nvidia   --ros-args   -p engine_path:=/home/ubuntu/robot_ws/src/balance/models/ball_detector_v4.engine   -p input_size:=640   -p conf_threshold:=0.30   -p rgb_fps:=20
 
 
 ros2 run writing_robot_control ball_balance_node --ros-args \
