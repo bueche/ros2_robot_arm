@@ -184,7 +184,8 @@ COPY docker/vscode_extensions.sh /usr/local/bin/vscode_extensions.sh
 
 # Source ROS workspace automatically when new terminal is opened
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USERNAME}/.bashrc && \
-    echo "source ${ROS_WS}/install/setup.bash 2>/dev/null || true" >> /home/${USERNAME}/.bashrc
+    echo "source ${ROS_WS}/install/setup.bash 2>/dev/null || true" >> /home/${USERNAME}/.bashrc \
+    echo "export CYCLONEDDS_URI=file://home/ubuntu/robot_ws/src/writing_robot_description/config/cyclonedds.xml" >> /home/${USERNAME}/.bashrc
 
 # Set working directory
 WORKDIR ${ROS_WS}

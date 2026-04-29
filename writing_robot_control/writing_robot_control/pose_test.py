@@ -848,7 +848,7 @@ class PoseTestNode(Node):
         state: 'MOVING' or 'SETTLED'
         """
         msg = StringMsg()
-        msg.data = state
+        msg.data = state + '\x00'
         self._arm_state_pub.publish(msg)
 
     def _wait_for_stable(self):
