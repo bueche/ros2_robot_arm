@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 imu_balance_node.py — ROS2 node for ESP32/MPU-6050 cup-balancing IMU
@@ -51,15 +52,28 @@ Parameters:
   settle_delay  Seconds after SETTLED before PID activates  default: 0.3
 
 Axis convention:
-  pitch → wrist_flex joint correction
-  roll  → wrist_roll joint correction
+  pitch:  wrist_flex joint correction
+  roll: wrist_roll joint correction
 
 If the correction direction is backwards, use invert_pitch/invert_roll params
-rather than editing code — makes it easy to flip at launch time.
+rather than editing code makes it easy to flip at launch time.
 
 Dependencies:
   pip install pyserial --break-system-packages
   ros2 packages: rclpy, sensor_msgs, geometry_msgs, std_msgs
+
+Hardware Dependencies: This code has been tailored to work with the 
+  HiLetgo ESP-32D Development Board. This has a CP210x chip which
+  translates between USB (PI or Orin Nano) and UART (which the ESP32 on
+  the controller board speaks). It has a number of undocumented quirks 
+  with the Linux driver and the changes can be summarized as:
+  1. stty <baud> -hupcl min 1 time 0 must run before opening the fd 
+    - tcsetattr() after open is ignored by this chip
+  2. Must open with O_RDONLY as O_RDWR asserts RTS which holds the FIFO 
+    and returns empty reads
+  3. min 1 time 0 (VMIN=1, VTIME=0) is required as without it the driver 
+   re-reads the same FIFO bytes repeatedly
+  4. -hupcl prevents DTR drop on close which would reset the ESP32
 """
 
 import rclpy
@@ -209,7 +223,7 @@ class ImuBalanceNode(Node):
         # State 
         self._latest = None          # most recent parsed JSON dict
         self._lock   = threading.Lock()
-        self._serial = None
+        self._serial_fd = None
         self._running = True
 
         # Arm state machine: "MOVING" or "SETTLED"
@@ -270,15 +284,16 @@ class ImuBalanceNode(Node):
           ros2 service call /imu/calibrate std_srvs/srv/Trigger "{}"
         """
         with self._cal_lock:
-            if self._serial is None or not self._serial.is_open:
+            if not hasattr(self, '_serial_fd') or self._serial_fd is None:
                 msg = 'Calibration failed: serial port not open'
                 self.get_logger().error(msg)
                 response.success = False
                 response.message = msg
                 return response
             try:
-                self._serial.write(b'c')
-                self._serial.flush()
+                wfd = os.open(self._port, os.O_WRONLY | os.O_NOCTTY)
+                os.write(wfd, b'c')
+                os.close(wfd)
                 self.get_logger().info(
                     'IMU calibration triggered — ESP32 zeroing pitch/roll.')
                 response.success = True
@@ -345,41 +360,116 @@ class ImuBalanceNode(Node):
         while self._running:
             try:
                 self.get_logger().info(f'Opening serial port {self._port}...')
-                self._serial = serial.Serial(self._port, self._baud, timeout=1.0)
-                self.get_logger().info('Serial port open.')
 
-                hash_cnt = 0
-                hash_cnt_limit = 1000
+                # CP210x USB-UART quirk on Linux: pyserial's termios settings
+                # are not committed to the chip until after the fd is closed.
+                # Opening a pyserial Serial() object to probe-configure then
+                # closing it resets the ESP32 via DTR even with dsrdtr=False,
+                # because some pyserial versions assert DTR during __init__
+                # before dtr=False takes effect.
+                #
+                # Solution: use stty to configure the port at the OS level
+                # without opening a Python fd at all.  stty -hupcl suppresses
+                # the hangup-on-close signal that would reset the ESP32.
+                # This is equivalent to what 'cat /dev/ttyIMU' does implicitly.
+                # CP210x on Linux: opening with O_RDWR asserts RTS which
+                # causes received bytes to be held in the chip FIFO and never
+                # delivered to the host read() returns empty forever.
+                # Opening with O_RDONLY avoids RTS assertion and data flows.
+                # We open the fd manually, configure termios, then pass the
+                # fd to pyserial via its fd-based constructor so readline()
+                # and the rest of the pyserial API work normally.
+                import os, termios
 
+                # stty configures the CP210x termios BEFORE we open the fd.
+                # This is the only reliable sequence on this driver:
+                #   1. stty sets baud/VMIN/VTIME/hupcl via a kernel-internal path
+                #   2. We open O_RDONLY (no RTS assertion) and inherit those settings
+                # tcsetattr() after open does NOT work on this CP210x the chip
+                # ignores termios changes once the fd is open.
+                import subprocess, termios
+                subprocess.run(
+                    ['stty', '-F', self._port,
+                     str(self._baud),
+                     '-hupcl',
+                     'min', '1',
+                     'time', '0'],
+                    check=True)
+                self.get_logger().info('stty configured CP210x')
+
+                # Open O_RDONLY — avoids RTS assertion that blocks FIFO delivery
+                fd = os.open(
+                    self._port,
+                    os.O_RDONLY | os.O_NOCTTY)
+
+                # Store fd directly — do NOT wrap in pyserial Serial().
+                # pyserial's is_open property checks internal state we cannot
+                # set via the fd-injection approach, causing readline() to
+                # immediately raise 'port not open'.  Instead use os.read()
+                # and a manual line buffer in the read loop below.
+                self._serial_fd = fd
+                self.get_logger().info(
+                    'CP210x opened O_RDONLY — RTS not asserted, data will flow')
+
+                # Flush anything that accumulated during open
+                time.sleep(0.1)
+                termios.tcflush(fd, termios.TCIFLUSH)
+                self.get_logger().info('Serial port open — buffer flushed.')
+
+                # Raw read diagnostic
+                test = os.read(fd, 20)
+                self.get_logger().info(f'Raw read test (20 bytes): {test}')
+
+                # Manual line reader using os.read() on the raw fd.
+                # pyserial readline() cannot be used because we opened
+                # with O_RDONLY and cannot inject the fd into pyserial.
+                linebuf = b''
                 while self._running:
-                    line = self._serial.readline().decode('utf-8', errors='ignore').strip()
-
-                    if not line or line.startswith('#'):
-                       if line.startswith('#'):
-                             if line.count("fail") > 0 or line.count("Fail") > 0 or line.count("ERROR") > 0:
-                                                         self.get_logger().info("error: " + line)
-                             if hash_cnt == 0:
-                                self.get_logger().info('hash lines: ' + line)
-                             hash_cnt += 1
- 
-                             if hash_cnt == hash_cnt_limit:
-                                self.get_logger().info('reset hash cnt at 1000 : ' + line)
-                                hash_cnt = 0
-
-                       continue  # skip comments/empty lines from ESP32
-
                     try:
-                        data = json.loads(line)
-                        with self._lock:
-                            self._latest = data
-                    except json.JSONDecodeError:
-                        self.get_logger().debug(f'Unparseable line: {line[:60]}')
+                        chunk = os.read(fd, 256)
+                    except OSError:
+                        break
+                    linebuf += chunk
+                    while b'\n' in linebuf:
+                        raw, linebuf = linebuf.split(b'\n', 1)
+                        line = raw.decode('utf-8', errors='ignore').strip()
+                        if not line:
+                            continue
+                        if line.startswith('#'):
+                            if any(w in line for w in ('fail','Fail','ERROR')):
+                                self.get_logger().info('error: ' + line)
+                            continue
+                        try:
+                            data = json.loads(line)
+                            if isinstance(data, dict):
+                                with self._lock:
+                                    self._latest = data
+                            else:
+                                self.get_logger().debug(
+                                    f'Skipping non-dict JSON: {line[:60]}')
+                        except json.JSONDecodeError:
+                            self.get_logger().debug(f'Unparseable: {line[:60]}')
+                    # (outer while self._running continues)
+                    if False: line = ''  # suppress unused-var warning
+
 
             except serial.SerialException as e:
+                if not self._running:
+                    break
                 self.get_logger().warn(f'Serial error: {e} — retrying in 2s...')
+                if hasattr(self, '_serial_fd'):
+                    try: os.close(self._serial_fd)
+                    except OSError: pass
+                    self._serial_fd = None
                 time.sleep(2.0)
             except Exception as e:
+                if not self._running:
+                    break
                 self.get_logger().error(f'Reader thread error: {e}')
+                if hasattr(self, '_serial_fd'):
+                    try: os.close(self._serial_fd)
+                    except OSError: pass
+                    self._serial_fd = None
                 time.sleep(1.0)
 
     # 
@@ -560,16 +650,21 @@ class ImuBalanceNode(Node):
     # 
     def send_calibrate(self):
         """Send 'c' to ESP32 to trigger onboard recalibration."""
-        if self._serial and self._serial.is_open:
-            self._serial.write(b'c')
+        try:
+            import os as _os
+            fd = _os.open(self._port, _os.O_WRONLY | _os.O_NOCTTY)
+            _os.write(fd, b'c')
+            _os.close(fd)
             self.get_logger().info('Sent calibration command to ESP32.')
-        else:
-            self.get_logger().warn('Serial port not open, cannot send calibrate.')
+        except OSError as e:
+            self.get_logger().warn(f'Cannot send calibrate: {e}')
 
     def destroy_node(self):
         self._running = False
-        if self._serial:
-            self._serial.close()
+        if hasattr(self, '_serial_fd') and self._serial_fd is not None:
+            try: os.close(self._serial_fd)
+            except OSError: pass
+            self._serial_fd = None
         super().destroy_node()
 
 
