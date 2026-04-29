@@ -346,7 +346,15 @@ class ImuBalanceNode(Node):
             try:
                 self.get_logger().info(f'Opening serial port {self._port}...')
                 self._serial = serial.Serial(self._port, self._baud, timeout=1.0)
-                self.get_logger().info('Serial port open.')
+                # Flush stale data accumulated while port was closed.
+                # The ESP32 streams continuously — the OS buffer may hold
+                # many lines of old data plus a partial line at the head.
+                # reset_input_buffer() clears the OS buffer; the sleep lets
+                # the ESP32 emit at least one complete fresh line before we
+                # start reading, ensuring readline() never blocks on a fragment.
+                time.sleep(0.3)
+                self._serial.reset_input_buffer()
+                self.get_logger().info('Serial port open — input buffer flushed.')
 
                 hash_cnt = 0
                 hash_cnt_limit = 1000
