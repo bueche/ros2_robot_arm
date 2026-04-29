@@ -3,8 +3,8 @@
 	    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	    xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
   <Domain id="any">
-    <Discovery>
-	<EnableTopicDiscoveryEndpoints>false</EnableTopicDiscoveryEndpoints>
-    </Discovery>
+    <Compatibility>
+      <StandardsConformance>lax</StandardsConformance>
+    </Compatibility>
   </Domain>
 </CycloneDDS>

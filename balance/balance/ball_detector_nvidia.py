@@ -30,7 +30,7 @@ Publishes:
   /ball/image           sensor_msgs/Image     annotated debug frame (debug_fps Hz)
 
 Subscribes:
-  /arm_state            std_msgs/String       MOVING→SETTLED resets size filter
+  /arm_state            std_msgs/String       MOVING→SETTLED resets cup size filter
 
 Parameters:
   engine_path       Path to TensorRT .engine file          default: ''
@@ -41,7 +41,6 @@ Parameters:
   mjpeg_quality     OAK onboard MJPEG quality (1-100)      default: 85
   exposure_us       Manual exposure us (0=auto)            default: 25000
   iso               Manual ISO (used when exposure_us > 0) default: 800
-  ball_jump_frac    Max fractional ball bbox size change    default: 0.50
   cup_jump_frac     Max fractional cup bbox size change     default: 0.50
   warmup_frames     Size-filter bypass for first N dets     default: 10
   debug_fps         Rate for /ball/image publish            default: 5.0
@@ -51,18 +50,6 @@ Parameters:
 """
 
 import os
-
-# Force OpenBLAS/MKL/OMP to single-threaded before numpy loads.
-# On aarch64 Jetson, numpy 1.26.x + OpenBLAS initializes its threadpool
-# lazily on the first BLAS call.  When that races with TensorRT's CUDA
-# worker threads during process startup the glibc allocator sees a
-# double-free and aborts.  Pinning to 1 thread serializes initialization
-# and eliminates the crash entirely.
-os.environ.setdefault('OPENBLAS_NUM_THREADS', '1')
-os.environ.setdefault('OMP_NUM_THREADS',      '1')
-os.environ.setdefault('MKL_NUM_THREADS',      '1')
-os.environ.setdefault('NUMEXPR_NUM_THREADS',  '1')
-
 import cv2
 import time
 import threading
@@ -123,7 +110,6 @@ class BallDetectorNvidiaNode(Node):
         self.declare_parameter('mjpeg_quality',     85)
         self.declare_parameter('exposure_us',       25000)
         self.declare_parameter('iso',               800)
-        self.declare_parameter('ball_jump_frac',    0.50)
         self.declare_parameter('cup_jump_frac',     0.50)
         self.declare_parameter('warmup_frames',     10)
         self.declare_parameter('debug_fps',         5.0)
@@ -137,7 +123,6 @@ class BallDetectorNvidiaNode(Node):
         self._p_iou_threshold   = self.get_parameter('iou_threshold').value
         self._p_rgb_fps         = self.get_parameter('rgb_fps').value
         self._p_mjpeg_quality   = self.get_parameter('mjpeg_quality').value
-        self._p_ball_jump_frac  = self.get_parameter('ball_jump_frac').value
         self._p_cup_jump_frac   = self.get_parameter('cup_jump_frac').value
         self._p_warmup_frames   = self.get_parameter('warmup_frames').value
         self._p_debug_fps       = self.get_parameter('debug_fps').value
@@ -170,8 +155,6 @@ class BallDetectorNvidiaNode(Node):
 
         # Temporal size tracking for bbox sanity filter
         self._last_cup_wh    = None
-        self._last_ball_wh   = None
-        self._ball_det_count = 0
         self._cup_det_count  = 0
 
         # Drop / diagnostics
@@ -190,8 +173,8 @@ class BallDetectorNvidiaNode(Node):
 
         self.get_logger().info(f'Loading TensorRT engine: {engine_path}')
         self._model = YOLO(engine_path, task='detect')
-        self.get_logger().info('TensorRT engine loaded — warmup deferred to first camera frame')
-        self._warmup_done = False
+        self.get_logger().info('TensorRT engine loaded — running warmup inferences')
+        self._trt_warmup()
 
         # Build depthai pipeline — camera only, MJPEG encoded
         self._device = self._build_pipeline()
@@ -233,35 +216,29 @@ class BallDetectorNvidiaNode(Node):
         prev = self._arm_state
         self._arm_state = clean
         if prev == 'MOVING' and clean == 'SETTLED':
-            self._last_ball_wh   = None
-            self._last_cup_wh    = None
-            self._ball_det_count = 0
-            self._cup_det_count  = 0
-            self.get_logger().info('Arm SETTLED — ball/cup size reference reset')
+            self._last_cup_wh   = None
+            self._cup_det_count = 0
+            self.get_logger().info('Arm SETTLED — cup size reference reset')
 
     # ------------------------------------------------------------------
     # TensorRT warmup
     # ------------------------------------------------------------------
 
-    def _trt_warmup(self, frame):
-        """Warmup TRT using the first real camera frame.
+    def _trt_warmup(self):
+        """Run a few dummy inferences to trigger CUDA kernel JIT compilation.
 
-        Deferred from __init__ to _inference_loop so that all allocator
-        initialization (OpenBLAS threadpool + CUDA workers) happens on the
-        inference thread after the CUDA context is already active.  This
-        eliminates the aarch64 double-free crash seen when warmup runs
-        during process startup before numpy's OpenBLAS is fully initialized.
+        Without this, the first live inference can take ~100ms, which would
+        stall the camera-facing queue and cause frame drops on startup.
         """
+        dummy = np.zeros(
+            (self._p_input_size, self._p_input_size, 3), dtype=np.uint8)
         for i in range(_TRT_WARMUP_INFERENCES):
             t0 = time.monotonic()
-            results = self._model.predict(
-                frame,
+            _ = self._model(
+                dummy,
                 conf=self._p_conf_threshold,
                 iou=self._p_iou_threshold,
-                verbose=False,
-                save=False,
-                stream=False)
-            del results
+                verbose=False)
             ms = (time.monotonic() - t0) * 1000
             self.get_logger().info(f'TRT warmup {i+1}/{_TRT_WARMUP_INFERENCES}: {ms:.1f}ms')
 
@@ -403,23 +380,13 @@ class BallDetectorNvidiaNode(Node):
             if frame.shape[0] != sz or frame.shape[1] != sz:
                 frame = cv2.resize(frame, (sz, sz))
 
-            # Deferred warmup: runs on the inference thread using the first
-            # real camera frame, avoiding the startup allocator race.
-            if not self._warmup_done:
-                self.get_logger().info('Running TRT warmup on first camera frame...')
-                self._trt_warmup(frame)
-                self._warmup_done = True
-                self.get_logger().info('TRT warmup complete')
-
             # TensorRT inference via ultralytics
             t0 = time.monotonic()
-            results = self._model.predict(
+            results = self._model(
                 frame,
                 conf=self._p_conf_threshold,
                 iou=self._p_iou_threshold,
-                verbose=False,
-                save=False,
-                stream=False)
+                verbose=False)
             infer_ms = (time.monotonic() - t0) * 1000
 
             # Spike logging
@@ -438,7 +405,6 @@ class BallDetectorNvidiaNode(Node):
 
             # Parse ultralytics Results object into a flat list of dicts
             dets = self._parse_results(results)
-            del results   # release TRT output buffers promptly
 
             # Push to publish queue
             try:
@@ -512,20 +478,12 @@ class BallDetectorNvidiaNode(Node):
             conf = d['confidence']
 
             if d['label'] == BALL_IDX and conf > best_ball_c:
-                # Size jump filter — bypass during warmup
-                if (self._last_ball_wh is not None
-                        and self._ball_det_count >= self._p_warmup_frames):
-                    lw, lh = self._last_ball_wh
-                    if lw > 0 and lh > 0:
-                        jump = max(abs(dw - lw) / lw, abs(dh_d - lh) / lh)
-                        if jump > self._p_ball_jump_frac:
-                            self.get_logger().warn(
-                                f'Ball size jump {jump:.0%} — rejected',
-                                throttle_duration_sec=1.0)
-                            continue
+                # Ball size filter disabled — in controlled scene environment
+                # the confidence threshold is sufficient.  Size filtering was
+                # causing false negatives when the arm moved (cup scale change
+                # caused proportional ball bbox change, exceeding jump threshold).
                 best_ball_c    = conf
                 best_ball_norm = (d['xmin'], d['ymin'], d['xmax'], d['ymax'])
-                self._ball_det_count += 1
                 self.get_logger().info(
                     f'Ball bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={conf:.3f}',
                     throttle_duration_sec=1.0)
@@ -561,9 +519,6 @@ class BallDetectorNvidiaNode(Node):
         if best_cup_norm is not None:
             xmin, ymin, xmax, ymax = best_cup_norm
             self._last_cup_wh = (xmax - xmin, ymax - ymin)
-        if best_ball_norm is not None:
-            xmin, ymin, xmax, ymax = best_ball_norm
-            self._last_ball_wh = (xmax - xmin, ymax - ymin)
 
         cup_found  = best_cup_norm  is not None
         ball_found = best_ball_norm is not None
