@@ -198,8 +198,9 @@ class BallDetectorOakNode(Node):
         re-triggers the warmup window so the first _warmup_frames detections
         are accepted unconditionally and seed the new correct reference size.
         """
+        clean = msg.data.rstrip('\x00').strip()
         prev = self._arm_state
-        self._arm_state = msg.data
+        self._arm_state = clean
         if prev == 'MOVING' and msg.data == 'SETTLED':
             self._last_ball_wh   = None
             self._last_cup_wh    = None

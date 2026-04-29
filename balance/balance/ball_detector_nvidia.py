@@ -51,6 +51,18 @@ Parameters:
 """
 
 import os
+
+# Force OpenBLAS/MKL/OMP to single-threaded before numpy loads.
+# On aarch64 Jetson, numpy 1.26.x + OpenBLAS initializes its threadpool
+# lazily on the first BLAS call.  When that races with TensorRT's CUDA
+# worker threads during process startup the glibc allocator sees a
+# double-free and aborts.  Pinning to 1 thread serializes initialization
+# and eliminates the crash entirely.
+os.environ.setdefault('OPENBLAS_NUM_THREADS', '1')
+os.environ.setdefault('OMP_NUM_THREADS',      '1')
+os.environ.setdefault('MKL_NUM_THREADS',      '1')
+os.environ.setdefault('NUMEXPR_NUM_THREADS',  '1')
+
 import cv2
 import time
 import threading
@@ -178,8 +190,8 @@ class BallDetectorNvidiaNode(Node):
 
         self.get_logger().info(f'Loading TensorRT engine: {engine_path}')
         self._model = YOLO(engine_path, task='detect')
-        self.get_logger().info('TensorRT engine loaded — running warmup inferences')
-        self._trt_warmup()
+        self.get_logger().info('TensorRT engine loaded — warmup deferred to first camera frame')
+        self._warmup_done = False
 
         # Build depthai pipeline — camera only, MJPEG encoded
         self._device = self._build_pipeline()
@@ -217,9 +229,10 @@ class BallDetectorNvidiaNode(Node):
         warmup window so the first _warmup_frames detections are accepted
         unconditionally and seed the new correct reference size.
         """
+        clean = msg.data.rstrip('\x00').strip()
         prev = self._arm_state
-        self._arm_state = msg.data
-        if prev == 'MOVING' and msg.data == 'SETTLED':
+        self._arm_state = clean
+        if prev == 'MOVING' and clean == 'SETTLED':
             self._last_ball_wh   = None
             self._last_cup_wh    = None
             self._ball_det_count = 0
@@ -230,21 +243,25 @@ class BallDetectorNvidiaNode(Node):
     # TensorRT warmup
     # ------------------------------------------------------------------
 
-    def _trt_warmup(self):
-        """Run a few dummy inferences to trigger CUDA kernel JIT compilation.
+    def _trt_warmup(self, frame):
+        """Warmup TRT using the first real camera frame.
 
-        Without this, the first live inference can take ~100ms, which would
-        stall the camera-facing queue and cause frame drops on startup.
+        Deferred from __init__ to _inference_loop so that all allocator
+        initialization (OpenBLAS threadpool + CUDA workers) happens on the
+        inference thread after the CUDA context is already active.  This
+        eliminates the aarch64 double-free crash seen when warmup runs
+        during process startup before numpy's OpenBLAS is fully initialized.
         """
-        dummy = np.zeros(
-            (self._p_input_size, self._p_input_size, 3), dtype=np.uint8)
         for i in range(_TRT_WARMUP_INFERENCES):
             t0 = time.monotonic()
-            _ = self._model(
-                dummy,
+            results = self._model.predict(
+                frame,
                 conf=self._p_conf_threshold,
                 iou=self._p_iou_threshold,
-                verbose=False)
+                verbose=False,
+                save=False,
+                stream=False)
+            del results
             ms = (time.monotonic() - t0) * 1000
             self.get_logger().info(f'TRT warmup {i+1}/{_TRT_WARMUP_INFERENCES}: {ms:.1f}ms')
 
@@ -386,13 +403,23 @@ class BallDetectorNvidiaNode(Node):
             if frame.shape[0] != sz or frame.shape[1] != sz:
                 frame = cv2.resize(frame, (sz, sz))
 
+            # Deferred warmup: runs on the inference thread using the first
+            # real camera frame, avoiding the startup allocator race.
+            if not self._warmup_done:
+                self.get_logger().info('Running TRT warmup on first camera frame...')
+                self._trt_warmup(frame)
+                self._warmup_done = True
+                self.get_logger().info('TRT warmup complete')
+
             # TensorRT inference via ultralytics
             t0 = time.monotonic()
-            results = self._model(
+            results = self._model.predict(
                 frame,
                 conf=self._p_conf_threshold,
                 iou=self._p_iou_threshold,
-                verbose=False)
+                verbose=False,
+                save=False,
+                stream=False)
             infer_ms = (time.monotonic() - t0) * 1000
 
             # Spike logging
@@ -411,6 +438,7 @@ class BallDetectorNvidiaNode(Node):
 
             # Parse ultralytics Results object into a flat list of dicts
             dets = self._parse_results(results)
+            del results   # release TRT output buffers promptly
 
             # Push to publish queue
             try:
