@@ -213,11 +213,21 @@ to center within the 10s window.
 
 ### 5.2 Pose 2 — Tilt Right (t ≈ 1777491901)
 
-**Starting condition:** See `1901_22.jpg`  
+**Starting condition:** 
+
+<p align="center">
+  <img src="../images/1901.22.jpg" alt="1901_22 " width="700">
+</p>
+
+
 State: MOVING, ball=(+0.70,-0.19). The cup is tilted to place the ball toward the right
 side (large positive X) and slightly toward the far side (small negative Y).
 
-**First PID correction (t=1777491901.80):** See `1901_80.jpg`  
+**First PID correction (t=1777491901.80):`  
+<p align="center">
+  <img src="../images/1901.80.jpg" alt="1901_80 " width="700">
+</p>
+
 ```
 ball=(+0.71,-0.19) f:-0.047 r:+0.177
 ```
@@ -225,7 +235,11 @@ Large positive ball.x drives a large positive roll_cmd (+0.177), tilting the cup
 roll the ball left toward center. Small negative ball.y drives a small negative
 flex_cmd (-0.047). Both signs correct.
 
-**Mid-correction (t≈1777491904.27):** See `1904_27.jpg`  
+**Mid-correction (t≈1777491904.27):**  
+<p align="center">
+  <img src="../images/1904.27.jpg" alt="1904 27 " width="700">
+</p> 
+
 ```
 ball=(+0.23,+0.68) f:+0.140 r:+0.116
 ```
@@ -234,7 +248,11 @@ However ball.y has swung to +0.68 (near side), suggesting the small flex correct
 combined with cup tilt caused the ball to roll toward the robot. The PID is now
 commanding both axes to compensate.
 
-**Late correction (t≈1777491911.28):** See `1911_28.jpg`  
+**Late correction (t≈1777491911.28):** See `1911_28.jpg`
+<p align="center">
+  <img src="../images/1911.28.jpg" alt="1911.28 " width="700">
+</p>   
+
 ```
 ball=(-0.47,+0.57) f:+0.160 r:-0.093
 ```
@@ -245,11 +263,18 @@ remains positive (+0.57). The oscillation pattern is consistent with Pose 1.
 
 ### 5.3 Pose 3 — Tilt Left (t ≈ 1777491921)
 
-**Starting condition:** See `1921_29.jpg`  
+**Starting condition:** See `1921_29.jpg` 
+<p align="center">
+  <img src="../images/1921.29.jpg" alt="1921.29 " width="700">
+</p>  
 State: MOVING, ball=(-0.68,-0.35). Ball at left side (negative X) and far side
 (negative Y).
 
-**First PID correction (t=1777491922.05):** See `1922_05.jpg`  
+**First PID correction (t=1777491922.05):** See `1922_05.jpg` 
+<p align="center">
+  <img src="../images/1922.05.jpg" alt="1922.05 " width="700">
+</p>  
+
 ```
 ball=(-0.67,-0.35) f:-0.086 r:-0.170
 ```
@@ -257,7 +282,11 @@ Negative ball.x → negative roll_cmd (-0.170): cup tilts to roll ball right tow
 center. Negative ball.y → negative flex_cmd (-0.086): cup tilts to roll ball from
 far side toward center. Both signs correct and acting simultaneously.
 
-**Mid-correction (t≈1777491924.80):** See `1924_80.jpg`  
+**Mid-correction (t≈1777491924.80):** See `1924_80.jpg` 
+<p align="center">
+  <img src="../images/1924.80.jpg" alt="1924.80 " width="700">
+</p>  
+
 ```
 ball=(+0.69,+0.27) f:+0.077 r:+0.170
 ```
@@ -266,7 +295,11 @@ to +0.27. The PID correctly reverses both commands. This is the clearest
 demonstration of the underdamped oscillation: the 2Hz rate cannot stop the ball
 before it crosses center on both axes simultaneously.
 
-**Late correction (t≈1777491931.27):** See `1931_27.jpg`  
+**Late correction (t≈1777491931.27):** See `1931_27.jpg` 
+<p align="center">
+  <img src="../images/1931.27.jpg" alt="1931.27 " width="700">
+</p>
+  
 ```
 ball=(-0.79,-0.04) f:+0.037 r:-0.185
 ```
@@ -280,12 +313,19 @@ amplitude. Wrist controller hit flex total limit (+28.6°) and clamped.
 
 ### 5.4 Pose 4 — Center (t ≈ 1777491941)
 
-**Starting condition:** See `1941_25.jpg`  
+**Starting condition:** See `1941_25.jpg` 
+<p align="center">
+  <img src="../images/1941.25.jpg" alt="1941.25 " width="700">
+</p>  
 State: MOVING, ball=(-0.24,-0.72). Despite being the "center" pose, the ball starts
 significantly offset on the Y axis (far side), indicating the starting wrist position
 still has a natural tilt.
 
-**First PID correction (t=1777491941.94):** See `1941_94.jpg`  
+**First PID correction (t=1777491941.94):** See `1941_94.jpg` 
+<p align="center">
+  <img src="../images/1941.94.jpg" alt="1941.94 " width="700">
+</p>  
+
 ```
 ball=(-0.24,-0.71) f:-0.180 r:-0.059
 CORR: flex 2.6691→2.6338 (Δ-2.02deg) cumul: flex=-2.0deg
@@ -294,6 +334,10 @@ Large negative ball.y drives strong negative flex_cmd. Cup tilting to bring ball
 far side toward center.
 
 **Mid-correction (t≈1777491944.78):** See `1944_78.jpg`  
+<p align="center">
+  <img src="../images/1944.78.jpg" alt="1944.78 " width="700">
+</p> 
+
 ```
 ball=(+0.03,+0.71) f:+0.176 r:-0.013
 ```
@@ -301,7 +345,10 @@ Ball has again overshot — Y flipped from -0.71 to +0.71. The overshooting patt
 repeats identically across all four poses, confirming it is a systematic timing issue
 rather than a pose-specific problem.
 
-**Late correction (t≈1777491951.25):** See `1951_25.jpg`  
+**Late correction (t≈1777491951.25):** See `1951_25.jpg` 
+<p align="center">
+  <img src="../images/1951.25.jpg" alt="1951.25 " width="700">
+</p>  
 ```
 ball=(+0.00,+0.72) f:+0.186 r:-0.028
 ```

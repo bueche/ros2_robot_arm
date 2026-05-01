@@ -51,6 +51,11 @@ Controls: SPACE=save frame, Q=quit
    - If no ball visible, draw only the cup box
    - If neither visible, add image with no annotations (negative example)
 
+<p align="center">
+  <img src="../images/example_annotation_in_roboflow.jpg" alt="roboflow annotation" width="700">
+  
+</p>
+
 **Tips for faster annotation:**
 - 
 - Tab key moves to next image
@@ -106,7 +111,7 @@ yolo train \
   data=dataset_640/data.yaml \
   epochs=100 \
   imgsz=640 \
-  batch=4 \
+  batch=3 \
   device=0 \
   project=runs/detect/ball_training_640 \
   name=run1 \
