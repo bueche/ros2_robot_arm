@@ -53,18 +53,33 @@ ball.z  = 0.0 when both ball and cup detected, -1.0 when not detected
 A value of (0.0, 0.0) means the ball is perfectly centered in the cup.
 A value of (±1.0, 0.0) means the ball is at the cup rim on the roll axis.
 
+<p align="center">
+  <img src="../images/ball_coordinate_orientation.jpg" alt="ball_orientation " width="700">
+</p> 
+
 ### 2.2 Robot Joint Frame
 
-The Koch v1.1 wrist has two joints relevant to balancing:
+The Koch v1.1 wrist has two joints we focus on for balancing:
 
-- **wrist_flex**: tilts the cup forward/backward (toward/away from robot base)
-- **wrist_roll**: tilts the cup left/right
+- **wrist_flex**: used to tilt the cup forward/backward (toward/away from robot base)
+- **wrist_roll**: used to tilt the cup left/right
 
-Joint positions are in radians. The operating range used during balancing:
+Joint positions are in radians. The operating range for these two joints are defined in the [urdf file](../writing_robot_description/urdf/koch_v11_arm_real_for_balance.urdf) as:
 - `wrist_flex`: 0.297 to 2.700 rad  
 - `wrist_roll`: -1.448 to 1.900 rad
 
-### 2.3 Control Law Sign Chain
+But for this application we don't have the joints operate over that full range for some practical reasons:
+- the wrist roll if moved too far in either direction will spill out the ball bearing from the cup,
+- if the wrist flex is too low, then the cup will hit the ground, and
+- In certain high positions it seemed as if the servos (like the elbow flex) were drawing too much current and having a hard time maintaining position while holding the cup.
+
+The positions from which the PID must operate to balance are defined in the [pose test balance seqeunce](../writing_robot_description/config/balance_v1.yaml). The limited movement for these two joints is illustrated below.
+
+<p align="center">
+  <img src="../images/illustration_of_wrist_flex_roll_orientation.jpg" alt="ball_orientation " width="700">
+</p> 
+
+### 2.3 Summary of PID logic
 
 The full sign chain from ball position to joint correction:
 
@@ -82,7 +97,18 @@ new_wrist_flex = current_wrist_flex + flex_delta
 new_wrist_roll = current_wrist_roll + roll_delta
 ```
 
-This is verified correct — increasing wrist_flex tilts the cup toward the robot (raising
+Now `current_wrist_flex` and `current_wrist_roll` are the actual current joint positions in radians as read from `/joint_states` — the real measured servo positions reported by the Dynamixel hardware interface via ros2_control. So they reflect where the joint actually is at the moment the correction step runs, not where it was commanded to be.
+The target position `new_wrist_flex `is then published as a `JointTrajectory` message with `time_from_start = move_duration = 0.3s`. This tells the trajectory controller "reach this position in 300ms." Whether the servo actually gets there depends on several factors:
+It probably doesn't fully reach it in most cases, for a few reasons. The XL330 servos have a profile velocity and acceleration configured in their firmware that limits how fast they move. If the commanded delta is small (e.g., 0.05 rad = 2.87°) and the servo is already moving or under load, the 300ms window may be enough. But if a new correction arrives at the 500ms mark (next 2Hz cycle), the controller publishes a new trajectory immediately — which replaces the in-progress one. The servo then starts tracking toward the new target, possibly from a position it hadn't finished reaching yet.
+
+This is actually visible in the CORR log (the format we will explain more in section 2.4). Each line reads current_wrist_flex from /joint_states at the moment of correction, which is the actual position, not the previously commanded one. You can see the servo falling behind:
+```
+CORR | flex 2.6691→2.6327 (Δ-2.09deg)   ← commanded 2.6327
+CORR | flex 2.6185→2.5821 (Δ-2.09deg)   ← actual was 2.6185, not 2.6327
+```
+The difference: commanded 2.6327, actual next read 2.6185 — the servo only traveled 0.0506 rad (2.9°) in 200ms toward its 0.0364 rad target. It was still moving when the next correction fired. So current_wrist_flex in each step genuinely reflects where the servo is, and the accumulation of actual_flex_delta (not the commanded delta) into _total_flex means the cumulative displacement tracking is also based on reality not intent.
+
+This has been verified correct — increasing wrist_flex tilts the cup toward the robot (raising
 the far side), which causes a ball on the far side (negative ball.y) to roll back toward
 center. The positive gain with positive error is the corrective direction.
 
@@ -95,8 +121,8 @@ CMD | ball=(-0.166,-0.728) Pflex=-0.1820 Proll=-0.0415 Dflex=+0.0000 Droll=-0.00
 ```
 
 - `ball=(x,y)` — normalized ball offset from cup center
-- `Pflex` = kp_flex × ball.y = 0.25 × (-0.728) = **-0.1820** ✓
-- `Proll` = kp_roll × ball.x = 0.25 × (-0.166) = **-0.0415** ✓  
+- `Pflex` = kp_flex × ball.y = 0.25 × (-0.728) = **-0.1820** ✓  where kp_flex = 0.25 is a ball_balance_node parameter
+- `Proll` = kp_roll × ball.x = 0.25 × (-0.166) = **-0.0415** ✓  where kp_roll = 0.25 is a ball_balance_node parameter
 - `Dflex`, `Droll` — D-term contributions (zero in this run, kd=0)
 - `flex`, `roll` — final command = P + D (clamped to max_cmd)
 - `imu_pitch`, `imu_roll` — raw IMU tilt in radians (used for D-term only)
@@ -153,16 +179,16 @@ direction and magnitude.
 
 ## 4. Test Poses
 
-The test script (pose_test_v25.py) cycles through four directional tilt poses followed
+The test script ([pose_test.py](../writing_robot_control/writing_robot_control/pose_test.py)) cycles through four directional tilt poses followed
 by a center pose, designed to place the ball at a known offset in each cardinal
-direction. This exercises all four sign combinations of the control law.
+direction. This exercises all four sign combinations of the control logic.
 
 | Pose | wrist_flex | wrist_roll | Expected ball.y | Expected ball.x |
 |------|-----------|-----------|----------------|----------------|
-| 1 — initial (tilt forward) | 2.700 (max) | 1.598 (neutral) | negative (far) | near zero |
+| 1 — initial (tilt backward) | 2.700 (max) | 1.598 (neutral) | negative (far) | near zero |
 | 2 — tilt right | 2.700 | 1.900 (max) | near zero | positive |
 | 3 — tilt left | 2.700 | 1.600 | near zero | negative |
-| 4 — center | 2.700 | 1.600 | varies | varies |
+| 4 — tilt forward | 2.700 | 1.600 | varies | varies |
 
 After each pose, the arm transitions MOVING → SETTLED, the PID activates, and the
 wrist controller runs for up to 10 seconds before the pose_test timeout advances
@@ -172,32 +198,52 @@ to the next pose.
 
 ## 5. Pose-by-Pose Analysis
 
+The following provides an example of some of the PID operations that happen after each of the initial poses occur. In it we also reference the clock (t) which are expressed in Unix timestamps in seconds since epoch. The decimal part is fractional seconds — so an increment of 0.01 means 10 milliseconds.
+
 ### 5.1 Pose 1 — Initial (t ≈ 1777491881)
 
 **Starting condition:** See `1881_07.jpg`  
 State: MOVING, ball=(-0.17,-0.73). The cup is tilted with wrist_flex at its maximum 
 (2.700 rad), placing the ball at the far side of the cup (large negative Y).
 
-**First PID correction (t=1777491881.699):**  
+<p align="center">
+  <img src="../images/1881.07.jpg" alt="1881.07 " width="700">
+</p>
+
+
+**First PID correction (t=1777491881.80):**  
 ```
-ball=(-0.166,-0.728) → flex_cmd=-0.182  roll_cmd=-0.042
-CORR: flex 2.6691→2.6327 (Δ-2.09deg) cumul: flex=-2.1deg
+[1777491881.700] [wrist_balance_controller]: Start pose: flex=2.6691  roll=1.5984
+[INFO] [1777491881.700] [ball_balance_node]: CMD | ball=(-0.166,-0.728) Pflex=-0.1820 Proll=-0.0415 
+   Dflex=+0.0000 Droll=-0.0000 → flex=-0.1820 roll=-0.0415 imu_pitch=-3.539 imu_roll=-1.598 stable=False
+[INFO] [1777491881.740] [wrist_balance_controller]: CORR | flex 2.6691→2.6327 (Δ-2.09deg)  roll 1.5984→1.5901 (Δ-0.48deg)  
+   cumul: flex=-2.1deg roll=-0.5deg
 ```
 The large negative ball.y drives a negative flex_cmd, causing wrist_flex to decrease
-(cup tilts away from robot, raising the near side to roll the ball back from the far side).
+(cup starts to tilt away from robot). 
 
-**Mid-correction (t≈1777491883.65):** See `1883_65.jpg`  
+
+<p align="center">
+  <img src="../images/1881.80.jpg" alt="1881.80 " width="700">
+</p>
+
+**Mid-correction (t≈1777491883.65):**   
 ```
 ball=(+0.14,+0.71) f:+0.174 r:+0.042
 CORR cumul: flex=-8.4deg
 ```
-Ball.y has **flipped sign** from -0.73 to +0.71. The ball has rolled through center
+1.85 seconds after the initial PID command there as been a number of commands issued (~10 adjustments). Ball.y has **flipped sign** from -0.73 to +0.71. The ball has rolled through center
 and overshot to the near side. The PID has correctly reversed: flex_cmd is now positive,
 so wrist_flex starts increasing again. The cumulative displacement is -8.4° from start —
 the cup has been tilted significantly but the ball has already passed through center,
 indicating the 2Hz correction rate is too slow to stop the ball before it overshoots.
 
-**Late correction (t≈1777491891.17):** See `1891_17.jpg`  
+<p align="center">
+  <img src="../images/1883.65.jpg" alt="1883.65 " width="700">
+</p>
+
+
+**Late correction (t≈1777491891.17):**  
 ```
 ball=(-0.62,+0.43) f:+0.108 r:-0.156
 ```
@@ -208,6 +254,11 @@ on the roll axis. The PID is now commanding both axes simultaneously.
 **Outcome:** Stability timeout reached at 10s. wrist_flex final position: 2.419 rad
 (started at 2.700 rad, net decrease of 0.281 rad = 16.1°). The ball did not converge
 to center within the 10s window.
+
+<p align="center">
+  <img src="../images/1891.17.jpg" alt="1891.17 " width="700">
+</p>
+
 
 ---
 
@@ -267,6 +318,7 @@ remains positive (+0.57). The oscillation pattern is consistent with Pose 1.
 <p align="center">
   <img src="../images/1921.29.jpg" alt="1921.29 " width="700">
 </p>  
+
 State: MOVING, ball=(-0.68,-0.35). Ball at left side (negative X) and far side
 (negative Y).
 
@@ -299,7 +351,7 @@ before it crosses center on both axes simultaneously.
 <p align="center">
   <img src="../images/1931.27.jpg" alt="1931.27 " width="700">
 </p>
-  
+
 ```
 ball=(-0.79,-0.04) f:+0.037 r:-0.185
 ```
@@ -313,7 +365,7 @@ amplitude. Wrist controller hit flex total limit (+28.6°) and clamped.
 
 ### 5.4 Pose 4 — Center (t ≈ 1777491941)
 
-**Starting condition:** See `1941_25.jpg` 
+**Starting condition:** 
 <p align="center">
   <img src="../images/1941.25.jpg" alt="1941.25 " width="700">
 </p>  
@@ -321,7 +373,7 @@ State: MOVING, ball=(-0.24,-0.72). Despite being the "center" pose, the ball sta
 significantly offset on the Y axis (far side), indicating the starting wrist position
 still has a natural tilt.
 
-**First PID correction (t=1777491941.94):** See `1941_94.jpg` 
+**First PID correction (t=1777491941.94):**  
 <p align="center">
   <img src="../images/1941.94.jpg" alt="1941.94 " width="700">
 </p>  
@@ -333,7 +385,8 @@ CORR: flex 2.6691→2.6338 (Δ-2.02deg) cumul: flex=-2.0deg
 Large negative ball.y drives strong negative flex_cmd. Cup tilting to bring ball from
 far side toward center.
 
-**Mid-correction (t≈1777491944.78):** See `1944_78.jpg`  
+**Mid-correction (t≈1777491944.78):** 
+
 <p align="center">
   <img src="../images/1944.78.jpg" alt="1944.78 " width="700">
 </p> 
@@ -345,10 +398,12 @@ Ball has again overshot — Y flipped from -0.71 to +0.71. The overshooting patt
 repeats identically across all four poses, confirming it is a systematic timing issue
 rather than a pose-specific problem.
 
-**Late correction (t≈1777491951.25):** See `1951_25.jpg` 
+**Late correction (t≈1777491951.25):** 
+
 <p align="center">
   <img src="../images/1951.25.jpg" alt="1951.25 " width="700">
 </p>  
+
 ```
 ball=(+0.00,+0.72) f:+0.186 r:-0.028
 ```
