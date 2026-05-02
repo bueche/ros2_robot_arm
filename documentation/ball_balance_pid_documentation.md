@@ -2,7 +2,7 @@
 
 **Test run:** 042926 t2 torch  
 **Date:** April 29, 2026  
-**Configuration:** kp_flex=0.25, kp_roll=0.25, kd=0, ki=0, correction_hz=2Hz, max_step_rad=0.05
+**Configuration:** kp_flex=0.25, kp_roll=0.25, kd=0, ki=0, correction_hz=5Hz, move_duration=0.1s, max_step_rad=0.05, max_total_rad=0.5
 
 ---
 
@@ -87,60 +87,135 @@ The full sign chain from ball position to joint correction:
 error_x = ball.x   (positive = ball right  → need to roll left  → positive wrist_roll)
 error_y = ball.y   (positive = ball near   → need to flex back  → positive wrist_flex)
 
-flex_cmd = +kp_flex × error_y   (same sign as error_y)
-roll_cmd = +kp_roll × error_x   (same sign as error_x)
+Pflex = +kp_flex × error_y        computed in ball_balance_node
+Proll = +kp_roll × error_x        computed in ball_balance_node
 
-flex_delta = flex_cmd × dt      (dt = 1/correction_hz = 0.5s)
-roll_delta = roll_cmd × dt
+flex_cmd = Pflex + Dflex           (Dflex=0 in this run)
+roll_cmd = Proll + Droll           (Droll=0 in this run)
+
+  → published to /imu/balance_cmd at ~15Hz
+
+flex_delta = flex_cmd × flex_scale × dt    computed in wrist_balance_controller
+roll_delta = roll_cmd × roll_scale × dt    dt = 1/correction_hz = 0.2s at 5Hz
+
+flex_delta = clamp(flex_delta, -max_step_rad, +max_step_rad)
+roll_delta = clamp(roll_delta, -max_step_rad, +max_step_rad)
 
 new_wrist_flex = current_wrist_flex + flex_delta
 new_wrist_roll = current_wrist_roll + roll_delta
+
+  → published to /koch_v11_controller/joint_trajectory
 ```
 
-Now `current_wrist_flex` and `current_wrist_roll` are the actual current joint positions in radians as read from `/joint_states` — the real measured servo positions reported by the Dynamixel hardware interface via ros2_control. So they reflect where the joint actually is at the moment the correction step runs, not where it was commanded to be.
-The target position `new_wrist_flex `is then published as a `JointTrajectory` message with `time_from_start = move_duration = 0.3s`. This tells the trajectory controller "reach this position in 300ms." Whether the servo actually gets there depends on several factors:
-It probably doesn't fully reach it in most cases, for a few reasons. The XL330 servos have a profile velocity and acceleration configured in their firmware that limits how fast they move. If the commanded delta is small (e.g., 0.05 rad = 2.87°) and the servo is already moving or under load, the 300ms window may be enough. But if a new correction arrives at the 500ms mark (next 2Hz cycle), the controller publishes a new trajectory immediately — which replaces the in-progress one. The servo then starts tracking toward the new target, possibly from a position it hadn't finished reaching yet.
+`current_wrist_flex` and `current_wrist_roll` are the **actual measured joint positions
+in radians** read from `/joint_states` at the moment the correction fires — the real
+servo positions as reported by the Dynamixel hardware interface via ros2_control. They
+reflect where the joint physically is, not where it was last commanded to be.
 
-This is actually visible in the CORR log (the format we will explain more in section 2.4). Each line reads current_wrist_flex from /joint_states at the moment of correction, which is the actual position, not the previously commanded one. You can see the servo falling behind:
+`new_wrist_flex` is the **target position** published in a `JointTrajectory` message
+with `time_from_start = move_duration = 0.1s` (in this run). This tells the trajectory
+controller to reach the target in 100ms. The servo may not fully reach it before the
+next correction fires 200ms later (at 5Hz), but this is by design — the next correction
+reads the actual position again and computes a fresh target from there.
+
+The servo falling behind its target is visible in consecutive CORR lines:
 ```
-CORR | flex 2.6691→2.6327 (Δ-2.09deg)   ← commanded 2.6327
-CORR | flex 2.6185→2.5821 (Δ-2.09deg)   ← actual was 2.6185, not 2.6327
+CORR | flex 2.6691→2.6327 (Δ-2.09deg)   ← correction 1: targets 2.6327
+CORR | flex 2.6185→2.5821 (Δ-2.09deg)   ← correction 2: actual was 2.6185, not 2.6327
 ```
-The difference: commanded 2.6327, actual next read 2.6185 — the servo only traveled 0.0506 rad (2.9°) in 200ms toward its 0.0364 rad target. It was still moving when the next correction fired. So current_wrist_flex in each step genuinely reflects where the servo is, and the accumulation of actual_flex_delta (not the commanded delta) into _total_flex means the cumulative displacement tracking is also based on reality not intent.
+The servo traveled from 2.6691 to 2.6185 = 0.0506 rad in 200ms — it overshot its
+0.0364 rad target slightly (servo was still decelerating). The next correction computes
+from 2.6185, not from the commanded 2.6327. This self-correcting behavior is correct:
+by always reading actual position the controller accumulates no tracking error.
 
-This has been verified correct — increasing wrist_flex tilts the cup toward the robot (raising
-the far side), which causes a ball on the far side (negative ball.y) to roll back toward
-center. The positive gain with positive error is the corrective direction.
+The sign chain has been verified correct across all four test poses — increasing
+wrist_flex tilts the cup toward the robot (raising the far side), rolling a ball on the
+far side (negative ball.y) back toward center. The positive gain with positive error
+is the corrective direction.
 
-### 2.4 Reading the Log Output
+### 2.4 Topic Flow and Timing
 
-A typical CMD line from ball_balance_node:
+Three nodes participate in the correction pipeline, each running on its own independent
+timer. They are **not synchronized** to each other:
+
+```
+ball_detector_nvidia     publishes /ball/position     ~35fps   (28ms intervals)
+ball_balance_node        publishes /imu/balance_cmd   ~15Hz    (67ms intervals)  
+wrist_balance_controller executes corrections         5Hz      (200ms intervals)
+```
+
+`ball_balance_node` runs a control loop at 15Hz. Each cycle it reads the latest
+`/ball/position` value (which may be up to 67ms old), computes P×error, and publishes
+to `/imu/balance_cmd`. The CMD log line is **throttled to 1Hz** in the logger, so the
+log shows only 1 CMD line per second even though the topic updates 15 times per second.
+
+`wrist_balance_controller` runs its correction timer at 5Hz independently. Each cycle
+it reads whatever the latest `/imu/balance_cmd` value is at that moment — it does not
+wait for a fresh one. The CMD it acts on may be up to 200ms old. In the log, CORR
+lines appear approximately every 200ms.
+
+The practical consequence is that **CMD and CORR lines in the log are not paired**.
+A CORR at time T is acting on the CMD that happened to be the most recent one when T
+fired. The CMD logged just before a CORR is typically acted on by the **next** CORR
+cycle, not the immediately following one. This offset-by-one relationship means you
+should not expect the math from a given CMD line to exactly produce the delta in the
+immediately following CORR line.
+
+To find which CMD drove a given CORR, look for the most recent CMD line **before**
+that CORR and compute: was the CORR's actual delta consistent with that CMD's flex/roll
+values? Example from the test log:
+
+```
+t=1777491882.766  CMD  ball=(-0.183,-0.722)  flex=-0.1804  roll=-0.0456
+t=1777491882.940  CORR flex 2.3608→2.3322 (Δ-1.64deg)  roll 1.5478→1.5368 (Δ-0.63deg)
+```
+
+Checking: flex_delta = -0.1804 × 1.0 × 0.2 = -0.0361 rad → clamped at -0.05 → 
+actual step = 2.3322 - 2.3608 = -0.0286 rad = -1.64° ✓ (servo not fully reaching
+target, consistent with still moving from prior correction).
+
+### 2.5 Reading the Log Output
+
+**CMD line** — published by `ball_balance_node` at 15Hz, logged at 1Hz:
 ```
 CMD | ball=(-0.166,-0.728) Pflex=-0.1820 Proll=-0.0415 Dflex=+0.0000 Droll=-0.0000 
     → flex=-0.1820 roll=-0.0415 imu_pitch=-3.539 imu_roll=-1.598 stable=False
 ```
 
-- `ball=(x,y)` — normalized ball offset from cup center
-- `Pflex` = kp_flex × ball.y = 0.25 × (-0.728) = **-0.1820** ✓  where kp_flex = 0.25 is a ball_balance_node parameter
-- `Proll` = kp_roll × ball.x = 0.25 × (-0.166) = **-0.0415** ✓  where kp_roll = 0.25 is a ball_balance_node parameter
-- `Dflex`, `Droll` — D-term contributions (zero in this run, kd=0)
-- `flex`, `roll` — final command = P + D (clamped to max_cmd)
-- `imu_pitch`, `imu_roll` — raw IMU tilt in radians (used for D-term only)
-- `stable` — True when ball error magnitude < deadband for N consecutive frames
+| Field | Meaning | Example calculation |
+|-------|---------|-------------------|
+| `ball=(x,y)` | Normalized ball offset from cup center | — |
+| `Pflex` | kp_flex × ball.y | 0.25 × (-0.728) = **-0.1820** |
+| `Proll` | kp_roll × ball.x | 0.25 × (-0.166) = **-0.0415** |
+| `Dflex`, `Droll` | D-term contributions | 0.0 in this run (kd=0) |
+| `flex`, `roll` | Final command = P + D | same as Pflex, Proll here |
+| `imu_pitch`, `imu_roll` | Corrected IMU tilt in radians | used for D-term input |
+| `stable` | True when error < deadband for N frames | False = ball not centered |
 
-A typical CORR line from wrist_balance_controller:
+**CORR line** — published by `wrist_balance_controller` at 5Hz, logged every cycle:
 ```
-CORR | flex 2.6691→2.6327 (Δ-2.09deg)  roll 1.5984→1.5901 (Δ-0.48deg)  
+CORR | flex 2.6691→2.6327 (Δ-2.09deg)  roll 1.5984→1.5901 (Δ-0.48deg)
       cumul: flex=-2.1deg roll=-0.5deg
 ```
 
-- `flex A→B` — wrist_flex joint position before and after correction (radians)
-- `(Δ±X.XXdeg)` — step size in degrees (converted from radians for readability)
-- `cumul` — total accumulated displacement from the start pose of this balance session
+| Field | Meaning |
+|-------|---------|
+| `flex A→B` | wrist_flex actual position before → commanded target (radians) |
+| `(Δ±X.XXdeg)` | Step size = B-A, shown in degrees for readability |
+| `cumul` | Total accumulated displacement from balance session start pose |
 
-The step size in degrees is: `flex_cmd × dt × (180/π)` = `-0.182 × 0.5 × 57.3` = **-5.2°**,
-but clamped to `max_step_rad=0.05 rad = 2.87°` per correction step. The 2Hz rate
-means corrections happen every 500ms.
+The step size calculation: `flex_cmd × dt` = `-0.182 × 0.2` = `-0.0364 rad`, clamped
+to `max_step_rad=0.05`. Since -0.0364 is within the limit, no clamping — target =
+2.6691 + (-0.0364) = **2.6327** ✓. In degrees: -0.0364 × 57.3 = **-2.09°** ✓.
+
+For the roll axis: `roll_cmd × dt` = `-0.0415 × 0.2` = `-0.0083 rad` → target =
+1.5984 + (-0.0083) = **1.5901** ✓. In degrees: -0.0083 × 57.3 = **-0.48°** ✓.
+
+Note the important distinction: the `A` value (e.g., 2.6691) is the **actual measured
+servo position** read from `/joint_states` at correction time. The `B` value (e.g.,
+2.6327) is the **commanded target** sent to the trajectory controller. The servo will
+attempt to reach B within `move_duration=0.1s` but may not fully get there before the
+next correction fires. The next CORR's `A` value reveals how far it actually got.
 
 ---
 
@@ -236,7 +311,7 @@ CORR cumul: flex=-8.4deg
 and overshot to the near side. The PID has correctly reversed: flex_cmd is now positive,
 so wrist_flex starts increasing again. The cumulative displacement is -8.4° from start —
 the cup has been tilted significantly but the ball has already passed through center,
-indicating the 2Hz correction rate is too slow to stop the ball before it overshoots.
+indicating the correction rate is too slow to stop the ball before it overshoots.
 
 <p align="center">
   <img src="../images/1883.65.jpg" alt="1883.65 " width="700">
@@ -344,8 +419,7 @@ ball=(+0.69,+0.27) f:+0.077 r:+0.170
 ```
 Both axes have overshot — ball.x flipped from -0.67 to +0.69, ball.y from -0.35
 to +0.27. The PID correctly reverses both commands. This is the clearest
-demonstration of the underdamped oscillation: the 2Hz rate cannot stop the ball
-before it crosses center on both axes simultaneously.
+demonstration of the underdamped oscillation: the correction loop cannot stop the ball before it crosses center on both axes simultaneously.
 
 **Late correction (t≈1777491931.27):** See `1931_27.jpg` 
 <p align="center">
@@ -420,63 +494,109 @@ magnitude regardless of direction.
 - **Sign chain verified correct** across all four poses and all four directions.
   Decreasing wrist_flex rolls ball from far side toward robot; increasing rolls it
   away. Positive roll_cmd tilts cup to move ball from right to left. All four
-  combinations confirmed by visual inspection.
+  combinations confirmed by visual inspection of RViz images correlated with log.
 
 - **Simultaneous dual-axis correction** works — both flex and roll are corrected
   in every CMD cycle, with magnitudes proportional to their respective errors.
 
 - **Detector performance** — ball detected consistently at 0.62-0.73 confidence,
-  cup at 0.90-0.94, at ~35fps camera rate with ~28ms TRT inference. The size
-  filter removal eliminated false negatives from pose transitions.
+  cup at 0.90-0.94, at ~35fps camera rate with ~28ms TRT inference. The ball size
+  filter removal eliminated false negatives during pose transitions.
 
-- **State transitions** — MOVING→SETTLED transitions correctly reset size references
-  and activate the PID within ~500ms of arm reaching position.
+- **State transitions** — MOVING→SETTLED correctly resets the cup size reference
+  and activates the PID within ~500ms of arm reaching position.
+
+- **Topic rates** — all three pipeline nodes running at their intended rates:
+  ball position at 35fps, CMD at 15Hz, CORR at 5Hz.
 
 ### 6.2 Root cause of non-convergence
 
 The system is **underdamped** — the ball oscillates around center rather than
-converging. The measured oscillation amplitude is ±0.7 (70% of cup radius) and
-the period is approximately 2-4 seconds.
+converging. The measured oscillation amplitude is ±0.7 (70% of cup radius) with
+a period of approximately 2-4 seconds.
 
-The cause is a mismatch between the correction rate (2Hz, one correction every 500ms)
-and the ball dynamics (a 6mm steel ball on a 29mm radius cup rolls across the cup
-in approximately 300-500ms). By the time the next correction executes, the ball has
-already rolled past center to the opposite side.
+The cause is a timing mismatch between correction execution and ball dynamics. A
+6mm steel ball on a 29mm radius cup can roll from rim to center in approximately
+300-500ms. The total pipeline delay from "ball detected at position X" to "cup
+physically reaches corrected tilt" is:
 
-Contributing factors:
-- `max_step_rad=0.05` limits each correction to 2.87°
-- `move_duration=0.3s` means the joint takes 300ms to reach its target
-- Net: effective correction lag ≈ 500ms + 300ms = 800ms before the cup reaches
-  its commanded position — longer than the ball's transit time across the cup
+```
+TRT inference latency          13-29ms   (normal), 50-60ms (during spikes)
+ROS2 publish/subscribe          5-10ms   (DDS transport across containers)
+CMD timer jitter               0-67ms    (ball_balance_node at 15Hz)
+CORR timer jitter              0-200ms   (wrist_balance_controller at 5Hz)
+servo move_duration              100ms   (joint trajectory execution)
+──────────────────────────────────────
+typical total                ~120-400ms
+worst case (with spike)      ~400-860ms
+```
 
-### 6.3 Pipeline latency
+At the typical 120-400ms total lag, by the time the cup reaches its corrected
+position the ball has already rolled past center to the opposite side. The PID
+then correctly reverses direction, but the ball overshoots again. This produces
+the ±0.7 limit cycle visible across all four poses.
 
-PIPELINE SPIKE warnings of 200-430ms were observed throughout the run. These occur
-when TRT inference takes 50-60ms (vs normal 13-28ms), causing frames to queue up.
-This adds additional latency to ball position measurements and worsens the timing
-problem described above.
+A key observation from the log: the CMD log line appears only once per second
+(throttled), which initially suggested 1Hz CMD updates. In fact CMDs publish at
+15Hz — the throttle is a logging artifact. However, 10 consecutive CORR steps
+were observed acting on the same CMD value in one window, each producing nearly
+identical -2.09° flex steps. This occurred because a pipeline spike blocked new
+ball detections for ~1 second, causing the CORR loop to consume stale CMD data
+for 5 consecutive cycles before a fresh ball position arrived.
+
+### 6.3 Pipeline latency spikes
+
+PIPELINE SPIKE warnings of 200-430ms were observed throughout the run at
+`[system_watchdog]`. These occur when TRT inference spikes to 50-60ms (vs the
+normal 13-28ms), causing MJPEG frames to queue behind the slow inference call.
+The watchdog measures the timestamp delta between frame capture and when the
+resulting `/ball/position` is consumed downstream.
+
+The inference spikes are caused by GPU clock throttling on the Orin Nano under
+sustained thermal load. During a spike, ball position updates effectively stop
+for 400-860ms, and the CORR loop runs 2-4 extra steps on stale CMD data before
+a fresh detection arrives. This significantly worsens overshoot.
+
+Fix: run `sudo nvpmodel -m 0 && sudo jetson_clocks` before each test session to
+lock GPU clocks at maximum frequency and prevent throttling.
 
 ---
 
-## 7. Proposed Parameter Changes
+## 7. Parameter Changes and Next Steps
+
+The actual parameters used in this test run were:
+
+```bash
+# ball_balance_node
+-p kp_flex:=0.25 -p kp_roll:=0.25
+
+# wrist_balance_controller  
+-p correction_hz:=5.0 -p move_duration:=0.1 -p max_total_rad:=0.5
+```
+
+Note that `correction_hz` was already 5Hz (not 2Hz) in this run, giving 200ms
+correction intervals. The `max_step_rad` default of 0.05 rad was in effect.
 
 Based on the analysis, the following parameter changes are recommended for the next run:
 
-| Parameter | Current | Proposed | Rationale |
-|-----------|---------|----------|-----------|
-| `correction_hz` | 2.0 | 5.0 | Reduce lag from 500ms to 200ms |
-| `max_step_rad` | 0.05 | 0.02 | Keep max correction rate (~0.1 rad/s) while allowing finer steps |
-| `move_duration` | 0.3 | 0.15 | Faster joint movement to reduce execution lag |
-| `kp_flex` | 0.25 | 0.10 | Reduce overshoot amplitude |
-| `kp_roll` | 0.25 | 0.10 | Reduce overshoot amplitude |
+| Parameter | Node | This run | Proposed | Rationale |
+|-----------|------|----------|----------|-----------|
+| `kp_flex` | ball_balance_node | 0.25 | 0.10 | Reduce overshoot amplitude |
+| `kp_roll` | ball_balance_node | 0.25 | 0.10 | Reduce overshoot amplitude |
+| `max_step_rad` | wrist_balance_controller | 0.05 | 0.02 | Finer steps, same max rate |
+| `move_duration` | wrist_balance_controller | 0.1 | 0.08 | Slightly faster servo response |
+| `correction_hz` | wrist_balance_controller | 5.0 | 5.0 | Already at target rate |
 
-The goal is to make the correction loop faster than the ball's natural rolling period.
-With 5Hz corrections and smaller steps, the controller should be able to track the
-ball more closely and prevent overshoot.
+The primary lever is reducing `kp_flex` and `kp_roll`. With kp=0.25 and a typical
+ball error of 0.72, each CMD produces a flex command of 0.18 rad/s. Over two 200ms
+CORR cycles at max_step_rad=0.05 the cup moves 0.10 rad = 5.7° — enough to send the
+ball from one side of the cup to the other. Reducing to kp=0.10 halves the command
+magnitude to 0.072 rad/s, giving the ball less momentum and making overshooting
+less likely.
 
 A physical cup with higher concavity (currently being designed/printed) will also
 help significantly — a deeper bowl naturally limits ball speed and gives the controller
-more time to respond.
+more time to respond before the ball reaches the rim.
 
 ---
 
@@ -496,3 +616,159 @@ more time to respond.
 The inference spikes are caused by GPU clock throttling on the Orin Nano under
 sustained load. Running `sudo nvpmodel -m 0 && sudo jetson_clocks` before the
 test will lock GPU clocks at maximum and eliminate the spikes.
+
+---
+
+## 9. Glossary
+
+**Clamping**  
+Restricting a value to stay within a defined minimum and maximum. In this system,
+`flex_delta` is clamped to `[-max_step_rad, +max_step_rad]` before being applied.
+Example: if the PID computes `flex_delta = -0.091 rad` but `max_step_rad = 0.05`,
+the clamped value is `-0.050 rad`. The servo moves only 2.87° instead of the full
+5.2° the PID requested. This prevents large sudden movements that could cause the
+ball to fly off the cup or trip a servo overload fault.
+
+**Confidence (detection)**  
+A number between 0 and 1 output by the YOLOv8n model indicating how certain it is
+that a detected bounding box contains the target object. In this system, ball
+detections below `conf_threshold=0.30` are discarded. In practice the ball is
+detected at 0.62-0.73 and the cup at 0.90-0.94. A low confidence does not
+necessarily mean the detection is wrong — it often reflects partial occlusion or
+a ball near the cup rim.
+
+**Cumulative displacement (cumul)**  
+The total angular distance the wrist joint has moved from its position at the start
+of the current balance session, accumulated across all CORR steps. Tracked separately
+for flex and roll. Shown in degrees in the CORR log line, e.g. `cumul: flex=-8.4deg`.
+When `cumul` approaches `max_total_rad` (0.5 rad = 28.6° in this run), the
+wrist_balance_controller clamps further movement on that axis and logs a warning.
+This prevents the arm from walking too far from the nominal balance pose.
+
+**D-term (derivative term)**  
+The component of a PID controller that responds to the *rate of change* of the
+error rather than its current magnitude. A positive D-term damps oscillation —
+if the ball is moving rapidly toward center the D-term reduces the correction
+command so the cup doesn't overshoot. In this test run `kd_flex = kd_roll = 0`
+so the D-term was inactive. The IMU (`imu_pitch`, `imu_roll` in the CMD log) is
+the intended input for the D-term in future runs.
+
+**Dead reckoning (stale data)**  
+Operating on the last known value when fresh data is unavailable. In this system,
+`wrist_balance_controller` reads `/imu/balance_cmd` at each 5Hz tick regardless
+of whether a new CMD has been published since the last tick. If an inference spike
+blocks new ball detections for 400ms, the CORR loop runs 2 correction steps using
+the same CMD value — effectively dead-reckoning the ball's position based on the
+last known measurement.
+
+**Dead zone / deadband**  
+A range of error values near zero within which no correction is applied. Not
+explicitly used in the wrist correction loop in this run, but `ball_balance_node`
+has a `stable` flag that becomes True when the ball error magnitude stays below
+a threshold for N consecutive frames. When `stable=True` the system considers the
+ball balanced.
+
+**DDS (Data Distribution Service)**  
+The middleware layer that ROS2 uses to transport messages between nodes. In this
+system, CycloneDDS carries topics between the Humble container (Orin Nano, running
+`ball_detector_nvidia`) and the Jazzy container (Pi5, running all other nodes)
+over the local network on `ROS_DOMAIN_ID=42`. The Humble/Jazzy version mismatch
+causes benign `Failed to parse type hash` warnings on discovery but does not
+affect message delivery.
+
+**FK (Forward Kinematics)**  
+The calculation that determines where the end-effector (cup) is in space given
+the joint angles. Not directly used in the balance controller but relevant for
+understanding why the cup's physical tilt depends on the combination of all six
+joint angles, not just wrist_flex and wrist_roll. The balance controller treats
+wrist_flex and wrist_roll as independent tilt axes, which is an approximation
+valid near the nominal balance pose.
+
+**FP16**  
+16-bit floating point — half the precision of the standard 32-bit float. The
+TensorRT engine in this system runs in FP16 mode (`half=True` at export time),
+which roughly doubles inference throughput on the Orin Nano's Ampere GPU compared
+to FP32, at negligible accuracy cost for YOLOv8n detection. This is what gives
+the 13-28ms inference times.
+
+**Inference spike**  
+An anomalously slow TRT inference cycle, typically 50-60ms vs the normal 13-28ms.
+Caused by the Orin Nano's GPU power governor throttling clock frequency under
+sustained thermal load. Visible in the log as `[infer] SPIKE 55.8ms` and in the
+`system_watchdog` as `PIPELINE SPIKE: 428ms`. Fix: `sudo nvpmodel -m 0 &&
+sudo jetson_clocks` to lock GPU clocks at maximum before a test session.
+
+**Jitter**  
+Variation in the timing of a periodic event. In this system, both `ball_balance_node`
+(15Hz) and `wrist_balance_controller` (5Hz) run on independent ROS2 timers that
+are not synchronized to each other or to the camera. The CORR timer may fire
+anywhere in a 200ms window relative to the most recent CMD publish. This means
+the CMD data the CORR acts on is between 0ms and 200ms old at the moment of
+execution. Timer jitter is distinct from pipeline latency — jitter is variability
+in *when* the correction fires, latency is the delay from ball movement to cup
+response.
+
+**Normalized position**  
+The ball's offset from the cup center expressed as a fraction of the cup radius,
+so that the value is independent of how large the cup appears in the camera frame.
+A value of `ball.x = +1.0` means the ball is at the cup rim on the right side;
+`ball.x = 0.0` means centered on the roll axis. This normalization means the
+PID gains do not need to change when the arm pose changes the apparent cup size
+in the image.
+
+**P-term (proportional term)**  
+The component of a PID controller proportional to the current error. In this
+system: `Pflex = kp_flex × ball.y`. When `kp_flex=0.25` and `ball.y=-0.728`,
+`Pflex = -0.182`. Larger errors produce larger corrections. The proportional term
+alone (P-only control) will oscillate unless the gains are very small or the
+system has natural damping.
+
+**Pipeline latency**  
+The total time from when the ball is at a given position to when the cup
+physically responds to that position. In this system it spans four stages:
+TRT inference (~13-28ms), ROS2 transport (~5-10ms), CMD timer jitter (0-67ms),
+CORR timer jitter (0-200ms), and servo move_duration (100ms). Typical total:
+120-400ms. During inference spikes: up to 860ms. The `system_watchdog` monitors
+the producer→consumer timestamp delta and logs a warning when it exceeds 150ms.
+
+**RViz**  
+Robot Visualization — the standard ROS2 3D visualization tool. In this system
+it displays the robot's digital twin (joint positions from `/joint_states`),
+the 3D ball marker (from `ball_marker_node`), the camera debug image (from
+`/ball/image`), and the text annotations showing current ball position, PID
+commands, and IMU values. The RViz display runs in a Jazzy Docker container
+on the Orin Nano alongside `ball_marker_node`.
+
+**Throttle (logging)**  
+A ROS2 logger feature that suppresses repeated log messages for a specified
+duration. In this system, `throttle_duration_sec=1.0` on the CMD log line means
+the CMD is logged at most once per second even though it publishes at 15Hz.
+Similarly, ball bbox detections log at most once per second despite 35fps camera
+rate. This is purely a logging artifact — the topics themselves publish at full
+rate. It can make the log look like the system is slower than it is.
+
+**Underdamped**  
+A control system property where the response overshoots the target and oscillates
+before settling. The opposite is overdamped (slow approach, no overshoot) or
+critically damped (fastest approach without overshoot). This system is underdamped
+because the PID corrections are large enough to send the ball past center before
+the next correction can respond. Increasing kp makes it more underdamped; reducing
+kp or adding D-term damping moves it toward critically damped. The ±0.7 amplitude
+limit cycles observed in this run are a symptom of an underdamped system operating
+near its stability boundary.
+
+**VPU (Vision Processing Unit)**  
+The Intel MyriadX compute core inside the OAK-D Lite camera. In the original
+`ball_detector_oak.py` architecture, YOLOv8n inference ran on the VPU using a
+`.blob` format engine. In the current `ball_detector_nvidia.py` architecture the
+VPU is bypassed — the OAK-D Lite is used as a camera only, and inference runs on
+the Orin Nano's GPU via TensorRT. This change was made to improve inference speed
+and eliminate USB2 bandwidth constraints from streaming raw frames.
+
+**Warmup (TRT)**  
+Running one or more dummy inferences through a TensorRT engine before the live
+inference loop begins. On the Orin Nano, the first TRT inference after loading an
+engine takes ~580-1327ms because CUDA kernels must be JIT-compiled for the specific
+GPU. Subsequent inferences drop to ~13-28ms. The warmup runs on the first real
+camera frame to ensure the CUDA context is fully initialized before the pipeline
+starts, avoiding a large latency spike on the first live detection.
