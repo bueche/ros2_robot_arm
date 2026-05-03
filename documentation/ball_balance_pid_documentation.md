@@ -1,5 +1,16 @@
 # Koch v1.1 Ball Balancing System — PID Control Documentation
 
+The following notes represent a deeper dive into the PID controller logic and operation for the 
+robot. This section has several goals that include explaining in detail:
+- How ball movements within the cup are turned into servo adjustments in the robot,
+- The timing of the various topics and the impact on the system,
+- How to interpret the log and rviz output from the key parts of the PID software
+- How all of this plays out using examples from a recent run.
+
+Some of the log output might change, so this section is not guaranteed to be 100% matching with the code. 
+The examples are taken from a test run with the inferencing happening using the Nvidia Orin Nano (as oppose to happening 
+on the camera): 
+
 **Test run:** 042926 t2 torch  
 **Date:** April 29, 2026  
 **Configuration:** kp_flex=0.25, kp_roll=0.25, kd=0, ki=0, correction_hz=5Hz, move_duration=0.1s, max_step_rad=0.05, max_total_rad=0.5
@@ -34,7 +45,11 @@ D-term gains were zero so it contributed no corrections.
 
 ## 2. Coordinate Conventions
 
-Understanding the sign conventions is essential for interpreting the log output.
+ The core challenge in translating ball position into servo commands is establishing a shared coordinate system that makes the math simple and the control logic intuitive. The approach here is to express the ball's position relative to the cup center — not in pixels, but as a normalized offset divided by the cup radius. This gives a coordinate space where (0,0) always means "ball is centered" regardless of how large the cup appears in the camera frame, and where the rim of the cup is at magnitude 1.0 in any direction. 
+ 
+ The X axis runs left-right across the cup as seen from the camera, with X+ to the right. The Y axis runs toward/away from the robot base, with Y+ away from the robot (lower in the camera image). These four quadrants map directly onto the four directions the cup can tilt: a ball at positive X needs a roll correction, a ball at positive Y needs a flex correction, and a ball anywhere off-center needs some combination of both applied simultaneously. The attentive reader will note that some of the other joint positions could be used to impact the ball position (e.g. elbow_flex and shoulder_lift), but if we fix those then (post pose step completion) then the PID controller can operate with a more simple model involving only the wrist_flex and wrist_roll.
+ 
+ Critically, the coordinate origin (0,0) is the goal state — it is the point at which both PID error terms are zero and no correction is commanded. The radian positions of wrist_flex and wrist_roll must be physically aligned to this coordinate system so that a positive X error drives the roll servo in the direction that actually moves the ball toward X=0, and a positive Y error drives the flex servo in the direction that moves the ball toward Y=0. This alignment was verified experimentally across all four quadrants in the test run described below, and the sign chain was confirmed correct in all cases.
 
 ### 2.1 Camera Frame → Ball Position
 
@@ -59,16 +74,18 @@ A value of (±1.0, 0.0) means the ball is at the cup rim on the roll axis.
 
 ### 2.2 Robot Joint Frame
 
-The Koch v1.1 wrist has two joints we focus on for balancing:
+As noted above, the Koch v1.1 wrist has two joints we focus on for balancing:
 
 - **wrist_flex**: used to tilt the cup forward/backward (toward/away from robot base)
 - **wrist_roll**: used to tilt the cup left/right
+
+This robot goes through a series of moves or poses which are defined ahead of time (in the pose sequence yaml, for example [here](../writing_robot_description/config/balance_v1.yaml))and deterministic. AFter each such step, it then transitions into a balancing phase controlled by the PID controller and whose goal is to get the ball to return the center. The pose step phase can impact all servos, but the PID phase only impacts the wrist flex and wrist roll.
 
 Joint positions are in radians. The operating range for these two joints are defined in the [urdf file](../writing_robot_description/urdf/koch_v11_arm_real_for_balance.urdf) as:
 - `wrist_flex`: 0.297 to 2.700 rad  
 - `wrist_roll`: -1.448 to 1.900 rad
 
-But for this application we don't have the joints operate over that full range for some practical reasons:
+But for this application we don't have these joints operate over that full range for some practical reasons:
 - the wrist roll if moved too far in either direction will spill out the ball bearing from the cup,
 - if the wrist flex is too low, then the cup will hit the ground, and
 - In certain high positions it seemed as if the servos (like the elbow flex) were drawing too much current and having a hard time maintaining position while holding the cup.
@@ -128,7 +145,7 @@ The servo traveled from 2.6691 to 2.6185 = 0.0506 rad in 200ms — it overshot i
 from 2.6185, not from the commanded 2.6327. This self-correcting behavior is correct:
 by always reading actual position the controller accumulates no tracking error.
 
-The sign chain has been verified correct across all four test poses — increasing
+We verified the  sign chain was correct across all four test poses — increasing
 wrist_flex tilts the cup toward the robot (raising the far side), rolling a ball on the
 far side (negative ball.y) back toward center. The positive gain with positive error
 is the corrective direction.
@@ -619,156 +636,4 @@ test will lock GPU clocks at maximum and eliminate the spikes.
 
 ---
 
-## 9. Glossary
 
-**Clamping**  
-Restricting a value to stay within a defined minimum and maximum. In this system,
-`flex_delta` is clamped to `[-max_step_rad, +max_step_rad]` before being applied.
-Example: if the PID computes `flex_delta = -0.091 rad` but `max_step_rad = 0.05`,
-the clamped value is `-0.050 rad`. The servo moves only 2.87° instead of the full
-5.2° the PID requested. This prevents large sudden movements that could cause the
-ball to fly off the cup or trip a servo overload fault.
-
-**Confidence (detection)**  
-A number between 0 and 1 output by the YOLOv8n model indicating how certain it is
-that a detected bounding box contains the target object. In this system, ball
-detections below `conf_threshold=0.30` are discarded. In practice the ball is
-detected at 0.62-0.73 and the cup at 0.90-0.94. A low confidence does not
-necessarily mean the detection is wrong — it often reflects partial occlusion or
-a ball near the cup rim.
-
-**Cumulative displacement (cumul)**  
-The total angular distance the wrist joint has moved from its position at the start
-of the current balance session, accumulated across all CORR steps. Tracked separately
-for flex and roll. Shown in degrees in the CORR log line, e.g. `cumul: flex=-8.4deg`.
-When `cumul` approaches `max_total_rad` (0.5 rad = 28.6° in this run), the
-wrist_balance_controller clamps further movement on that axis and logs a warning.
-This prevents the arm from walking too far from the nominal balance pose.
-
-**D-term (derivative term)**  
-The component of a PID controller that responds to the *rate of change* of the
-error rather than its current magnitude. A positive D-term damps oscillation —
-if the ball is moving rapidly toward center the D-term reduces the correction
-command so the cup doesn't overshoot. In this test run `kd_flex = kd_roll = 0`
-so the D-term was inactive. The IMU (`imu_pitch`, `imu_roll` in the CMD log) is
-the intended input for the D-term in future runs.
-
-**Dead reckoning (stale data)**  
-Operating on the last known value when fresh data is unavailable. In this system,
-`wrist_balance_controller` reads `/imu/balance_cmd` at each 5Hz tick regardless
-of whether a new CMD has been published since the last tick. If an inference spike
-blocks new ball detections for 400ms, the CORR loop runs 2 correction steps using
-the same CMD value — effectively dead-reckoning the ball's position based on the
-last known measurement.
-
-**Dead zone / deadband**  
-A range of error values near zero within which no correction is applied. Not
-explicitly used in the wrist correction loop in this run, but `ball_balance_node`
-has a `stable` flag that becomes True when the ball error magnitude stays below
-a threshold for N consecutive frames. When `stable=True` the system considers the
-ball balanced.
-
-**DDS (Data Distribution Service)**  
-The middleware layer that ROS2 uses to transport messages between nodes. In this
-system, CycloneDDS carries topics between the Humble container (Orin Nano, running
-`ball_detector_nvidia`) and the Jazzy container (Pi5, running all other nodes)
-over the local network on `ROS_DOMAIN_ID=42`. The Humble/Jazzy version mismatch
-causes benign `Failed to parse type hash` warnings on discovery but does not
-affect message delivery.
-
-**FK (Forward Kinematics)**  
-The calculation that determines where the end-effector (cup) is in space given
-the joint angles. Not directly used in the balance controller but relevant for
-understanding why the cup's physical tilt depends on the combination of all six
-joint angles, not just wrist_flex and wrist_roll. The balance controller treats
-wrist_flex and wrist_roll as independent tilt axes, which is an approximation
-valid near the nominal balance pose.
-
-**FP16**  
-16-bit floating point — half the precision of the standard 32-bit float. The
-TensorRT engine in this system runs in FP16 mode (`half=True` at export time),
-which roughly doubles inference throughput on the Orin Nano's Ampere GPU compared
-to FP32, at negligible accuracy cost for YOLOv8n detection. This is what gives
-the 13-28ms inference times.
-
-**Inference spike**  
-An anomalously slow TRT inference cycle, typically 50-60ms vs the normal 13-28ms.
-Caused by the Orin Nano's GPU power governor throttling clock frequency under
-sustained thermal load. Visible in the log as `[infer] SPIKE 55.8ms` and in the
-`system_watchdog` as `PIPELINE SPIKE: 428ms`. Fix: `sudo nvpmodel -m 0 &&
-sudo jetson_clocks` to lock GPU clocks at maximum before a test session.
-
-**Jitter**  
-Variation in the timing of a periodic event. In this system, both `ball_balance_node`
-(15Hz) and `wrist_balance_controller` (5Hz) run on independent ROS2 timers that
-are not synchronized to each other or to the camera. The CORR timer may fire
-anywhere in a 200ms window relative to the most recent CMD publish. This means
-the CMD data the CORR acts on is between 0ms and 200ms old at the moment of
-execution. Timer jitter is distinct from pipeline latency — jitter is variability
-in *when* the correction fires, latency is the delay from ball movement to cup
-response.
-
-**Normalized position**  
-The ball's offset from the cup center expressed as a fraction of the cup radius,
-so that the value is independent of how large the cup appears in the camera frame.
-A value of `ball.x = +1.0` means the ball is at the cup rim on the right side;
-`ball.x = 0.0` means centered on the roll axis. This normalization means the
-PID gains do not need to change when the arm pose changes the apparent cup size
-in the image.
-
-**P-term (proportional term)**  
-The component of a PID controller proportional to the current error. In this
-system: `Pflex = kp_flex × ball.y`. When `kp_flex=0.25` and `ball.y=-0.728`,
-`Pflex = -0.182`. Larger errors produce larger corrections. The proportional term
-alone (P-only control) will oscillate unless the gains are very small or the
-system has natural damping.
-
-**Pipeline latency**  
-The total time from when the ball is at a given position to when the cup
-physically responds to that position. In this system it spans four stages:
-TRT inference (~13-28ms), ROS2 transport (~5-10ms), CMD timer jitter (0-67ms),
-CORR timer jitter (0-200ms), and servo move_duration (100ms). Typical total:
-120-400ms. During inference spikes: up to 860ms. The `system_watchdog` monitors
-the producer→consumer timestamp delta and logs a warning when it exceeds 150ms.
-
-**RViz**  
-Robot Visualization — the standard ROS2 3D visualization tool. In this system
-it displays the robot's digital twin (joint positions from `/joint_states`),
-the 3D ball marker (from `ball_marker_node`), the camera debug image (from
-`/ball/image`), and the text annotations showing current ball position, PID
-commands, and IMU values. The RViz display runs in a Jazzy Docker container
-on the Orin Nano alongside `ball_marker_node`.
-
-**Throttle (logging)**  
-A ROS2 logger feature that suppresses repeated log messages for a specified
-duration. In this system, `throttle_duration_sec=1.0` on the CMD log line means
-the CMD is logged at most once per second even though it publishes at 15Hz.
-Similarly, ball bbox detections log at most once per second despite 35fps camera
-rate. This is purely a logging artifact — the topics themselves publish at full
-rate. It can make the log look like the system is slower than it is.
-
-**Underdamped**  
-A control system property where the response overshoots the target and oscillates
-before settling. The opposite is overdamped (slow approach, no overshoot) or
-critically damped (fastest approach without overshoot). This system is underdamped
-because the PID corrections are large enough to send the ball past center before
-the next correction can respond. Increasing kp makes it more underdamped; reducing
-kp or adding D-term damping moves it toward critically damped. The ±0.7 amplitude
-limit cycles observed in this run are a symptom of an underdamped system operating
-near its stability boundary.
-
-**VPU (Vision Processing Unit)**  
-The Intel MyriadX compute core inside the OAK-D Lite camera. In the original
-`ball_detector_oak.py` architecture, YOLOv8n inference ran on the VPU using a
-`.blob` format engine. In the current `ball_detector_nvidia.py` architecture the
-VPU is bypassed — the OAK-D Lite is used as a camera only, and inference runs on
-the Orin Nano's GPU via TensorRT. This change was made to improve inference speed
-and eliminate USB2 bandwidth constraints from streaming raw frames.
-
-**Warmup (TRT)**  
-Running one or more dummy inferences through a TensorRT engine before the live
-inference loop begins. On the Orin Nano, the first TRT inference after loading an
-engine takes ~580-1327ms because CUDA kernels must be JIT-compiled for the specific
-GPU. Subsequent inferences drop to ~13-28ms. The warmup runs on the first real
-camera frame to ensure the CUDA context is fully initialized before the pipeline
-starts, avoiding a large latency spike on the first live detection.

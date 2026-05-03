@@ -1,16 +1,20 @@
-# Ros2 Robot Arm Study Using Koch v1.1 Follower
+# Ros2 Robot Arm and PID Controller Using Koch v1.1 Follower
 
 ## Summary
 The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/)) and its powered by The Robot Operating System v2 [ROS2](https://github.com/ros2).  This repository supports both [Ros2 Jazzy](https://docs.ros.org/en/jazzy/index.html) and [Ros2 Humble](https://docs.ros.org/en/humble/index.html) (see respective  branches in this repository). 
 
-This effort is meant to learn and explore both the software and hardware used in robotic arm development. See FAQ at the bottom for more information.
-This branch supports Ros2 Jazzy (4.2+).
+The current effort is focused on getting this robotic arm to balance a cup containing a metal ball bearing. This is being 
+accomplished by enhancing the robot with the hardware and software needed to add a [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) (PID = Proportional–integral–derivative).
 
-This includes:
+ See FAQ at the bottom for more information.
+This branch supports Ros2 Jazzy (4.2+) and a combination with Humble for the ball bearing detection inferencing.
+
+The details in this project include:
  - Fabrication and/or purchase, modification, and assembly of robotic parts (brackets, Dynamixel servos, and related circuit boards and sensors)
  - Testing and tuning of the physical robot
  - Creating, calibrating, and tuning of the robot arm digital twin
  - Refinement of ROS2-based software to support various actions of the robotic arm and the gathering of physical statistics (current, voltage, temperature, etc)
+ - The development of the PID controller and ML models for ball detection.
 
 <p align="center">
   <img src="./images/real_robot.jpg" alt="Real Robot Arm" width="400">
@@ -26,12 +30,11 @@ The documentation for this repository covers the following:
 - [Launching the Physical Robot](./documentation/launching_physical.md) Steps involved in bringing up the physical robot.
 - [Running the display only version of the Digital twin](./documentation/display_launch.md): This describes how to bring up the digital twin - either along side the physical robot or by itself as an rviz display-only flavor of the robot.
 - [Pose Sequence Tools and Analysis](./documentation/utilities.md): Several tools are provided that drive the robot through a series of poses and analyze physical characteristics (position, temp, current, voltage, etc). This section also provides some analysis case studies that are of interest.
+- [Cup Balancing related hardware and software](./documentation/balance.md): This includes add-ons to the Koch v1.1 hardware (3D Inferencing camera and IMU) and PID related software and Machine Learning models for inferencing on the Camera and on an Nvidia Orin Nano.
 
 <p align="center">
   <img src="./images/robot_arm_in_motion.gif" alt="Real Robot Arm" width="400">
 </p>
-## Medium articles:
-- TBD 🚧 
 
 ## FAQ
 ### How can this repository be useful?
