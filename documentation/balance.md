@@ -26,37 +26,15 @@ The video below shows the rviz output for a portion of the test (as of 04/24/202
 The rest of this page provides more detail or links to more detail on this sub-project
 
 ## Sections
-- [Hardware](./hardware_for_balance.md)
-- [Software](#software)
-- [Vision Model training and building](#vision-model-training-and-building)
-- [Ball detection tuning](#ball-detection-tuning)
-- [Dynamixel PID controller tuning](./dynamixel_pid_controller_tuning.md)
-- [Balacing PID controller](./ball_balance_pid_documentation.md) 
+- [Hardware](./hardware_for_balance.md): This section focuses on the hardware added to the base robot hardware to support the cup balancing project, with specific emphasis on the 3D Inferencing camera and IMU. [Learn more...](./hardware_for_balance.md)
+- [Software](#software): A number of software components were added to support the balance project. This section outlines them. [Learn more...](./software_for_balance.md)
+- [Vision Model training and building](#vision-model-training-and-building): A key capability for the cup balancing project was the Machine Learning model used to detect the position of the ball bearing within the cup. We explored two different approaches: Inferencing on the camera and Inferencing on the Nvidia Orin Nano. This section describes how the two models were built. [Learn more...](./vision_model_training.md)
+- [Ball detection tuning](./ball_detection_tuning.md): This section describes some of the tuning steps wrt ball detection. It also compares camera inferencing vs. inferencing on the Nvidia Orin Nano. [Learn more ...](./ball_detection_tuning.md)
+- [Dynamixel PID controller tuning](./dynamixel_pid_controller_tuning.md): There was actually multilple levels of PID-related control. Indeed each Dynamixel servo has a PID controller. We did need to make some adjustments to that configuration for this application. [Learn more...](./dynamixel_pid_controller_tuning.md)
+- [Balacing PID controller](./ball_balance_pid_documentation.md): The above described ball detection fed into an overall PID controller whose focus was to balance the ball bearing. How do you adjust a servo based on knowing its coordinates? [Learn more..](./ball_balance_pid_documentation.md)
 - [Current status and next steps](#current-status-and-next-steps) 
 - [FAQ](#faq)
 
-
-## Software
-- draw software architecture and highlight the new ros2 components needed for this project
-- outline each of the new components and their purpose
-- describe the hybrid jazzy / humble approach
-- Describe the software/hardware approaches for ball inference
-
-## Vision Model training and building
-This section outlines the steps and services used in training and building the cup and ball detection and tracking model. 
-### Model building for camera inferencing
-The workflow for building the model to run on the Luxonis camera is outlined below. 
-<p align="center">
-  <img src="../images/model_training_workflow.jpg" alt=" camera model training workflow" width="800">
-</p>
-The detailed steps are provided in the [model training workflow steps](./retraining_workflow.md#ball-detector-training-and-retraining-workflow).
-
-### Model building for Nvidia Orin Nano inferencing with Torch
-The workflow for building the model to run on the Luxonis camera is outlined below. 
-<p align="center">
-  <img src="../images/training_nvidia_torch.jpg" alt="nvidia model training workflow" width="800">
-</p>
-The detailed steps are provided in TBD.
 
 
 

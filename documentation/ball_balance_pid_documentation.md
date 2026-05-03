@@ -1,11 +1,11 @@
 # Koch v1.1 Ball Balancing System — PID Control Documentation
 
 The following notes represent a deeper dive into the PID controller logic and operation for the 
-robot. This section has several goals that include explaining in detail:
-- How ball movements within the cup are turned into servo adjustments in the robot,
-- The timing of the various topics and the impact on the system,
-- How to interpret the log and rviz output from the key parts of the PID software
-- How all of this plays out using examples from a recent run.
+robot. This section has several goals that include explaining in detail using details from an example test:
+- How do we turn ball movements in the cup into servo adjustments in the robot?
+- What are the ros2 topics and what is their timing?
+- How do we interpret the log and rviz output?
+
 
 Some of the log output might change, so this section is not guaranteed to be 100% matching with the code. 
 The examples are taken from a test run with the inferencing happening using the Nvidia Orin Nano (as oppose to happening 
@@ -20,26 +20,20 @@ on the camera):
 ## 1. System Architecture
 
 The ball balancing system consists of five nodes working in a pipeline:
+<p align="center">
+  <img src="../images/balance_topic_flow.jpg" alt="ball_orientation " width="800">
+</p> 
 
-```
-OAK-D Lite camera
-    ↓ MJPEG over USB2
-ball_detector_nvidia  →  /ball/position (normalized x,y)
-                      →  /ball/cup_detected
-                              ↓
-ball_balance_node     →  /imu/balance_cmd (flex_cmd, roll_cmd)
-                      →  /balance_enabled
-                              ↓
-wrist_balance_controller  →  /koch_v11_controller/joint_trajectory
-                              ↓
-                         wrist_flex + wrist_roll servos
-                              ↓
-                         cup tilts → ball rolls toward center
-```
+1. The camera interfaces either with `ball_detector_oak.py` or `ball_detector_nvidia.py` depending on whether cup and ball inferencing is happening on the camera or the nvidia orin nano. These nodes publish the same topics, however, which consist of the ball coordinates and whether a ball was detected or not (along with some debug information).
 
-The IMU (BNO085/MPU-6050 on ESP32, mounted on wrist) publishes `/imu/balance_error` 
+2. The `ball_balance_node.py` then uses this information and to formulate the PID command and publishes this as the topic `/imu/balance_cmd`. Note this is labeled as the node `/imu` due to originally all I had was the imu and not the camera. Need to clean this up. Also, note that the ball balance node doesn't know the position of the servos. So the pid command still needs to be translated into servo radian positions by the `wrist_balance_controller`.
+
+3. The IMU (BNO085/MPU-6050 on ESP32, mounted on wrist) publishes `/imu/balance_error` 
 and `/imu/raw` for monitoring and optional D-term feedforward, but in this test run 
 D-term gains were zero so it contributed no corrections.
+
+4. The `wrist_balance_controller` takes in the input from the camera (now formulated as a PID command), tge servo positions, and the IMU and does the last bit of PID operation by translating this into servo radian targets. It publishes these to make this happen.
+
 
 ---
 
