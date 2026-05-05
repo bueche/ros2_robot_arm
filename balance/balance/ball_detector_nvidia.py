@@ -30,7 +30,7 @@ Publishes:
   /ball/image           sensor_msgs/Image     annotated debug frame (debug_fps Hz)
 
 Subscribes:
-  /arm_state            std_msgs/String       MOVING→SETTLED resets cup size filter
+  /arm_state            std_msgs/String       MOVING→SETTLED resets containment warmup
 
 Parameters:
   engine_path       Path to TensorRT .engine file          default: ''
@@ -41,8 +41,9 @@ Parameters:
   mjpeg_quality     OAK onboard MJPEG quality (1-100)      default: 85
   exposure_us       Manual exposure us (0=auto)            default: 25000
   iso               Manual ISO (used when exposure_us > 0) default: 800
-  cup_jump_frac     Max fractional cup bbox size change     default: 0.50
-  warmup_frames     Size-filter bypass for first N dets     default: 10
+  containment_margin  Slack around cup bbox for ball containment check  default: 0.15
+  warmup_frames       Containment-filter bypass for first N cup dets    default: 10
+  min_ball_conf       Min ball conf accepted without a cup anchor        default: 0.50
   debug_fps         Rate for /ball/image publish            default: 5.0
   show_debug        Annotate debug image                   default: True
   publish_image     Publish /ball/image topic              default: True
@@ -110,8 +111,9 @@ class BallDetectorNvidiaNode(Node):
         self.declare_parameter('mjpeg_quality',     85)
         self.declare_parameter('exposure_us',       25000)
         self.declare_parameter('iso',               800)
-        self.declare_parameter('cup_jump_frac',     0.50)
-        self.declare_parameter('warmup_frames',     10)
+        self.declare_parameter('containment_margin', 0.15)
+        self.declare_parameter('warmup_frames',      10)
+        self.declare_parameter('min_ball_conf',      0.50)
         self.declare_parameter('debug_fps',         5.0)
         self.declare_parameter('show_debug',        True)
         self.declare_parameter('publish_image',     True)
@@ -123,8 +125,9 @@ class BallDetectorNvidiaNode(Node):
         self._p_iou_threshold   = self.get_parameter('iou_threshold').value
         self._p_rgb_fps         = self.get_parameter('rgb_fps').value
         self._p_mjpeg_quality   = self.get_parameter('mjpeg_quality').value
-        self._p_cup_jump_frac   = self.get_parameter('cup_jump_frac').value
-        self._p_warmup_frames   = self.get_parameter('warmup_frames').value
+        self._p_containment_margin = self.get_parameter('containment_margin').value
+        self._p_warmup_frames      = self.get_parameter('warmup_frames').value
+        self._p_min_ball_conf      = self.get_parameter('min_ball_conf').value
         self._p_debug_fps       = self.get_parameter('debug_fps').value
         self._p_show_debug      = self.get_parameter('show_debug').value
         self._p_publish_image   = self.get_parameter('publish_image').value
@@ -154,7 +157,6 @@ class BallDetectorNvidiaNode(Node):
         self._det_queue = queue.Queue(maxsize=60)
 
         # Temporal size tracking for bbox sanity filter
-        self._last_cup_wh    = None
         self._cup_det_count  = 0
 
         # Drop / diagnostics
@@ -204,21 +206,19 @@ class BallDetectorNvidiaNode(Node):
     # ------------------------------------------------------------------
 
     def _on_arm_state(self, msg):
-        """Reset bbox size references when arm transitions MOVING → SETTLED.
+        """Reset containment warmup counter when arm transitions MOVING → SETTLED.
 
-        After an arm move the cup appears at a different scale in the frame.
-        Keeping the pre-move size reference would cause every post-move detection
-        to be rejected as a size jump.  Clearing references re-triggers the
-        warmup window so the first _warmup_frames detections are accepted
-        unconditionally and seed the new correct reference size.
+        After an arm move the cup appears at a different position in the frame.
+        Resetting _cup_det_count re-triggers the warmup window so the first
+        _warmup_frames cup detections are accepted without containment validation,
+        allowing the system to re-anchor to the cup's new position.
         """
         clean = msg.data.rstrip('\x00').strip()
         prev = self._arm_state
         self._arm_state = clean
         if prev == 'MOVING' and clean == 'SETTLED':
-            self._last_cup_wh   = None
             self._cup_det_count = 0
-            self.get_logger().info('Arm SETTLED — cup size reference reset')
+            self.get_logger().info('Arm SETTLED — containment warmup counter reset')
 
     # ------------------------------------------------------------------
     # TensorRT warmup
@@ -464,11 +464,43 @@ class BallDetectorNvidiaNode(Node):
     # Detection processing and publish
     # ------------------------------------------------------------------
 
+    def _ball_inside_cup(self, ball_norm, cup_norm):
+        """Return True if ball center falls within cup bbox + containment_margin.
+
+        The margin is a fraction of the image dimension, adding slack so a ball
+        sitting at the cup rim (whose center is technically just outside the bbox)
+        is still accepted as contained.
+        """
+        bx = (ball_norm[0] + ball_norm[2]) / 2.0
+        by = (ball_norm[1] + ball_norm[3]) / 2.0
+        m  = self._p_containment_margin
+        return (cup_norm[0] - m < bx < cup_norm[2] + m and
+                cup_norm[1] - m < by < cup_norm[3] + m)
+
     def _process_and_publish(self, dets, frame):
-        """Apply size filter, compute normalised position, publish all topics."""
+        """Containment-based detection, normalised position publish.
+
+        Filter strategy — exploits the physical containment relationship:
+
+        Pass 1: collect highest-confidence ball and cup candidates from raw
+                YOLO detections with no spatial filtering.
+
+        Pass 2: containment validation:
+          Both found, ball inside cup  → mutually validating, accept both.
+          Both found, ball outside cup → one is a false positive; trust
+                                         whichever has higher confidence.
+          Ball only, no cup            → accept if conf >= min_ball_conf,
+                                         otherwise discard as unvalidated.
+          Cup only, no ball            → accepted (ball may be occluded).
+
+        During warmup (first _warmup_frames cup detections after SETTLED reset)
+        the containment check is bypassed so the system can anchor to the cup
+        position without needing a prior.
+        """
         h, w = frame.shape[:2] if frame is not None else (
             self._p_input_size, self._p_input_size)
 
+        # Pass 1 — collect best raw candidates
         best_ball_norm = None;  best_ball_c = 0.0
         best_cup_norm  = None;  best_cup_c  = 0.0
 
@@ -478,10 +510,6 @@ class BallDetectorNvidiaNode(Node):
             conf = d['confidence']
 
             if d['label'] == BALL_IDX and conf > best_ball_c:
-                # Ball size filter disabled — in controlled scene environment
-                # the confidence threshold is sufficient.  Size filtering was
-                # causing false negatives when the arm moved (cup scale change
-                # caused proportional ball bbox change, exceeding jump threshold).
                 best_ball_c    = conf
                 best_ball_norm = (d['xmin'], d['ymin'], d['xmax'], d['ymax'])
                 self.get_logger().info(
@@ -489,25 +517,6 @@ class BallDetectorNvidiaNode(Node):
                     throttle_duration_sec=1.0)
 
             elif d['label'] == CUP_IDX and conf > best_cup_c:
-                # ROI sanity: cup centre must be in lower 75% and middle 80%
-                cx_n = (d['xmin'] + d['xmax']) / 2.0
-                cy_n = (d['ymin'] + d['ymax']) / 2.0
-                if cy_n < 0.25 or cx_n < 0.10 or cx_n > 0.90:
-                    self.get_logger().warn(
-                        f'Cup rejected by ROI: cx={cx_n:.2f} cy={cy_n:.2f}',
-                        throttle_duration_sec=2.0)
-                    continue
-                # Size jump filter — bypass during warmup
-                if (self._last_cup_wh is not None
-                        and self._cup_det_count >= self._p_warmup_frames):
-                    lw, lh = self._last_cup_wh
-                    if lw > 0 and lh > 0:
-                        jump = max(abs(dw - lw) / lw, abs(dh_d - lh) / lh)
-                        if jump > self._p_cup_jump_frac:
-                            self.get_logger().warn(
-                                f'Cup size jump {jump:.0%} — rejected',
-                                throttle_duration_sec=1.0)
-                            continue
                 best_cup_c    = conf
                 best_cup_norm = (d['xmin'], d['ymin'], d['xmax'], d['ymax'])
                 self._cup_det_count += 1
@@ -515,24 +524,53 @@ class BallDetectorNvidiaNode(Node):
                     f'Cup  bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={conf:.3f}',
                     throttle_duration_sec=1.0)
 
-        # Update temporal size trackers
-        if best_cup_norm is not None:
-            xmin, ymin, xmax, ymax = best_cup_norm
-            self._last_cup_wh = (xmax - xmin, ymax - ymin)
-
+        # Pass 2 — containment validation
         cup_found  = best_cup_norm  is not None
         ball_found = best_ball_norm is not None
+        in_warmup  = self._cup_det_count < self._p_warmup_frames
 
-        if not cup_found and not ball_found:
+        if cup_found and ball_found:
+            if in_warmup:
+                self.get_logger().info(
+                    f'Warmup ({self._cup_det_count}/{self._p_warmup_frames}): '
+                    f'containment check bypassed',
+                    throttle_duration_sec=2.0)
+            elif self._ball_inside_cup(best_ball_norm, best_cup_norm):
+                pass  # mutually validating — accept both
+            else:
+                # Ball outside cup — discard lower-confidence detection
+                if best_ball_c >= best_cup_c:
+                    self.get_logger().warn(
+                        f'Ball outside cup — discarding cup '
+                        f'(ball={best_ball_c:.3f} >= cup={best_cup_c:.3f})',
+                        throttle_duration_sec=1.0)
+                    cup_found = False
+                else:
+                    self.get_logger().warn(
+                        f'Ball outside cup — discarding ball '
+                        f'(cup={best_cup_c:.3f} > ball={best_ball_c:.3f})',
+                        throttle_duration_sec=1.0)
+                    ball_found = False
+
+        elif ball_found and not cup_found:
+            if best_ball_c < self._p_min_ball_conf:
+                self.get_logger().warn(
+                    f'Ball (conf={best_ball_c:.3f}) without cup and below '
+                    f'min_ball_conf={self._p_min_ball_conf} — discarding',
+                    throttle_duration_sec=2.0)
+                ball_found = False
+            else:
+                self.get_logger().warn(
+                    f'Ball (conf={best_ball_c:.3f}) found but NO CUP',
+                    throttle_duration_sec=2.0)
+
+        elif cup_found and not ball_found:
+            self.get_logger().warn(
+                f'Cup (conf={best_cup_c:.3f}) found but NO BALL',
+                throttle_duration_sec=2.0)
+
+        else:
             self.get_logger().warn('No detections', throttle_duration_sec=2.0)
-        elif not cup_found:
-            self.get_logger().warn(
-                f'Ball found (conf={best_ball_c:.3f}) but NO CUP',
-                throttle_duration_sec=2.0)
-        elif not ball_found:
-            self.get_logger().warn(
-                f'Cup found (conf={best_cup_c:.3f}) but NO BALL',
-                throttle_duration_sec=2.0)
 
         # Normalised cup geometry
         cup_cx_n = cup_cy_n = cup_r_n = None
@@ -551,7 +589,8 @@ class BallDetectorNvidiaNode(Node):
         # /ball/cup_detected
         self._pub_cup.publish(Bool(data=cup_found))
 
-        # /ball/position — normalised offset from cup centre
+        # /ball/position — normalised offset from cup centre, divided by cup radius
+        # (0,0) = ball at cup centre; magnitude 1.0 = ball at rim
         pos_msg = Point()
         if ball_found and cup_found and cup_r_n and cup_r_n > 0:
             pos_msg.x = (ball_cx_n - cup_cx_n) / cup_r_n
@@ -560,8 +599,19 @@ class BallDetectorNvidiaNode(Node):
         else:
             pos_msg.x = 0.0
             pos_msg.y = 0.0
-            pos_msg.z = -1.0
+            pos_msg.z = -1.0   # sentinel: no valid position
         self._pub_pos.publish(pos_msg)
+        # Log normalized ball coordinates at every publish — unthrottled so
+        # timestamps can be correlated with CORR lines to measure pipeline lag.
+        #if pos_msg.z >= 0:
+        #    self.get_logger().info(
+        #        f'BALL_POS | x={pos_msg.x:+.3f} y={pos_msg.y:+.3f} '
+        #        f'ball_conf={best_ball_c:.3f} cup_conf={best_cup_c:.3f}')
+        #else:
+        #    self.get_logger().info(
+        #        f'BALL_POS | no valid position '
+        #        f'(ball_found={ball_found} cup_found={cup_found})',
+        #        throttle_duration_sec=1.0)
 
         # /ball/image — rate-limited to debug_fps, annotated
         if frame is not None and self._p_publish_image:
