@@ -24,12 +24,12 @@ The ball balancing system consists of five nodes working in a pipeline:
   <img src="../images/balance_topic_flow.jpg" alt="ball_orientation " width="800">
 </p> 
 
-1. The camera interfaces either with `ball_detector_oak.py` or `ball_detector_nvidia.py` depending on whether cup and ball inferencing is happening on the camera or the nvidia orin nano. These nodes publish the same topics, however, which consist of the ball coordinates and whether a ball was detected or not (along with some debug information).
+1. The camera interfaces either with `ball_detector_oak.py` or `ball_detector_nvidia.py` depending on whether cup and ball inferencing is happening on the camera or the nvidia orin nano. These nodes publish the same topics, however, which consist of the ball coordinates within the image and whether a ball was detected or not (along with some debug information).
 
-2. The `ball_balance_node.py` then uses this information and to formulate the PID command and publishes this as the topic `/imu/balance_cmd`. Note this is labeled as the node `/imu` due to originally all I had was the imu and not the camera. Need to clean this up. Also, note that the ball balance node doesn't know the position of the servos. So the pid command still needs to be translated into servo radian positions by the `wrist_balance_controller`.
+2. The `ball_balance_node.py` then uses this information to work out the ball's coordinates within the cup. Then it formulates the Proportional adjustment portion of the PID command and publishes this as the topic `/imu/balance_cmd`. Note this is labeled as the node `/imu` due to originally all I had was the imu and not the camera. Need to clean this up. Also, note that the ball balance node doesn't know the position of the servos. So the pid command still needs to be translated into servo radian positions by the `wrist_balance_controller`.
 
 3. The IMU (BNO085/MPU-6050 on ESP32, mounted on wrist) publishes `/imu/balance_error` 
-and `/imu/raw` for monitoring and optional D-term feedforward, but in this test run 
+and `/imu/raw` for monitoring and optional Derivative or D-term feedforward, but in this test run 
 D-term gains were zero so it contributed no corrections.
 
 4. The `wrist_balance_controller` takes in the input from the camera (now formulated as a PID command), tge servo positions, and the IMU and does the last bit of PID operation by translating this into servo radian targets. It publishes these to make this happen.
@@ -39,7 +39,11 @@ D-term gains were zero so it contributed no corrections.
 
 ## 2. Coordinate Conventions
 
- The core challenge in translating ball position into servo commands is establishing a shared coordinate system that makes the math simple and the control logic intuitive. The approach here is to express the ball's position relative to the cup center — not in pixels, but as a normalized offset divided by the cup radius. This gives a coordinate space where (0,0) always means "ball is centered" regardless of how large the cup appears in the camera frame, and where the rim of the cup is at magnitude 1.0 in any direction. 
+The ML model returns coordinates on the image, not within the cup. It has no concept of the cup at all — it just returns bounding boxes for whatever objects it detects that meet the confidence threshold. For each detection it outputs four numbers: the pixel coordinates of the top-left and bottom-right corners of the bounding box (xmin, ymin, xmax, ymax), along with a class label (0=ball, 1=cup) and a confidence score. The model was trained to recognize both objects but it treats them as completely independent detections — it doesn't know or care that the ball should be inside the cup.
+
+ The next challenge in translating ball position into servo commands is establishing a shared coordinate system that makes the math simple and the control logic intuitive.   The approach here is to express the ball's position relative to the cup center — not in pixels, but as a normalized offset divided by the cup radius. This gives a coordinate space where (0,0) always means "ball is centered" regardless of how large the cup appears in the camera frame, and where the rim of the cup is at magnitude 1.0 in any direction. 
+ 
+ The translation into normalized cup-relative coordinates happens entirely in `ball_detector_nvidia.py` (or `ball_detector_oak.py`) in the `_process_and_publish()` method. It uses the bounding boxes to come up with a cup and ball center and then calculates the position of the ball wrt to the cup. 
  
  The X axis runs left-right across the cup as seen from the camera, with X+ to the right. The Y axis runs toward/away from the robot base, with Y+ away from the robot (lower in the camera image). These four quadrants map directly onto the four directions the cup can tilt: a ball at positive X needs a roll correction, a ball at positive Y needs a flex correction, and a ball anywhere off-center needs some combination of both applied simultaneously. The attentive reader will note that some of the other joint positions could be used to impact the ball position (e.g. elbow_flex and shoulder_lift), but if we fix those then (post pose step completion) then the PID controller can operate with a more simple model involving only the wrist_flex and wrist_roll.
  
