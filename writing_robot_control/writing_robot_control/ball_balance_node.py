@@ -52,6 +52,7 @@ Parameters:
   imu_timeout     Seconds before IMU stale         default: 0.5
   ball_lost_timeout  Seconds ball undetected before suspend  default: 1.0
   attempt_timeout    Seconds before giving up balancing      default: 5.0
+  centered_hold_time Seconds ball must stay centered to declare success  default: 2.0
   dry_run         Log only, don't publish cmd      default: False
   use_imu         Use IMU derivative term          default: True
 
@@ -96,7 +97,8 @@ class BallBalanceNode(Node):
         self.declare_parameter('camera_timeout',    2.0)
         self.declare_parameter('imu_timeout',       0.5)
         self.declare_parameter('ball_lost_timeout', 1.0)
-        self.declare_parameter('attempt_timeout',   30.0)
+        self.declare_parameter('attempt_timeout',     30.0)
+        self.declare_parameter('centered_hold_time',  2.0)
         self.declare_parameter('dry_run',           False)
         self.declare_parameter('use_imu',           True)
 
@@ -124,6 +126,7 @@ class BallBalanceNode(Node):
         self._arm_state         = 'MOVING'
         self._settled_at        = None
         self._pid_active        = False
+        self._centered_since    = None   # monotonic time ball first entered stable zone
 
         # Integrals
         self._integral_flex     = 0.0
@@ -198,6 +201,7 @@ class BallBalanceNode(Node):
                 self._pid_active           = False
                 self._settled_at           = None
                 self._pid_started_at       = None
+                self._centered_since       = None
                 self._last_valid_ball_time = None
                 self._integral_flex        = 0.0
                 self._integral_roll        = 0.0
@@ -312,6 +316,29 @@ class BallBalanceNode(Node):
         stable_thresh = self.get_parameter('stable_thresh').value
         is_stable = magnitude < stable_thresh
         self._pub_stable.publish(Bool(data=is_stable))
+
+        # Centered hold — declare success if ball stays within stable_thresh
+        # for centered_hold_time seconds continuously.  Disables the PID and
+        # logs 'Ball centered' so pose_test can detect success and move on.
+        centered_hold = self.get_parameter('centered_hold_time').value
+        if is_stable:
+            if self._centered_since is None:
+                self._centered_since = now
+            elif now - self._centered_since >= centered_hold:
+                self.get_logger().info(
+                    f'Ball centered — held within stable_thresh={stable_thresh:.2f} '
+                    f'for {centered_hold:.1f}s  '
+                    f'magnitude={magnitude:.3f}  '
+                    f'ball=({error_x:+.3f},{error_y:+.3f})')
+                self._pid_active     = False
+                self._pid_started_at = None
+                self._settled_at     = None
+                self._centered_since = None
+                self._pub_enabled.publish(Bool(data=False))
+                return
+        else:
+            # Ball left the stable zone — reset the hold timer
+            self._centered_since = None
 
         if error_x == 0.0 and error_y == 0.0:
             # Within deadband — reset integrals slowly
