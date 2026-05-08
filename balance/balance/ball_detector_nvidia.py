@@ -422,6 +422,11 @@ class BallDetectorNvidiaNode(Node):
 
         Each dict: {label, confidence, xmin, ymin, xmax, ymax}
         Coordinates are normalised 0-1.
+
+        Sub-threshold ball detections are logged (but not returned) so
+        we can diagnose cases where the ball is visible but YOLO confidence
+        is below conf_threshold.  Cup sub-threshold detections are not
+        logged as the cup is almost always detected at high confidence.
         """
         dets = []
         if not results or results[0].boxes is None:
@@ -429,18 +434,34 @@ class BallDetectorNvidiaNode(Node):
 
         boxes = results[0].boxes
         sz    = float(self._p_input_size)
+        ball_max_subthresh_conf = 0.0
         for i in range(len(boxes)):
             xyxy  = boxes.xyxy[i].cpu().numpy()
             conf  = float(boxes.conf[i].cpu().numpy())
             label = int(boxes.cls[i].cpu().numpy())
-            dets.append({
-                'label':      label,
-                'confidence': conf,
-                'xmin':       float(xyxy[0]) / sz,
-                'ymin':       float(xyxy[1]) / sz,
-                'xmax':       float(xyxy[2]) / sz,
-                'ymax':       float(xyxy[3]) / sz,
-            })
+            if conf >= self._p_conf_threshold:
+                dets.append({
+                    'label':      label,
+                    'confidence': conf,
+                    'xmin':       float(xyxy[0]) / sz,
+                    'ymin':       float(xyxy[1]) / sz,
+                    'xmax':       float(xyxy[2]) / sz,
+                    'ymax':       float(xyxy[3]) / sz,
+                })
+            elif label == BALL_IDX:
+                # Track highest sub-threshold ball confidence for diagnostics
+                ball_max_subthresh_conf = max(ball_max_subthresh_conf, conf)
+
+        # Log if ball was seen sub-threshold but no ball made it into dets
+        ball_in_dets = any(d['label'] == BALL_IDX for d in dets)
+        if ball_max_subthresh_conf > 0.0 and not ball_in_dets:
+            self.get_logger().warn(
+                f'Ball detected sub-threshold: '
+                f'conf={ball_max_subthresh_conf:.3f} < '
+                f'conf_threshold={self._p_conf_threshold:.2f} '
+                f'— consider lowering conf_threshold',
+                throttle_duration_sec=1.0)
+
         return dets
 
     # ------------------------------------------------------------------
@@ -538,17 +559,26 @@ class BallDetectorNvidiaNode(Node):
             elif self._ball_inside_cup(best_ball_norm, best_cup_norm):
                 pass  # mutually validating — accept both
             else:
-                # Ball outside cup — discard lower-confidence detection
+                # Ball outside cup — discard lower-confidence detection.
+                # Log ball center vs cup bbox so we can tune margin.
+                bx = (best_ball_norm[0] + best_ball_norm[2]) / 2.0
+                by = (best_ball_norm[1] + best_ball_norm[3]) / 2.0
                 if best_ball_c >= best_cup_c:
                     self.get_logger().warn(
                         f'Ball outside cup — discarding cup '
-                        f'(ball={best_ball_c:.3f} >= cup={best_cup_c:.3f})',
+                        f'(ball={best_ball_c:.3f} >= cup={best_cup_c:.3f}) '
+                        f'ball_center=({bx:.3f},{by:.3f}) '
+                        f'cup_bbox=({best_cup_norm[0]:.3f},{best_cup_norm[1]:.3f},'
+                        f'{best_cup_norm[2]:.3f},{best_cup_norm[3]:.3f})',
                         throttle_duration_sec=1.0)
                     cup_found = False
                 else:
                     self.get_logger().warn(
                         f'Ball outside cup — discarding ball '
-                        f'(cup={best_cup_c:.3f} > ball={best_ball_c:.3f})',
+                        f'(cup={best_cup_c:.3f} > ball={best_ball_c:.3f}) '
+                        f'ball_center=({bx:.3f},{by:.3f}) '
+                        f'cup_bbox=({best_cup_norm[0]:.3f},{best_cup_norm[1]:.3f},'
+                        f'{best_cup_norm[2]:.3f},{best_cup_norm[3]:.3f})',
                         throttle_duration_sec=1.0)
                     ball_found = False
 
@@ -601,17 +631,6 @@ class BallDetectorNvidiaNode(Node):
             pos_msg.y = 0.0
             pos_msg.z = -1.0   # sentinel: no valid position
         self._pub_pos.publish(pos_msg)
-        # Log normalized ball coordinates at every publish — unthrottled so
-        # timestamps can be correlated with CORR lines to measure pipeline lag.
-        #if pos_msg.z >= 0:
-        #    self.get_logger().info(
-        #        f'BALL_POS | x={pos_msg.x:+.3f} y={pos_msg.y:+.3f} '
-        #        f'ball_conf={best_ball_c:.3f} cup_conf={best_cup_c:.3f}')
-        #else:
-        #    self.get_logger().info(
-        #        f'BALL_POS | no valid position '
-        #        f'(ball_found={ball_found} cup_found={cup_found})',
-        #        throttle_duration_sec=1.0)
 
         # /ball/image — rate-limited to debug_fps, annotated
         if frame is not None and self._p_publish_image:
