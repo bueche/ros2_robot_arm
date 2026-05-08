@@ -3,7 +3,7 @@
 ## Summary
 The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/)) and its powered by The Robot Operating System v2 [ROS2](https://github.com/ros2).  This repository supports both [Ros2 Jazzy](https://docs.ros.org/en/jazzy/index.html) and [Ros2 Humble](https://docs.ros.org/en/humble/index.html) (see respective  branches in this repository). 
 
-(**NEW**) The current effort is focused on getting this robotic arm to balance a cup containing a metal ball bearing. This is being 
+(**NEW**) The current effort is focused on getting this robotic arm to balance a cup containing a metal ball bearing. Balancing is a perennial challenge with robotics (as humanoid robots often fall at embarrassing times). The koch v1.1 hardware is a bit limited to explore all aspects of balance, but useful as a starter task. This is being 
 accomplished by enhancing the robot with the hardware and software needed to add a [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) (PID = Proportional–integral–derivative). [Learn more ..](./documentation/balance.md)
 
 See FAQ at the bottom for more information.
