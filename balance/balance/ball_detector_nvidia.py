@@ -13,7 +13,7 @@ Architecture:
   _publish_loop   — timer-driven: /ball/position, /ball/cup_detected at inference rate
                     /ball/image at debug_fps (default 5 Hz)
 
-Target: ≥20 FPS detection on Orin Nano (JetPack 6.1, TensorRT 10.x, CUDA 12.x).
+Target: ≥35 FPS detection on Orin Nano (JetPack 6.1, TensorRT 10.x, CUDA 12.x).
 
 Requires:
   depthai==2.24.0
@@ -37,7 +37,7 @@ Parameters:
   input_size        Model input width/height (px)          default: 640
   conf_threshold    Detection confidence threshold         default: 0.30
   iou_threshold     NMS IoU threshold                      default: 0.45
-  rgb_fps           Camera framerate                       default: 20
+  rgb_fps           Camera framerate                       default: 35
   mjpeg_quality     OAK onboard MJPEG quality (1-100)      default: 85
   exposure_us       Manual exposure us (0=auto)            default: 25000
   iso               Manual ISO (used when exposure_us > 0) default: 800
@@ -107,7 +107,7 @@ class BallDetectorNvidiaNode(Node):
         self.declare_parameter('input_size',        640)
         self.declare_parameter('conf_threshold',    0.30)
         self.declare_parameter('iou_threshold',     0.45)
-        self.declare_parameter('rgb_fps',           20)
+        self.declare_parameter('rgb_fps',           35)
         self.declare_parameter('mjpeg_quality',     85)
         self.declare_parameter('exposure_us',       25000)
         self.declare_parameter('iso',               800)

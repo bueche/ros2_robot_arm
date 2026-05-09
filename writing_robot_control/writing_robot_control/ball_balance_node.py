@@ -52,7 +52,6 @@ Parameters:
   imu_timeout     Seconds before IMU stale         default: 0.5
   ball_lost_timeout  Seconds ball undetected before suspend  default: 1.0
   attempt_timeout    Seconds before giving up balancing      default: 5.0
-  centered_hold_time Seconds ball must stay centered to declare success  default: 2.0
   dry_run         Log only, don't publish cmd      default: False
   use_imu         Use IMU derivative term          default: True
 
@@ -98,7 +97,8 @@ class BallBalanceNode(Node):
         self.declare_parameter('imu_timeout',       0.5)
         self.declare_parameter('ball_lost_timeout', 1.0)
         self.declare_parameter('attempt_timeout',     30.0)
-        self.declare_parameter('centered_hold_time',  2.0)
+        self.declare_parameter('near_thresh',          0.30)
+        self.declare_parameter('summary_hz',           1.0)
         self.declare_parameter('dry_run',           False)
         self.declare_parameter('use_imu',           True)
 
@@ -126,7 +126,14 @@ class BallBalanceNode(Node):
         self._arm_state         = 'MOVING'
         self._settled_at        = None
         self._pid_active        = False
-        self._centered_since    = None   # monotonic time ball first entered stable zone
+
+        # 1Hz summary accumulator — collects every /ball/position reading
+        # during active PID for high-frequency center proximity stats.
+        self._acc_magnitudes     = []
+        self._acc_valid          = 0
+        self._acc_invalid        = 0
+        self._acc_near           = 0
+        self._acc_tight          = 0
 
         # Integrals
         self._integral_flex     = 0.0
@@ -160,6 +167,8 @@ class BallBalanceNode(Node):
         # Control timer
         hz = self.get_parameter('publish_hz').value
         self._timer = self.create_timer(1.0 / hz, self._control_loop)
+        summary_hz  = self.get_parameter('summary_hz').value
+        self.create_timer(1.0 / summary_hz, self._summary_loop)
 
         self.get_logger().info('ball_balance_node started.')
         self.get_logger().info(
@@ -173,16 +182,25 @@ class BallBalanceNode(Node):
     # Callbacks
 
     def _ball_cb(self, msg: Point):
-        """Camera ball position callback."""
+        """Camera ball position callback — accumulates every reading for summary."""
         with self._lock:
             if msg.z < 0:
-                # z = -1 means ball not detected — don't update position
-                # but DO update ball_time so camera_timeout doesn't fire
                 self._ball_time = time.monotonic()
+                if self._pid_active:
+                    self._acc_invalid += 1
                 return
             self._ball_pos             = msg
             self._ball_time            = time.monotonic()
             self._last_valid_ball_time = time.monotonic()
+            if self._pid_active:
+                import math as _math
+                mag = _math.sqrt(msg.x**2 + msg.y**2)
+                st  = self.get_parameter('stable_thresh').value
+                nt  = self.get_parameter('near_thresh').value
+                self._acc_magnitudes.append(mag)
+                self._acc_valid += 1
+                if mag < nt: self._acc_near  += 1
+                if mag < st: self._acc_tight += 1
 
     def _imu_cb(self, msg: Vector3):
         """IMU balance error callback (pitch, roll from imu_balance_node)."""
@@ -201,10 +219,14 @@ class BallBalanceNode(Node):
                 self._pid_active           = False
                 self._settled_at           = None
                 self._pid_started_at       = None
-                self._centered_since       = None
                 self._last_valid_ball_time = None
                 self._integral_flex        = 0.0
                 self._integral_roll        = 0.0
+                self._acc_magnitudes       = []
+                self._acc_valid            = 0
+                self._acc_invalid          = 0
+                self._acc_near             = 0
+                self._acc_tight            = 0
                 self._pub_enabled.publish(Bool(data=False))
             elif state == 'SETTLED':
                 self._settled_at = time.monotonic()
@@ -212,6 +234,65 @@ class BallBalanceNode(Node):
     def _joint_state_cb(self, msg: JointState):
         """Joint states — kept for future FK setpoint computation."""
         pass
+
+    # Summary loop
+
+    def _summary_loop(self):
+        """1Hz timer: logs ball proximity summary during PID.
+
+        Accumulates every /ball/position reading (~15Hz, unthrottled) so the
+        output reflects true detection rate and center proximity, not the
+        ~1Hz throttled CMD log.
+
+        Format:
+          PID_SUMMARY | frames=35/37  near(30%)=12(34%)  tight(15%)=3(9%)
+                      | min=0.082  mean=0.312  ball=(+0.14,-0.08)
+
+          frames = valid_ball / total_callbacks
+          near   = frames within near_thresh of center
+          tight  = frames within stable_thresh (centered)
+        """
+        with self._lock:
+            if not self._pid_active:
+                self._acc_magnitudes = []
+                self._acc_valid      = 0
+                self._acc_invalid    = 0
+                self._acc_near       = 0
+                self._acc_tight      = 0
+                return
+            mags    = list(self._acc_magnitudes)
+            valid   = self._acc_valid
+            invalid = self._acc_invalid
+            near    = self._acc_near
+            tight   = self._acc_tight
+            ball    = self._ball_pos
+            self._acc_magnitudes = []
+            self._acc_valid      = 0
+            self._acc_invalid    = 0
+            self._acc_near       = 0
+            self._acc_tight      = 0
+
+        total = valid + invalid
+        if total == 0:
+            self.get_logger().info('PID_SUMMARY | no ball data this second')
+            return
+
+        import math as _math
+        st = self.get_parameter('stable_thresh').value
+        nt = self.get_parameter('near_thresh').value
+        min_mag  = min(mags)          if mags else float('nan')
+        mean_mag = sum(mags)/len(mags) if mags else float('nan')
+        near_pct  = 100*near/valid  if valid else 0
+        tight_pct = 100*tight/valid if valid else 0
+        bx = ball.x if ball else 0.0
+        by = ball.y if ball else 0.0
+        self.get_logger().info(
+            f'PID_SUMMARY | '
+            f'frames={valid}/{total}  '
+            f'near({nt:.0%})={near}({near_pct:.0f}%)  '
+            f'tight({st:.0%})={tight}({tight_pct:.0f}%)  '
+            f'min={min_mag:.3f}  mean={mean_mag:.3f}  '
+            f'ball=({bx:+.3f},{by:+.3f})')
 
     # Control loop
 
@@ -316,29 +397,6 @@ class BallBalanceNode(Node):
         stable_thresh = self.get_parameter('stable_thresh').value
         is_stable = magnitude < stable_thresh
         self._pub_stable.publish(Bool(data=is_stable))
-
-        # Centered hold — declare success if ball stays within stable_thresh
-        # for centered_hold_time seconds continuously.  Disables the PID and
-        # logs 'Ball centered' so pose_test can detect success and move on.
-        centered_hold = self.get_parameter('centered_hold_time').value
-        if is_stable:
-            if self._centered_since is None:
-                self._centered_since = now
-            elif now - self._centered_since >= centered_hold:
-                self.get_logger().info(
-                    f'Ball centered — held within stable_thresh={stable_thresh:.2f} '
-                    f'for {centered_hold:.1f}s  '
-                    f'magnitude={magnitude:.3f}  '
-                    f'ball=({error_x:+.3f},{error_y:+.3f})')
-                self._pid_active     = False
-                self._pid_started_at = None
-                self._settled_at     = None
-                self._centered_since = None
-                self._pub_enabled.publish(Bool(data=False))
-                return
-        else:
-            # Ball left the stable zone — reset the hold timer
-            self._centered_since = None
 
         if error_x == 0.0 and error_y == 0.0:
             # Within deadband — reset integrals slowly

@@ -3,7 +3,7 @@
 ball_detector_oak.py (v9 - depthai v2 API, MyriadX inference)
 
 Detects ball and cup using YOLOv8n blob running on OAK-D Lite MyriadX VPU.
-Inference runs on the camera hardware at ~25-30fps, zero CPU/GPU load on host.
+Inference runs on the camera hardware at ~12 fps, zero CPU/GPU load on host.
 
 Requires: depthai==2.24.0, blob file from blobconverter (OpenVINO 2022.1, 6 shaves)
 
@@ -18,7 +18,7 @@ Parameters:
   conf_threshold    Detection confidence threshold      default: 0.5
   iou_threshold     NMS IoU threshold                   default: 0.45
   input_size        Model input size (px)               default: 640
-  rgb_fps           Camera framerate                    default: 30
+  rgb_fps           Camera framerate                    default: 12
   exposure_us       Manual exposure us (0=auto)         default: 25000
   iso               Manual ISO                          default: 800
   enable_depth      Enable stereo depth pipeline        default: False
@@ -29,7 +29,7 @@ Parameters:
   publish_image     Publish /ball/image topic           default: True
   debug_width       Debug image width (px)              default: 320
   debug_height      Debug image height (px)             default: 320
-  publish_hz        ROS publish rate                    default: 30.0
+  publish_hz        ROS publish rate                    default: 12.0
 """
 
 import os
@@ -74,7 +74,7 @@ class BallDetectorOakNode(Node):
         self.declare_parameter('conf_threshold',   0.5)
         self.declare_parameter('iou_threshold',    0.45)
         self.declare_parameter('input_size',       640)
-        self.declare_parameter('rgb_fps',          30)
+        self.declare_parameter('rgb_fps',          12)
         self.declare_parameter('exposure_us',      25000)
         self.declare_parameter('iso',              800)
         self.declare_parameter('enable_depth',     False)
@@ -86,7 +86,7 @@ class BallDetectorOakNode(Node):
         self.declare_parameter('publish_image', True)
         self.declare_parameter('debug_width',   320)
         self.declare_parameter('debug_height',  320)
-        self.declare_parameter('publish_hz',    30.0)
+        self.declare_parameter('publish_hz',    12.0)
         self.declare_parameter('log_spikes',   True)   # log publish time spikes >half budget
 
         # Publishers
