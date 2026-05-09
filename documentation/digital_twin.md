@@ -39,11 +39,14 @@ This disconnect makes it difficult to:
 At first glance it would seem easy to just use the CAD files used to 3D print the robot in the URDF to build a digital twin in ROS2. It turned out not to be.
 **These notes document our learnings and outline a process of creating a high-fidelity ROS2-based digital twin** that looks and moves like the physical robot, using  those 3D-printed STL meshes in the URDF definition.
 
-Essentially our goal is to create something that represents reality more faithfully as shown below.
+Essentially our goal is to create something that represents reality more faithfully as shown below using a freecad model (also shown).
 
 <p align="center">
   <img src="../images/digital_twin.jpg" alt="The digital twin" width="400">
+  <img src="./images/freecad.robot.representation.jpg" alt="The freecad digital twin" width="400">
 </p>
+
+
 
 ## Scope and Limitations
 
