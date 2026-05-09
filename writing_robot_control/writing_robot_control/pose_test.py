@@ -673,8 +673,8 @@ class PoseTestNode(Node):
         self.declare_parameter('movement_time', 2.0)
         self.declare_parameter('urdf_file', '')
         self.declare_parameter('power_monitoring', False)
-        self.declare_parameter('wait_for_stable', False)   # wait for /imu/is_stable before next pose
-        self.declare_parameter('stable_timeout',  10.0)    # max seconds to wait for stability
+        self.declare_parameter('wait_for_stable', False)   # wait for /ball/is_centered before next pose
+        self.declare_parameter('stable_timeout',  10.0)    # max seconds to wait for ball centering
         
         # Get parameters
         self.poses_file = self.get_parameter('poses_file').value
@@ -728,7 +728,7 @@ class PoseTestNode(Node):
         from std_msgs.msg import Bool as BoolMsg
         self._is_stable = False
         self.create_subscription(
-            BoolMsg, '/imu/is_stable',
+            BoolMsg, '/ball/is_centered',
             lambda msg: setattr(self, '_is_stable', msg.data),
             10
         )
@@ -848,20 +848,27 @@ class PoseTestNode(Node):
         state: 'MOVING' or 'SETTLED'
         """
         msg = StringMsg()
-        msg.data = state
+        msg.data = state + '\x00'
         self._arm_state_pub.publish(msg)
 
     def _wait_for_stable(self):
         """
-        Block until /imu/is_stable is True or stable_timeout expires.
-        Only called when wait_for_stable=True AND imu_balance_node is running.
+        Block until /ball/is_centered is True or stable_timeout expires.
+
+        /ball/is_centered is published True by ball_balance_node only when
+        the ball has been continuously within stable_thresh for
+        centered_hold_time seconds (default 2s). A single frame at center
+        is not enough — the ball must genuinely settle.
+
+        Returns immediately when True is received. On timeout, logs a warning
+        and proceeds so the test sequence is not blocked indefinitely.
         Returns True if stable was achieved, False if timed out.
         """
         if not self.wait_for_stable:
             return True
 
         self.get_logger().info(
-            f'  ⏳ Waiting for cup stability (timeout: {self.stable_timeout:.1f}s)...'
+            f'  ⏳ Waiting for ball to center (timeout: {self.stable_timeout:.1f}s)...'
         )
         start = time.time()
         self._is_stable = False   # reset before waiting

@@ -109,8 +109,14 @@ class WristBalanceController(Node):
         self.create_subscription(
             JointState, '/joint_states',
             self._joint_state_callback, 10)
+        # Subscribes to /ball/is_centered for topic visibility.
+        # ball_balance_node publishes True here when the ball has been
+        # held within stable_thresh for centered_hold_time seconds.
+        # The wrist controller itself does not act on this signal —
+        # it is gated by /balance_enabled — but the subscription keeps
+        # the topic discoverable via 'ros2 topic list'.
         self.create_subscription(
-            Bool, '/imu/is_stable',
+            Bool, '/ball/is_centered',
             lambda msg: None, 10)
         self.create_subscription(
             Bool, '/balance_enabled',
