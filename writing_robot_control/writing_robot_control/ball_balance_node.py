@@ -8,7 +8,9 @@ as the primary error signal and IMU tilt as a derivative/feedforward signal.
 
 Architecture:
   /ball/position      (geometry_msgs/Point)    — camera: where ball IS
-  /imu/balance_error  (geometry_msgs/Vector3)  — IMU: cup tilt pitch/roll
+  /imu/balance_error  (geometry_msgs/Vector3)  — IMU: cup tilt angles (pitch, roll) rad
+  /imu/raw            (sensor_msgs/Imu)         — IMU: angular_velocity.x/y in rad/s
+                                                   used as true D-term (rate of tilt change)
   /joint_states       (sensor_msgs/JointState) — current joint positions
   /arm_state          (std_msgs/String)         — MOVING / SETTLED
 
@@ -26,8 +28,16 @@ Control law:
   error_x = ball_pos.x   (positive = ball right  → roll  cup left  → +wrist_roll)
   error_y = ball_pos.y   (positive = ball toward robot → flex forward → -wrist_flex)
 
-  flex_cmd = -Kp_flex * error_y  - Kd_flex * imu_pitch
-  roll_cmd = +Kp_roll * error_x  + Kd_roll * imu_roll
+  flex_cmd = +Kp_flex * error_y  - Kd_flex * imu_pitch_rate
+  roll_cmd = +Kp_roll * error_x  - Kd_roll * imu_roll_rate
+
+  imu_pitch_rate = angular_velocity.x from /imu/raw (rad/s) — true gyroscope rate.
+  SIGN: D-term is SUBTRACTED so it opposes motion, providing true damping.
+  When the cup is already tilting in the corrective direction (pitch_rate same
+  sign as P command), D-term reduces total command magnitude — preventing overshoot.
+  Adding D-term (wrong sign) would reinforce motion → positive feedback → oscillation.
+  The IMU angle (from /imu/balance_error) is NOT used for D-term — that would
+  act as a second P term biased by cup tilt, not a damping signal.
 
   The IMU term acts as derivative — it damps oscillation by sensing the
   direction the cup is already tilting before the ball reaches the edge.
@@ -76,7 +86,7 @@ import threading
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point, Vector3
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import Imu, JointState
 from std_msgs.msg import Bool, String
 
 
@@ -88,8 +98,8 @@ class BallBalanceNode(Node):
         # Parameters
         self.declare_parameter('kp_flex',        0.3)
         self.declare_parameter('kp_roll',        0.3)
-        self.declare_parameter('kd_flex',        0.1)
-        self.declare_parameter('kd_roll',        0.1)
+        self.declare_parameter('kd_flex',        0.02)  # conservative default — tune up carefully
+        self.declare_parameter('kd_roll',        0.02)
         self.declare_parameter('ki_flex',        0.01)
         self.declare_parameter('ki_roll',        0.01)
         self.declare_parameter('max_cmd',        0.3)
@@ -123,9 +133,16 @@ class BallBalanceNode(Node):
         self._last_valid_ball_time  = time.monotonic()
 
         # IMU
-        self._imu_pitch         = 0.0   # rad
+        self._imu_pitch         = 0.0   # rad — tilt angle from /imu/balance_error
         self._imu_roll          = 0.0   # rad
         self._imu_time          = None
+        self._imu_pitch_rate    = 0.0   # rad/s — low-pass filtered angular velocity
+        self._imu_roll_rate     = 0.0   # rad/s
+        self._imu_raw_time      = None
+        # Low-pass filter coefficient for gyro smoothing.
+        # alpha=0.3 means 30% new reading + 70% history — smooths noise
+        # without adding significant lag at 50Hz IMU rate.
+        self._gyro_alpha        = 0.3
 
         # Arm state
         self._arm_state         = 'MOVING'
@@ -169,6 +186,12 @@ class BallBalanceNode(Node):
         self.create_subscription(
             Vector3,    '/imu/balance_error',
             self._imu_cb,        10)
+        # Subscribe to /imu/raw for angular velocity (true D-term signal).
+        # angular_velocity.x = pitch rate (rad/s), .y = roll rate (rad/s).
+        # This is the gyroscope output — rate of cup tilt, not tilt angle.
+        self.create_subscription(
+            Imu, '/imu/raw',
+            self._imu_raw_cb, 10)
         self.create_subscription(
             String,     '/arm_state',
             self._arm_state_cb,  10)
@@ -186,7 +209,12 @@ class BallBalanceNode(Node):
 
         self.get_logger().info('ball_balance_node started.')
         self.get_logger().info(
-            'Subscriptions: /ball/position  /imu/balance_error  /arm_state')
+            'Subscriptions: /ball/position  /imu/balance_error  /imu/raw  /arm_state')
+        self.get_logger().info(
+            f'D-term: kd_flex={self.get_parameter("kd_flex").value}  '
+            f'kd_roll={self.get_parameter("kd_roll").value}  '
+            f'use_imu={self.get_parameter("use_imu").value}  '
+            f'(angular velocity from /imu/raw, NOT tilt angle)')
         self.get_logger().info(
             'Publishes: /imu/balance_cmd  /balance_enabled  /ball/is_centered')
         if self.get_parameter('dry_run').value:
@@ -231,6 +259,24 @@ class BallBalanceNode(Node):
             self._imu_pitch = msg.x
             self._imu_roll  = msg.y
             self._imu_time  = time.monotonic()
+
+    def _imu_raw_cb(self, msg: Imu):
+        """Receive angular velocity from /imu/raw for true D-term.
+
+        angular_velocity.x = pitch rate (rad/s) — how fast cup tilts forward/back.
+        angular_velocity.y = roll rate  (rad/s) — how fast cup tilts left/right.
+        Published at 50Hz by imu_balance_node from ESP32 gyroscope data.
+        Sign convention matches the IMU mounting orientation on the wrist.
+        """
+        with self._lock:
+            # Low-pass filter to reduce gyro noise before D-term use.
+            # Raw gyro can spike ±0.5+ rad/s from vibration.
+            a = self._gyro_alpha
+            self._imu_pitch_rate = (a * msg.angular_velocity.x +
+                                    (1 - a) * self._imu_pitch_rate)
+            self._imu_roll_rate  = (a * msg.angular_velocity.y +
+                                    (1 - a) * self._imu_roll_rate)
+            self._imu_raw_time   = time.monotonic()
 
     def _arm_state_cb(self, msg: String):
         """Arm state machine: MOVING or SETTLED."""
@@ -321,9 +367,12 @@ class BallBalanceNode(Node):
         with self._lock:
             ball_pos  = self._ball_pos
             ball_time = self._ball_time
-            imu_pitch = self._imu_pitch
-            imu_roll  = self._imu_roll
-            imu_time  = self._imu_time
+            imu_pitch      = self._imu_pitch
+            imu_roll       = self._imu_roll
+            imu_time       = self._imu_time
+            imu_pitch_rate = self._imu_pitch_rate
+            imu_roll_rate  = self._imu_roll_rate
+            imu_raw_time   = self._imu_raw_time
 
         # Camera freshness check
         cam_timeout = self.get_parameter('camera_timeout').value
@@ -375,6 +424,11 @@ class BallBalanceNode(Node):
         if imu_age_ms > 60:    # >3 frames at 50Hz
             self.get_logger().warn(
                 f'IMU LAG: {imu_age_ms:.0f}ms since last IMU reading',
+                throttle_duration_sec=1.0)
+        imu_raw_age_ms = (now - imu_raw_time) * 1000 if imu_raw_time else 9999.0
+        if imu_raw_age_ms > 60:
+            self.get_logger().warn(
+                f'IMU RAW LAG: {imu_raw_age_ms:.0f}ms since last /imu/raw',
                 throttle_duration_sec=1.0)
 
         # Compute errors
@@ -464,21 +518,27 @@ class BallBalanceNode(Node):
         kd_roll = self.get_parameter('kd_roll').value
         use_imu = self.get_parameter('use_imu').value
 
-        # IMU derivative term (damp oscillation)
-        imu_fresh = (use_imu and imu_time is not None and
-                     now - imu_time < self.get_parameter('imu_timeout').value)
-        d_flex = imu_pitch if imu_fresh else 0.0
-        d_roll = imu_roll  if imu_fresh else 0.0
+        # IMU derivative term — uses angular RATE (rad/s) from /imu/raw,
+        # NOT tilt angle.  The rate is the true derivative of cup tilt:
+        # positive pitch_rate = cup tilting toward robot (near side rising).
+        # When the cup is tilting toward center, D-term reduces the command
+        # to prevent overshoot.  Uses imu_timeout for freshness check.
+        imu_timeout = self.get_parameter('imu_timeout').value
+        imu_raw_fresh = (use_imu and
+                         imu_raw_time is not None and
+                         now - imu_raw_time < imu_timeout)
+        d_flex = imu_pitch_rate if imu_raw_fresh else 0.0
+        d_roll = imu_roll_rate  if imu_raw_fresh else 0.0
 
         # Control law (validated signs from balance_v1.yaml):
         #   ball right (+x) → roll left  → +wrist_roll → roll_cmd positive
         #   ball near  (+y) → flex back → +wrist_flex → flex_cmd positive
         flex_cmd = (+kp_flex * error_y
                     + ki_flex * self._integral_flex
-                    + kd_flex * d_flex)
+                    - kd_flex * d_flex)   # MINUS: D-term opposes motion (damping)
         roll_cmd = (+kp_roll * error_x
                     + ki_roll * self._integral_roll
-                    + kd_roll * d_roll)
+                    - kd_roll * d_roll)   # MINUS: D-term opposes motion (damping)
 
         # Clamp
         flex_cmd = max(-max_cmd, min(max_cmd, flex_cmd))
@@ -502,9 +562,9 @@ class BallBalanceNode(Node):
         self.get_logger().info(
             f'CMD | ball=({error_x:+.3f},{error_y:+.3f}) '
             f'Pflex={+kp_flex*error_y:+.4f} Proll={+kp_roll*error_x:+.4f} '
-            f'Dflex={-kd_flex*d_flex:+.4f} Droll={+kd_roll*d_roll:+.4f} '
+            f'Dflex={-kd_flex*d_flex:+.4f} Droll={-kd_roll*d_roll:+.4f} '
             f'→ flex={flex_cmd:+.4f} roll={roll_cmd:+.4f} '
-            f'imu_pitch={d_flex:+.3f} imu_roll={d_roll:+.3f} '
+            f'imu_pitch_rate={d_flex:+.4f}rad/s imu_roll_rate={d_roll:+.4f}rad/s '
             f'stable={is_stable} '
             f'hold={f"{now-self._centered_since:.1f}s" if self._centered_since else "--"}',
             throttle_duration_sec=1.0)
