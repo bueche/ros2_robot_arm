@@ -16,7 +16,10 @@ Parameters:
   correction_hz      Correction rate (Hz)                    default: 2.0
   move_duration      Trajectory duration per step (s)        default: 0.3
   max_step_rad       Max per-correction displacement (rad)   default: 0.05
-  max_total_rad      Max total displacement from start (rad) default: 0.3
+  max_total_rad      Max total displacement for both axes (rad)  default: 0.3
+                     Overridden per-axis by max_total_flex_rad / max_total_roll_rad
+  max_total_flex_rad Max total flex displacement (rad)  default: uses max_total_rad
+  max_total_roll_rad Max total roll displacement (rad)  default: uses max_total_rad
   cmd_timeout        Stale command threshold (s)             default: 2.0
   wrist_flex_joint   Flex joint name                         default: wrist_flex
   wrist_roll_joint   Roll joint name                         default: wrist_roll
@@ -53,7 +56,9 @@ class WristBalanceController(Node):
         self.declare_parameter('correction_hz',    2.0)
         self.declare_parameter('move_duration',    0.3)
         self.declare_parameter('max_step_rad',     0.05)
-        self.declare_parameter('max_total_rad',    0.3)
+        self.declare_parameter('max_total_rad',      0.3)   # fallback for both axes
+        self.declare_parameter('max_total_flex_rad', -1.0)  # -1 = use max_total_rad
+        self.declare_parameter('max_total_roll_rad', -1.0)  # -1 = use max_total_rad
         self.declare_parameter('cmd_timeout',      2.0)
         self.declare_parameter('wrist_flex_joint', 'wrist_flex')
         self.declare_parameter('wrist_roll_joint', 'wrist_roll')
@@ -70,7 +75,11 @@ class WristBalanceController(Node):
         self._p_corr_hz     = self.get_parameter('correction_hz').value
         self._p_move_dur    = self.get_parameter('move_duration').value
         self._p_max_step    = self.get_parameter('max_step_rad').value
-        self._p_max_total   = self.get_parameter('max_total_rad').value
+        _max_total          = self.get_parameter('max_total_rad').value
+        _max_flex_override  = self.get_parameter('max_total_flex_rad').value
+        _max_roll_override  = self.get_parameter('max_total_roll_rad').value
+        self._p_max_total_flex = _max_flex_override if _max_flex_override > 0 else _max_total
+        self._p_max_total_roll = _max_roll_override if _max_roll_override > 0 else _max_total
         self._p_cmd_timeout = self.get_parameter('cmd_timeout').value
         self._p_flex_joint  = self.get_parameter('wrist_flex_joint').value
         self._p_roll_joint  = self.get_parameter('wrist_roll_joint').value
@@ -109,14 +118,8 @@ class WristBalanceController(Node):
         self.create_subscription(
             JointState, '/joint_states',
             self._joint_state_callback, 10)
-        # Subscribes to /ball/is_centered for topic visibility.
-        # ball_balance_node publishes True here when the ball has been
-        # held within stable_thresh for centered_hold_time seconds.
-        # The wrist controller itself does not act on this signal —
-        # it is gated by /balance_enabled — but the subscription keeps
-        # the topic discoverable via 'ros2 topic list'.
         self.create_subscription(
-            Bool, '/ball/is_centered',
+            Bool, '/imu/is_stable',
             lambda msg: None, 10)
         self.create_subscription(
             Bool, '/balance_enabled',
@@ -132,7 +135,8 @@ class WristBalanceController(Node):
         self.get_logger().info(
             f'Rate={self._p_corr_hz}Hz  '
             f'step={math.degrees(self._p_max_step):.1f}deg  '
-            f'total_limit={math.degrees(self._p_max_total):.1f}deg  '
+            f'total_limit=flex:{math.degrees(self._p_max_total_flex):.1f}deg '
+            f'roll:{math.degrees(self._p_max_total_roll):.1f}deg  '
             f'move_dur={self._p_move_dur}s')
         self.get_logger().info(
             'Disable: ros2 param set /wrist_balance_controller enabled false')
@@ -217,20 +221,22 @@ class WristBalanceController(Node):
         projected_flex = self._total_flex + flex_delta
         projected_roll = self._total_roll + roll_delta
 
-        if abs(projected_flex) > self._p_max_total:
-            remaining = self._p_max_total - abs(self._total_flex)
+        if abs(projected_flex) > self._p_max_total_flex:
+            remaining = self._p_max_total_flex - abs(self._total_flex)
             flex_delta = math.copysign(max(0.0, remaining), flex_delta)
             self.get_logger().warn(
                 f'Flex total limit reached '
-                f'({math.degrees(self._total_flex):+.1f}deg) — clamping',
+                f'({math.degrees(self._total_flex):+.1f}deg '
+                f'limit={math.degrees(self._p_max_total_flex):.1f}deg) — clamping',
                 throttle_duration_sec=2.0)
 
-        if abs(projected_roll) > self._p_max_total:
-            remaining = self._p_max_total - abs(self._total_roll)
+        if abs(projected_roll) > self._p_max_total_roll:
+            remaining = self._p_max_total_roll - abs(self._total_roll)
             roll_delta = math.copysign(max(0.0, remaining), roll_delta)
             self.get_logger().warn(
                 f'Roll total limit reached '
-                f'({math.degrees(self._total_roll):+.1f}deg) — clamping',
+                f'({math.degrees(self._total_roll):+.1f}deg '
+                f'limit={math.degrees(self._p_max_total_roll):.1f}deg) — clamping',
                 throttle_duration_sec=2.0)
 
         if abs(flex_delta) < 1e-4 and abs(roll_delta) < 1e-4:

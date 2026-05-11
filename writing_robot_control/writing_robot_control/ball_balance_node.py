@@ -8,7 +8,9 @@ as the primary error signal and IMU tilt as a derivative/feedforward signal.
 
 Architecture:
   /ball/position      (geometry_msgs/Point)    — camera: where ball IS
-  /imu/balance_error  (geometry_msgs/Vector3)  — IMU: cup tilt angles (pitch, roll) rad
+  /imu/balance_error      (geometry_msgs/Vector3) — IMU: cup tilt angles (pitch, roll) rad
+  /balance/cmd_delta      (geometry_msgs/Vector3) — wrist: commanded flex/roll delta per CORR
+  /balance/achieved_delta (geometry_msgs/Vector3) — wrist: actually achieved flex/roll delta
   /imu/raw            (sensor_msgs/Imu)         — IMU: angular_velocity.x/y in rad/s
                                                    used as true D-term (rate of tilt change)
   /joint_states       (sensor_msgs/JointState) — current joint positions
@@ -17,7 +19,7 @@ Architecture:
 Publishes:
   /imu/balance_cmd    (geometry_msgs/Vector3)  — corrections for wrist_balance_controller
   /balance_enabled    (std_msgs/Bool)           — gate for wrist_balance_controller
-  /ball/is_centered   (std_msgs/Bool)            — True only when ball has been
+  /ball/is_centered       (std_msgs/Bool)          — True only when ball has been
                                                    continuously within stable_thresh
                                                    for centered_hold_time seconds.
                                                    Causes pose_test to advance immediately.
@@ -113,6 +115,20 @@ class BallBalanceNode(Node):
         self.declare_parameter('attempt_timeout',     30.0)
         self.declare_parameter('centered_hold_time',  2.0)  # seconds ball must stay within stable_thresh
         self.declare_parameter('near_thresh',          0.30)  # near-center zone for summary stats
+        self.declare_parameter('use_achievement',      True)  # scale commands by servo achievement ratio
+        self.declare_parameter('achievement_alpha',    0.3)   # EMA weight for ratio update (0=frozen, 1=instant)
+        self.declare_parameter('achievement_max_scale',3.0)   # max multiplier to prevent runaway
+        self.declare_parameter('achievement_min_cmd',  0.003) # min |cmd| to avoid updating on HOLD steps
+
+        # ki mode — three options, select via 'ki_mode' parameter:
+        #   'ball'     — classic: accumulate ball_error × dt (standard PID integral)
+        #   'servo'    — accumulate (commanded - achieved) servo delta per CORR step
+        #                grows when servo underperforms, not just when ball is off-center
+        #   'combined' — accumulate ball_error × (1 - achievement) × dt
+        #                grows only when ball is wrong AND servo is underperforming
+        #   'none'     — integral disabled (ki_flex=0 and ki_roll=0 still work as before)
+        self.declare_parameter('ki_mode',  'ball')  # 'ball' | 'servo' | 'combined' | 'none'
+        self.declare_parameter('ki_windup_limit', 0.5)  # clamp integral contribution to ±this
         self.declare_parameter('summary_hz',           1.0)   # rate of PID_SUMMARY log lines
         self.declare_parameter('dry_run',           False)
         self.declare_parameter('use_imu',           True)
@@ -152,7 +168,17 @@ class BallBalanceNode(Node):
         # Integrals
         self._integral_flex     = 0.0
         self._integral_roll     = 0.0
+        self._integral_flex_servo  = 0.0   # ki_mode='servo'/'combined': undelivered flex
+        self._integral_roll_servo  = 0.0   # ki_mode='servo'/'combined': undelivered roll
         self._last_control_time = None
+
+        # Servo achievement ratio — exponential moving average of (achieved/commanded).
+        # When the servo only achieves 50% of commanded, next command is scaled up 2×.
+        # Separate per axis since flex and roll have different load characteristics.
+        self._flex_achievement  = 1.0   # starts at 1.0 (assume perfect)
+        self._roll_achievement  = 1.0
+        self._last_cmd_flex     = None  # most recent commanded delta
+        self._last_cmd_roll     = None
 
         # Centered hold tracking — ball must stay within stable_thresh
         # continuously for centered_hold_time seconds before /ball/is_centered
@@ -186,6 +212,17 @@ class BallBalanceNode(Node):
         self.create_subscription(
             Vector3,    '/imu/balance_error',
             self._imu_cb,        10)
+        # Subscribe to servo achievement feedback from wrist_balance_controller.
+        # cmd_delta = what was commanded, achieved_delta = what the servo did.
+        # Used to scale future commands so persistent servo underperformance
+        # is compensated — true closed-loop PID spirit.
+        self.create_subscription(
+            Vector3, '/balance/cmd_delta',
+            self._cmd_delta_cb, 10)
+        self.create_subscription(
+            Vector3, '/balance/achieved_delta',
+            self._achieved_delta_cb, 10)
+
         # Subscribe to /imu/raw for angular velocity (true D-term signal).
         # angular_velocity.x = pitch rate (rad/s), .y = roll rate (rad/s).
         # This is the gyroscope output — rate of cup tilt, not tilt angle.
@@ -260,6 +297,64 @@ class BallBalanceNode(Node):
             self._imu_roll  = msg.y
             self._imu_time  = time.monotonic()
 
+    def _cmd_delta_cb(self, msg: Vector3):
+        """Receive the commanded flex/roll delta from the previous CORR step."""
+        with self._lock:
+            self._last_cmd_flex = msg.x
+            self._last_cmd_roll = msg.y
+
+    def _achieved_delta_cb(self, msg: Vector3):
+        """Receive achieved flex/roll delta and update achievement ratios.
+
+        Updates an exponential moving average of achieved/commanded per axis.
+        Only updates when the commanded delta is above a minimum threshold
+        to avoid dividing by near-zero and to ignore HOLD steps.
+        """
+        with self._lock:
+            if not self.get_parameter('use_achievement').value:
+                return
+            alpha   = self.get_parameter('achievement_alpha').value
+            min_cmd = self.get_parameter('achievement_min_cmd').value
+
+            ki_mode     = self.get_parameter('ki_mode').value
+            windup_lim  = self.get_parameter('ki_windup_limit').value
+            ki_flex     = self.get_parameter('ki_flex').value
+            ki_roll     = self.get_parameter('ki_roll').value
+
+            if self._last_cmd_flex is not None:
+                cmd_f = abs(self._last_cmd_flex)
+                act_f = abs(msg.x)
+                if cmd_f >= min_cmd:
+                    ratio_f = min(act_f / cmd_f, 2.0)
+                    self._flex_achievement = ((1 - alpha) * self._flex_achievement +
+                                              alpha * ratio_f)
+                    self._flex_achievement = max(0.05, self._flex_achievement)
+                    # servo ki — accumulate undelivered flex displacement
+                    if ki_mode in ('servo', 'combined') and ki_flex > 0:
+                        undelivered_f = self._last_cmd_flex - msg.x  # signed gap
+                        self._integral_flex_servo += undelivered_f
+                        self._integral_flex_servo = max(
+                            -windup_lim / max(ki_flex, 1e-6),
+                            min(windup_lim / max(ki_flex, 1e-6),
+                                self._integral_flex_servo))
+
+            if self._last_cmd_roll is not None:
+                cmd_r = abs(self._last_cmd_roll)
+                act_r = abs(msg.y)
+                if cmd_r >= min_cmd:
+                    ratio_r = min(act_r / cmd_r, 2.0)
+                    self._roll_achievement = ((1 - alpha) * self._roll_achievement +
+                                              alpha * ratio_r)
+                    self._roll_achievement = max(0.05, self._roll_achievement)
+                    # servo ki — accumulate undelivered roll displacement
+                    if ki_mode in ('servo', 'combined') and ki_roll > 0:
+                        undelivered_r = self._last_cmd_roll - msg.y
+                        self._integral_roll_servo += undelivered_r
+                        self._integral_roll_servo = max(
+                            -windup_lim / max(ki_roll, 1e-6),
+                            min(windup_lim / max(ki_roll, 1e-6),
+                                self._integral_roll_servo))
+
     def _imu_raw_cb(self, msg: Imu):
         """Receive angular velocity from /imu/raw for true D-term.
 
@@ -291,7 +386,13 @@ class BallBalanceNode(Node):
                 self._last_valid_ball_time = None
                 self._integral_flex        = 0.0
                 self._integral_roll        = 0.0
+                self._integral_flex_servo  = 0.0
+                self._integral_roll_servo  = 0.0
                 self._centered_since       = None
+                self._flex_achievement     = 1.0   # reset — new pose may have different load
+                self._roll_achievement     = 1.0
+                self._last_cmd_flex        = None
+                self._last_cmd_roll        = None
                 self._acc_magnitudes       = []
                 self._acc_valid            = 0
                 self._acc_invalid          = 0
@@ -533,11 +634,20 @@ class BallBalanceNode(Node):
         # Control law (validated signs from balance_v1.yaml):
         #   ball right (+x) → roll left  → +wrist_roll → roll_cmd positive
         #   ball near  (+y) → flex back → +wrist_flex → flex_cmd positive
+        # Select integral source based on ki_mode
+        ki_mode = self.get_parameter('ki_mode').value
+        if ki_mode == 'servo':
+            i_flex = self._integral_flex_servo
+            i_roll = self._integral_roll_servo
+        else:  # 'ball', 'combined', 'none'
+            i_flex = self._integral_flex
+            i_roll = self._integral_roll
+
         flex_cmd = (+kp_flex * error_y
-                    + ki_flex * self._integral_flex
+                    + ki_flex * i_flex
                     - kd_flex * d_flex)   # MINUS: D-term opposes motion (damping)
         roll_cmd = (+kp_roll * error_x
-                    + ki_roll * self._integral_roll
+                    + ki_roll * i_roll
                     - kd_roll * d_roll)   # MINUS: D-term opposes motion (damping)
 
         # Clamp
@@ -565,6 +675,8 @@ class BallBalanceNode(Node):
             f'Dflex={-kd_flex*d_flex:+.4f} Droll={-kd_roll*d_roll:+.4f} '
             f'→ flex={flex_cmd:+.4f} roll={roll_cmd:+.4f} '
             f'imu_pitch_rate={d_flex:+.4f}rad/s imu_roll_rate={d_roll:+.4f}rad/s '
+            f'ach_flex={self._flex_achievement:.2f} ach_roll={self._roll_achievement:.2f} '
+            f'i_flex={i_flex:+.4f} i_roll={i_roll:+.4f} ki_mode={self.get_parameter("ki_mode").value} '
             f'stable={is_stable} '
             f'hold={f"{now-self._centered_since:.1f}s" if self._centered_since else "--"}',
             throttle_duration_sec=1.0)
