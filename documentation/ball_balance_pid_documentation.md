@@ -37,7 +37,7 @@ D-term gains were zero so it contributed no corrections.
 
 ---
 
-## 2. Coordinate Conventions
+## 2. Visual Coordinate Conventions
 
 The ML model returns coordinates on the image, not within the cup. It has no concept of the cup at all — it just returns bounding boxes for whatever objects it detects that meet the confidence threshold. For each detection it outputs four numbers: the pixel coordinates of the top-left and bottom-right corners of the bounding box (xmin, ymin, xmax, ymax), along with a class label (0=ball, 1=cup) and a confidence score. The model was trained to recognize both objects but it treats them as completely independent detections — it doesn't know or care that the ball should be inside the cup.
 
@@ -70,7 +70,7 @@ A value of (±1.0, 0.0) means the ball is at the cup rim on the roll axis.
   <img src="../images/ball_coordinate_orientation.jpg" alt="ball_orientation " width="700">
 </p> 
 
-### 2.2 Robot Joint Frame
+### 2.2 Robot Joint Frame and Understanding Past Errors
 
 As noted above, the Koch v1.1 wrist has two joints we focus on for balancing:
 
@@ -94,8 +94,61 @@ The positions from which the PID must operate to balance are defined in the [pos
   <img src="../images/illustration_of_wrist_flex_roll_orientation.jpg" alt="ball_orientation " width="700">
 </p> 
 
-### 2.3 Summary of PID logic
 
+*The standard characterization of I-term** is "accumulates past error over time to eliminate steady-state offset." The classic example: a thermostat with only P-term will hold temperature slightly below the setpoint because the proportional correction weakens as the error shrinks — eventually the small remaining error produces just enough heating to balance heat loss, but never quite reaches the target. The I-term accumulates that persistent small error and keeps increasing the command until the offset is eliminated.
+
+Currently, we are using the error in the servo's commanded vs. actual position to define the I-term error. That is, after each pose is set each servo 's wheel has been moved to some position. When the PID algorithm kicks in it will start to set new incremental targets for the wrist_flex and wrist_roll in order to move the ball into the center. How well the servo does to reach that position defines the error. It can either do really well, fail misreably, or fall somewhere in between. In all cases we can get that information because the servo reports its position. 
+
+Lets look at an actual scenario for one of the difficult scenarios in our test: pose 5. In this one, the arm tips the cup forward in a manner that puts significant strain on the wrist and elbow flex joints (essentially Servos 3 and 4). That is, it starts close to the wrist-flex-low pose shown in the figure above (position =  2.3 radians). Gravity makes it hard to do small moves. It can move in a single pose from there to the wrist-flex-high (position = 2.7 radians), but doing small incremental ones is more difficult for the XL-330's as is illustrated in this sequence below. The table output comes from the [corr_analysis.py](../balance/scripts/corr_analysis.py) script which analyzes the raw correction log output from the [wrist_balance_controller.py](../writing_robot_control/writing_robot_control/wrist_balance_controller.py). In this output it evaluates how well the two joints did in the sequence while the PID was operating. For each step the wrist flex is being commanded to move 1.719 radians but it is unable to make much headway. 
+
+For example, at step 1 it is being commanded to move from 2.2918 rad to 2.318 rad, but one can see that by the time step 2 fires it had only moved to 2.2933 (see the from in step 2). now the difference between the ending (2.2933 rad) and the start (2.2918 rad) is 0.0015 rad or 0.086 degrees. The flex servo was commanded to achieve 1.719 degrees, but only managed 0.086, that is 5% of goal. On the otherhand, the wrist_roll on the same steps did far better, achieving 92% of what it was targetted to do. In this case, it was much easier to move side-to-side than forward to back. But the main point is that error in achievement by the wrist_flex joint needs to be fed back into the controller, else the outcome will remain the same: the proportional movement will stay fixed (a command to 1.719 degrees) without success. Since we know that larger steps are easier than smaller ones for the servo to achieve, the I contribution should grow 1.719 degrees into something larger. This wasn't being done in the case below, but has now been implemented.
+
+
+```
+================================================================================
+  POSE : pose 5 - forward
+  Start: flex=2.2918 rad  roll=1.5999 rad
+  Duration: 19.5s    CORR steps: 17
+================================================================================
+  step  ── FLEX ──────────────────────────────────────  ── ROLL ──────────────────────────────────────      
+            from       to   tgt_deg  act_deg  ratio%      from       to   tgt_deg  act_deg  ratio%
+  --------------------------------------------------------------------------------------------------------------------------------
+     1  flex:   2.2918→  2.3218 tgt= +1.719 act= +0.086     +5%  roll:   1.5999→  1.5699 tgt= -1.720 act= -1.581    +92%  
+     2  flex:   2.2933→  2.3233 tgt= +1.719 act= +0.178    +10%  roll:   1.5723→  1.5423 tgt= -1.720 act= -1.667    +97%  
+     3  flex:   2.2964→  2.3264 tgt= +1.719 act= +0.172    +10%  roll:   1.5432→  1.5432 tgt= +0.000 act= +0.000     N/A  
+     4  flex:   2.2994→  2.3294 tgt= +1.719 act= +0.264    +15%  roll:   1.5432→  1.5187 tgt= -1.400 act= -1.232    +88%  
+     5  flex:   2.3040→  2.3340 tgt= +1.719 act= +0.000     +0%  roll:   1.5217→  1.5081 tgt= -0.780 act= -0.613    +79%  
+     6  flex:   2.3040→  2.3340 tgt= +1.719 act= +0.178    +10%  roll:   1.5110→  1.5110 tgt= +0.000 act= +0.000     N/A  
+     7  flex:   2.3071→  2.3371 tgt= +1.719 act= +0.178    +10%  roll:   1.5110→  1.4922 tgt= -1.070 act= -1.054    +98%  
+     8  flex:   2.3102→  2.3402 tgt= +1.719 act= +0.000     +0%  roll:   1.4926→  1.4834 tgt= -0.530 act= -0.441    +84%  
+     9  flex:   2.3102→  2.3402 tgt= +1.719 act= +0.086     +5%  roll:   1.4849→  1.4849 tgt= +0.000 act= +0.000     N/A  
+    10  flex:   2.3117→  2.3417 tgt= +1.719 act= +0.000     +0%  roll:   1.4849→  1.4933 tgt= +0.480 act= +0.350    +73%  
+    11  flex:   2.3117→  2.3417 tgt= +1.719 act= +0.000     +0%  roll:   1.4910→  1.5012 tgt= +0.580 act= +0.441    +75%  
+    ---
+
+```
+
+The error of the servo accumulates `commanded_delta - achieved_delta` — the gap between what was asked and what was delivered. This is conceptually the same thing but measured at a different layer. Notice that we are not asking:  "how long has the ball been off-center?", but rather "how much have I asked the servo to do that it hasn't done yet?" The accumulated undelivered displacement represents a debt that the controller owes to the system.
+
+
+**The one place where the characterization slightly diverges** from classic I-term: traditional integral is about error *persistence in the output space* (the ball hasn't moved enough). Our servo integral is about error *persistence in the input space* (the actuator hasn't responded). These are related but not identical — it's possible for the servo to underdeliver while the ball is actually moving (if gravity is doing some of the work), in which case our logic would accumulate less than logic based solely on the ball movement would. We will see how that plays out as more tuning continues.
+
+
+### 2.3 IMU feedback and the prediction of future error
+
+The D in PID stands for Derivative and is often described as the part of the logic that predicts future errors. This isn't quite correct, I think in particular for this implementation. What D-term actually does is respond to the rate of change of the error, not a prediction. The formula is `D = -kd × d(error)/dt`. If the ball is at position 0.7 in the cup (far from center) but moving toward center rapidly, the D-term reduces the correction command — because the error is already improving fast and a full P-term correction would overshoot. If the ball is at 0.7 and moving away from center, D-term adds to the correction. It's damping (TODO: define), not making a prediction. The "predicts future error" framing is an informal way of saying "if error is decreasing fast now, the future error will be smaller, so act accordingly."
+
+Why are we using the IMU and not the camera for the D-term?  That is, if we used the camera computing `d(ball.y)/dt` from consecutive `/ball/position` topic readings seems reasonable at first: (ball.x, ball.y) move to (ball.x1, ball.y1) in time t. But it has a couple of problems. First, the camera runs at 35Hz with ~30ms latency (TODO: check), so by the time we compute the rate the cup has already moved. Second, the ball's position in the cup is an *effect* of cup tilt — by the time the ball has moved, the cup has already been tilted for some time. We'd be reacting to a lagging indicator.
+
+Why IMU-based D-term is better: The IMU measures angular_velocity of the cup directly — the cause of ball movement rather than the effect. When the wrist_flex servo moves the cup, the IMU detects the tilt rate within milliseconds at 50Hz (every 20 ms), well before the ball has had time to roll significantly. So `d(flex) = -kd × imu_pitch_rate` is saying: "the cup is currently tilting forward at X rad/s — reduce the flex command so it doesn't tilt too far and cause the ball to overshoot center." 
+
+The concrete scenario where this should help our system: During pose 1 (initial), the ball starts at y=-0.73 (far side). The P-term commands a strong negative flex correction. The cup starts tilting, the ball rolls toward center. Without D-term, the P-term stays large until the ball reaches 0.0 — but by then the cup has built up angular momentum and the ball overshoots to +0.7 on the other side. With IMU D-term: as the cup tilts at increasing pitch rate, imu_pitch_rate grows negative, `-kd × negative_rate` adds a positive contribution to flex_cmd, partially canceling the P-term. The cup decelerates before the ball reaches center. The ball arrives at center with less momentum. This is the damping behavior we need to stop the oscillation.
+The "prediction" framing applied properly: The IMU is sensing the cup's angular velocity right now. Since the ball's future position is determined by current cup tilt rate (a ball on a tilting surface accelerates proportionally to tilt angle), the IMU rate is a leading indicator of where the ball will be in 200-500ms. In that sense the D-term from the IMU is genuinely predictive — it acts on cup motion before the ball has moved, rather than reacting after the ball has already overshot.
+
+This is the theory at least, as of 05-13-2026 we don't have it working. ;-)
+
+### 2.4 Summary of PID logic
+**this section needs and update**
 The full sign chain from ball position to joint correction:
 
 ```
@@ -138,7 +191,7 @@ The servo falling behind its target is visible in consecutive CORR lines:
 CORR | flex 2.6691→2.6327 (Δ-2.09deg)   ← correction 1: targets 2.6327
 CORR | flex 2.6185→2.5821 (Δ-2.09deg)   ← correction 2: actual was 2.6185, not 2.6327
 ```
-The servo traveled from 2.6691 to 2.6185 = 0.0506 rad in 200ms — it overshot its
+The servo traveled from 2.6691 to 2.6185 = 0.0506 rad in 100ms — it overshot its
 0.0364 rad target slightly (servo was still decelerating). The next correction computes
 from 2.6185, not from the commanded 2.6327. This self-correcting behavior is correct:
 by always reading actual position the controller accumulates no tracking error.
@@ -156,7 +209,7 @@ timer. They are **not synchronized** to each other:
 ```
 ball_detector_nvidia     publishes /ball/position     ~35fps   (28ms intervals)
 ball_balance_node        publishes /imu/balance_cmd   ~15Hz    (67ms intervals)  
-wrist_balance_controller executes corrections         5Hz      (200ms intervals)
+wrist_balance_controller executes corrections         1Hz      (1000ms intervals)
 ```
 
 `ball_balance_node` runs a control loop at 15Hz. Each cycle it reads the latest
@@ -166,8 +219,11 @@ log shows only 1 CMD line per second even though the topic updates 15 times per 
 
 `wrist_balance_controller` runs its correction timer at 5Hz independently. Each cycle
 it reads whatever the latest `/imu/balance_cmd` value is at that moment — it does not
-wait for a fresh one. The CMD it acts on may be up to 200ms old. In the log, CORR
-lines appear approximately every 200ms.
+wait for a fresh one. The CMD it acts on may be up to 1000ms old. In the log, CORR
+lines appear approximately every 1000ms. 
+
+Now, 1000 ms between corrections is a long time. This was chosen due to issues with the 
+servo motors at less than 1000ms (see [test results and analysis for more details](./balance_test_results.md)).
 
 The practical consequence is that **CMD and CORR lines in the log are not paired**.
 A CORR at time T is acting on the CMD that happened to be the most recent one when T

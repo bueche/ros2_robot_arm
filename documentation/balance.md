@@ -34,6 +34,8 @@ The rest of this page provides more detail or links to more detail on this sub-p
 - [Ball detection tuning](./ball_detection_tuning.md): This section describes some of the tuning steps wrt ball detection. It also compares camera inferencing vs. inferencing on the Nvidia Orin Nano. [Learn more ...](./ball_detection_tuning.md)
 - [Dynamixel PID controller tuning](./dynamixel_pid_controller_tuning.md): There was actually multilple levels of PID-related control. Indeed each Dynamixel servo has a PID controller. We did need to make some adjustments to that configuration for this application. [Learn more...](./dynamixel_pid_controller_tuning.md)
 - [Balacing PID controller](./ball_balance_pid_documentation.md): The above described ball detection fed into an overall PID controller whose focus was to balance the ball bearing. How do you adjust a servo based on knowing its coordinates? [Learn more..](./ball_balance_pid_documentation.md)
+- [Balancing Metrics](./balance_metrics.md): As the robot works to balance the cup alot is happening dynamically. We derived a number of metrics that are helpful to determine if a run has improved over the last one. This sections discusses the metrics in detail and outlines their evolution. [Learn more..](./balance_metrics.md)
+- [Balancing Test Results](./balance_test_results.md): Getting to a point in which the robot can balance the cup effectively will be the result of many tests and attention to the metrics. This section covers the latest test results in more detail. [Learn more...](./balance_test_results.md).
 - [Current status and next steps](#current-status-and-next-steps) 
 - [FAQ](#faq)
 
