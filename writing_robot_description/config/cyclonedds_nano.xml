@@ -6,6 +6,7 @@
     <General>
 	  <NetworkInterfaceAddress>eno1</NetworkInterfaceAddress>
 	  <AllowMulticast>false</AllowMulticast>
+	  <EnableMulticastLoopback>true</EnableMulticastLoopback>
     </General>
     <Discovery>
       <Peers>
