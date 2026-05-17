@@ -2,9 +2,20 @@
 <CycloneDDS xmlns="https://cdds.io/config"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
             xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
-  <Domain Id="any">
+  <Domain id="any">
     <General>
-      <NetworkInterfaceAddress>192.168.7.3</NetworkInterfaceAddress>
+	  <NetworkInterfaceAddress>eth0</NetworkInterfaceAddress>
+	  <AllowMulticast>false</AllowMulticast>
+	  <EnableMulticastLoopback>true</EnableMulticastLoopback>
     </General>
+    <Discovery>
+      <Peers>
+         <!-- Add the IP of the OTHER host here -->
+         <Peer address="192.168.7.2"/>
+	 <Peer address="172.17.0.1"/>
+      </Peers>
+      <!-- ParticipantIndex helps avoid port collisions in containers -->
+      <ParticipantIndex>auto</ParticipantIndex>
+    </Discovery>
   </Domain>
 </CycloneDDS>
