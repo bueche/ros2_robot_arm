@@ -11,8 +11,10 @@ Architecture:
   /imu/balance_error      (geometry_msgs/Vector3) — IMU: cup tilt angles (pitch, roll) rad
   /balance/cmd_delta      (geometry_msgs/Vector3) — wrist: commanded flex/roll delta per CORR
   /balance/achieved_delta (geometry_msgs/Vector3) — wrist: actually achieved flex/roll delta
-  /imu/raw            (sensor_msgs/Imu)         — IMU: angular_velocity.x/y in rad/s
-                                                   used as true D-term (rate of tilt change)
+  /imu/raw            (sensor_msgs/Imu)         — IMU: angular_velocity.x=roll_rate,
+                                                   angular_velocity.y=pitch_rate (rad/s)
+                                                   NOTE: x=roll, y=pitch — opposite to
+                                                   ROS REP-103. See _imu_raw_cb.
   /joint_states       (sensor_msgs/JointState) — current joint positions
   /arm_state          (std_msgs/String)         — MOVING / SETTLED
 
@@ -33,7 +35,7 @@ Control law:
   flex_cmd = +Kp_flex * error_y  - Kd_flex * imu_pitch_rate
   roll_cmd = +Kp_roll * error_x  - Kd_roll * imu_roll_rate
 
-  imu_pitch_rate = angular_velocity.x from /imu/raw (rad/s) — true gyroscope rate.
+  imu_pitch_rate = angular_velocity.y from /imu/raw (rad/s) — true gyroscope rate.
   SIGN: D-term is SUBTRACTED so it opposes motion, providing true damping.
   When the cup is already tilting in the corrective direction (pitch_rate same
   sign as P command), D-term reduces total command magnitude — preventing overshoot.
@@ -67,6 +69,8 @@ Parameters:
   camera_timeout  Seconds before camera stale      default: 2.0
   imu_timeout     Seconds before IMU stale         default: 0.5
   ball_lost_timeout  Seconds ball undetected before suspend  default: 1.0
+  jiggle_amplitude   Flex cmd amplitude during jiggle (rad/s) default: 0.04
+  jiggle_start_delay Seconds lost before jiggle starts       default: 2.0
   attempt_timeout    Seconds before giving up balancing      default: 5.0
   dry_run         Log only, don't publish cmd      default: False
   use_imu         Use IMU derivative term          default: True
@@ -112,6 +116,8 @@ class BallBalanceNode(Node):
         self.declare_parameter('camera_timeout',    2.0)
         self.declare_parameter('imu_timeout',       0.5)
         self.declare_parameter('ball_lost_timeout', 1.0)
+        self.declare_parameter('jiggle_amplitude',  0.04)  # rad/s flex cmd during jiggle
+        self.declare_parameter('jiggle_start_delay',2.0)   # seconds lost before jiggle starts
         self.declare_parameter('attempt_timeout',     30.0)
         self.declare_parameter('centered_hold_time',  2.0)  # seconds ball must stay within stable_thresh
         self.declare_parameter('near_thresh',          0.30)  # near-center zone for summary stats
@@ -185,6 +191,9 @@ class BallBalanceNode(Node):
         # is published True and the PID session ends.
         self._centered_since    = None
 
+        # Jiggle state — alternating flex direction when ball is lost
+        self._jiggle_phase      = 1  # +1 or -1, flips each tick
+
         # 1Hz PID_SUMMARY accumulator — collects every /ball/position reading
         # at full 15Hz rate during active PID for accurate proximity stats.
         self._acc_magnitudes    = []
@@ -224,8 +233,9 @@ class BallBalanceNode(Node):
             self._achieved_delta_cb, 10)
 
         # Subscribe to /imu/raw for angular velocity (true D-term signal).
-        # angular_velocity.x = pitch rate (rad/s), .y = roll rate (rad/s).
-        # This is the gyroscope output — rate of cup tilt, not tilt angle.
+        # imu_balance_node publishes: angular_velocity.x = dr (roll rate),
+        #                             angular_velocity.y = dp (pitch rate).
+        # This is opposite to ROS REP-103 — see _imu_raw_cb for full explanation.
         self.create_subscription(
             Imu, '/imu/raw',
             self._imu_raw_cb, 10)
@@ -358,18 +368,48 @@ class BallBalanceNode(Node):
     def _imu_raw_cb(self, msg: Imu):
         """Receive angular velocity from /imu/raw for true D-term.
 
-        angular_velocity.x = pitch rate (rad/s) — how fast cup tilts forward/back.
-        angular_velocity.y = roll rate  (rad/s) — how fast cup tilts left/right.
-        Published at 50Hz by imu_balance_node from ESP32 gyroscope data.
-        Sign convention matches the IMU mounting orientation on the wrist.
+        AXIS CONVENTION — follow this chain carefully, it has been a source of bugs:
+
+        ESP32 sketch (imu_balance.ino):
+          MPU-6050 physical axes on the wrist mount:
+            gyro X (gx) → roll rate  → named 'dr' in JSON
+            gyro Y (gy) → pitch rate → named 'dp' in JSON
+          Published in JSON: {"dp": gy, "dr": gx, ...}
+
+        imu_balance_node_v19.py parses JSON and fills sensor_msgs/Imu:
+          angular_velocity.x = dr  (roll rate,  rad/s)   ← NOTE: x=ROLL
+          angular_velocity.y = dp  (pitch rate, rad/s)   ← NOTE: y=PITCH
+          This is OPPOSITE to the ROS REP-103 convention where x=forward(pitch).
+          It was set this way to match the physical wrist mounting orientation
+          where the IMU is mounted upside-down with axes rotated ~56°.
+          Do not "fix" this to REP-103 without re-validating on hardware.
+
+        ball_balance_node reads:
+          imu_pitch_rate ← angular_velocity.y  (dp, pitch rate)
+          imu_roll_rate  ← angular_velocity.x  (dr, roll rate)
+
+        D-term application (control law):
+          flex_cmd -= kd_flex * imu_pitch_rate   (MINUS = damping, opposes motion)
+          roll_cmd -= kd_roll * imu_roll_rate
+
+        Sign check: if the cup is already tilting toward center (pitch_rate same
+        sign as the P-term flex_cmd), the D-term reduces the command — preventing
+        overshoot.  If signs are wrong the D-term reinforces motion → oscillation.
+        Validate sign with kd=0.02 and use_imu=True before increasing.
+
+        NOTE: kd_flex and kd_roll default to 0.0 — D-term is OFF until explicitly
+        enabled.  The axis swap bug (reading .x as pitch, .y as roll) was present
+        in v17 and earlier.  Fixed here.
         """
         with self._lock:
             # Low-pass filter to reduce gyro noise before D-term use.
             # Raw gyro can spike ±0.5+ rad/s from vibration.
             a = self._gyro_alpha
-            self._imu_pitch_rate = (a * msg.angular_velocity.x +
+            # .y = dp = pitch rate (wrist_flex axis) — see convention note above
+            # .x = dr = roll rate  (wrist_roll axis)
+            self._imu_pitch_rate = (a * msg.angular_velocity.y +
                                     (1 - a) * self._imu_pitch_rate)
-            self._imu_roll_rate  = (a * msg.angular_velocity.y +
+            self._imu_roll_rate  = (a * msg.angular_velocity.x +
                                     (1 - a) * self._imu_roll_rate)
             self._imu_raw_time   = time.monotonic()
 
@@ -488,14 +528,34 @@ class BallBalanceNode(Node):
                 throttle_duration_sec=2.0)
             return
 
-        # Ball-lost check — ball undetected for too long
-        ball_lost_timeout = self.get_parameter('ball_lost_timeout').value
+        # Ball-lost check — ball undetected for too long.
+        # After ball_lost_timeout: suspend normal PID.
+        # After jiggle_start_delay: issue small alternating flex commands to
+        # physically rock the cup and make the ball visible to the detector.
+        # Jiggle stops immediately when ball is redetected (z>=0 in _ball_cb).
+        ball_lost_timeout  = self.get_parameter('ball_lost_timeout').value
+        jiggle_amplitude   = self.get_parameter('jiggle_amplitude').value
+        jiggle_start_delay = self.get_parameter('jiggle_start_delay').value
         if (self._last_valid_ball_time is not None and
                 now - self._last_valid_ball_time > ball_lost_timeout):
+            lost_duration = now - self._last_valid_ball_time
             self.get_logger().warn(
-                f'Ball lost for {now - self._last_valid_ball_time:.1f}s '
+                f'Ball lost for {lost_duration:.1f}s '
                 f'(>{ball_lost_timeout:.1f}s) — suspending PID.',
                 throttle_duration_sec=1.0)
+            if lost_duration > jiggle_start_delay and jiggle_amplitude > 0.0:
+                # Alternate flex direction each tick to rock the cup
+                self._jiggle_phase *= -1
+                jiggle_cmd = Vector3()
+                jiggle_cmd.x = jiggle_amplitude * self._jiggle_phase
+                jiggle_cmd.y = 0.0
+                jiggle_cmd.z = 0.0
+                if not self.get_parameter('dry_run').value:
+                    self._pub_cmd.publish(jiggle_cmd)
+                self.get_logger().info(
+                    f'JIGGLE | lost={lost_duration:.1f}s '
+                    f'flex_cmd={jiggle_cmd.x:+.3f} (phase={self._jiggle_phase:+d})',
+                    throttle_duration_sec=0.5)
             return
 
         # Attempt timeout — give up if not achieved within limit.

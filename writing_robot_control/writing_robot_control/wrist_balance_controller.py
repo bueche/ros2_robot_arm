@@ -15,13 +15,7 @@ Parameters:
   dry_run            Log only, don't publish                 default: False
   correction_hz      Correction rate (Hz)                    default: 2.0
   move_duration      Trajectory duration per step (s)        default: 0.3
-  max_step_rad           Max per-correction displacement (rad)       default: 0.05
-  stall_scale_enable     Scale max_step_rad up when servo stalls      default: True
-  stall_scale_max        Max multiplier for stall scaling             default: 3.0
-  stall_entry_steps      Consecutive bad steps to enter boost         default: 1
-  stall_exit_steps       Consecutive good steps to release boost      default: 3
-  stall_threshold        Achievement ratio below which stall fires    default: 0.50
-  stall_exit_threshold   Achievement ratio above which recovery counts default: 0.70
+  max_step_rad       Max per-correction displacement (rad)   default: 0.10
   max_total_rad      Max total displacement from start (rad) default: 0.3
   cmd_timeout        Stale command threshold (s)             default: 2.0
   wrist_flex_joint   Flex joint name                         default: wrist_flex
@@ -58,13 +52,7 @@ class WristBalanceController(Node):
         self.declare_parameter('dry_run',          False)
         self.declare_parameter('correction_hz',    2.0)
         self.declare_parameter('move_duration',    0.3)
-        self.declare_parameter('max_step_rad',         0.05)
-        self.declare_parameter('stall_scale_enable',   True)
-        self.declare_parameter('stall_scale_max',      3.0)
-        self.declare_parameter('stall_entry_steps',    1)
-        self.declare_parameter('stall_exit_steps',     3)
-        self.declare_parameter('stall_threshold',      0.50)
-        self.declare_parameter('stall_exit_threshold', 0.70)
+        self.declare_parameter('max_step_rad',       0.10)
         self.declare_parameter('max_total_rad',      0.3)   # fallback for both axes
         self.declare_parameter('max_total_flex_rad', -1.0)  # -1 = use max_total_rad
         self.declare_parameter('max_total_roll_rad', -1.0)  # -1 = use max_total_rad
@@ -112,18 +100,6 @@ class WristBalanceController(Node):
         self._total_flex  = 0.0
         self._total_roll  = 0.0
 
-        # Per-axis stall detection.
-        # Entry: 1 step below stall_threshold immediately activates boost.
-        # Exit:  stall_exit_steps consecutive steps above stall_exit_threshold
-        #        required before boost is released. Asymmetric by design —
-        #        stalls are urgent, recovery must be sustained.
-        # Separate per axis — roll may be fine while flex stalls (pose 5).
-        self._flex_ratios      = []    # recent true achievement ratios (for logging)
-        self._roll_ratios      = []
-        self._flex_stalled     = False  # boost currently active
-        self._roll_stalled     = False
-        self._flex_good_streak = 0      # consecutive steps above exit threshold
-        self._roll_good_streak = 0
         self._prev_target_flex = None  # target set by previous CORR step
         self._prev_target_roll = None
         self._prev_cmd_flex    = None  # commanded delta for previous step
@@ -238,115 +214,30 @@ class WristBalanceController(Node):
         flex_delta = float(cmd.x) * self._p_flex_scale * dt
         roll_delta = float(cmd.y) * self._p_roll_scale * dt
 
-        # Update stall detection ratios BEFORE computing stall scale,
-        # so this step's achievement informs this step's boost decision.
-        # True achievement = how far servo moved since prev target was set.
-        # Also publish /balance/achieved_delta so ball_balance_node can update
-        # its ki_mode=servo integral and achievement EMA.
+        # Compute true achievement for /balance/achieved_delta so ball_balance_node
+        # can update its ki_mode=servo integral and achievement EMA.
+        # True achievement = how far servo actually moved since previous target was set.
         if self._prev_target_flex is not None and abs(self._prev_cmd_flex) > 1e-4:
             true_achieved_f = joint_pos[fj] - (self._prev_target_flex - self._prev_cmd_flex)
-            ratio_f = min(abs(true_achieved_f) / abs(self._prev_cmd_flex), 2.0)
-            self._flex_ratios.append(ratio_f)
-            if len(self._flex_ratios) > 20:
-                self._flex_ratios.pop(0)
         else:
             true_achieved_f = 0.0
         if self._prev_target_roll is not None and abs(self._prev_cmd_roll) > 1e-4:
             true_achieved_r = joint_pos[rj] - (self._prev_target_roll - self._prev_cmd_roll)
-            ratio_r = min(abs(true_achieved_r) / abs(self._prev_cmd_roll), 2.0)
-            self._roll_ratios.append(ratio_r)
-            if len(self._roll_ratios) > 20:
-                self._roll_ratios.pop(0)
         else:
             true_achieved_r = 0.0
 
-        # Publish achieved_delta — uses prev step's commanded delta and this
-        # step's measured position to report what the servo actually delivered.
+        # Publish achieved_delta so ball_balance_node can track servo delivery.
         if self._prev_cmd_flex is not None or self._prev_cmd_roll is not None:
             ach_msg = Vector3()
             ach_msg.x = float(true_achieved_f)
             ach_msg.y = float(true_achieved_r)
             self._pub_achieved_delta.publish(ach_msg)
 
-        # Stall-adaptive step size clamping.
-        # When the rolling average of achieved/commanded drops below
-        # stall_threshold, scale up max_step_rad to give the servo a
-        # larger positional error — generating more PWM/torque to
-        # overcome gravity or mechanical resistance.  The scale factor
-        # is capped at stall_scale_max to prevent violent lurching.
-        # When the servo recovers (achievement improves), the scale
-        # returns toward 1.0 automatically as the window fills.
-        base_step    = self._p_max_step
-        threshold    = self.get_parameter('stall_threshold').value
-        exit_thresh  = self.get_parameter('stall_exit_threshold').value
-        exit_steps   = self.get_parameter('stall_exit_steps').value
-        scale_max    = self.get_parameter('stall_scale_max').value
-        scale_en     = self.get_parameter('stall_scale_enable').value
-
-        def stall_scale(axis):
-            # axis: 'flex' or 'roll'
-            stalled     = self._flex_stalled     if axis == 'flex' else self._roll_stalled
-            good_streak = self._flex_good_streak if axis == 'flex' else self._roll_good_streak
-            ratios      = self._flex_ratios      if axis == 'flex' else self._roll_ratios
-
-            if not scale_en or not ratios:
-                return 1.0
-            last = ratios[-1]
-
-            if not stalled:
-                # Entry: one bad step is enough
-                if last < threshold:
-                    if axis == 'flex':
-                        self._flex_stalled     = True
-                        self._flex_good_streak = 0
-                    else:
-                        self._roll_stalled     = True
-                        self._roll_good_streak = 0
-                    stalled = True
-            else:
-                # Exit: require sustained recovery above exit_thresh
-                if last >= exit_thresh:
-                    if axis == 'flex':
-                        self._flex_good_streak += 1
-                        good_streak = self._flex_good_streak
-                    else:
-                        self._roll_good_streak += 1
-                        good_streak = self._roll_good_streak
-                    if good_streak >= exit_steps:
-                        if axis == 'flex':
-                            self._flex_stalled     = False
-                            self._flex_good_streak = 0
-                        else:
-                            self._roll_stalled     = False
-                            self._roll_good_streak = 0
-                        stalled = False
-                else:
-                    # Bad step resets the good streak
-                    if axis == 'flex':
-                        self._flex_good_streak = 0
-                    else:
-                        self._roll_good_streak = 0
-
-            if not stalled:
-                return 1.0
-            # Scale inversely with recent achievement, capped at scale_max
-            avg = sum(ratios[-3:]) / len(ratios[-3:])
-            return min(scale_max, threshold / max(avg, 0.01))
-
-        flex_scale = stall_scale('flex')
-        roll_scale = stall_scale('roll')
-        eff_flex_step = base_step * flex_scale
-        eff_roll_step = base_step * roll_scale
-
-        if flex_scale > 1.0 or roll_scale > 1.0:
-            self.get_logger().info(
-                f'Stall scale active: '
-                f'flex={flex_scale:.2f}× (stalled={self._flex_stalled} good={self._flex_good_streak})  '
-                f'roll={roll_scale:.2f}× (stalled={self._roll_stalled} good={self._roll_good_streak})',
-                throttle_duration_sec=2.0)
-
-        flex_delta = max(-eff_flex_step, min(eff_flex_step, flex_delta))
-        roll_delta = max(-eff_roll_step, min(eff_roll_step, roll_delta))
+        # Clamp step to max_step_rad — the PID I-term in ball_balance_node
+        # grows flex_cmd as the servo underdelivers, so max_step_rad should be
+        # large enough that the I-term is not always saturated (default: 0.10 rad).
+        flex_delta = max(-self._p_max_step, min(self._p_max_step, flex_delta))
+        roll_delta = max(-self._p_max_step, min(self._p_max_step, roll_delta))
 
         if abs(flex_delta) < 1e-4 and abs(roll_delta) < 1e-4:
             return
