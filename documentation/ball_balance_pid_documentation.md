@@ -8,12 +8,6 @@ robot. This section has several goals that include explaining in detail using de
 
 
 Some of the log output might change, so this section is not guaranteed to be 100% matching with the code. 
-The examples are taken from a test run with the inferencing happening using the Nvidia Orin Nano (as oppose to happening 
-on the camera): 
-
-**Test run:** 042926 t2 torch  
-**Date:** April 29, 2026  
-**Configuration:** kp_flex=0.25, kp_roll=0.25, kd=0, ki=0, correction_hz=5Hz, move_duration=0.1s, max_step_rad=0.05, max_total_rad=0.5
 
 ---
 
@@ -97,11 +91,45 @@ The positions from which the PID must operate to balance are defined in the [pos
 
 *The standard characterization of I-term** is "accumulates past error over time to eliminate steady-state offset." The classic example: a thermostat with only P-term will hold temperature slightly below the setpoint because the proportional correction weakens as the error shrinks — eventually the small remaining error produces just enough heating to balance heat loss, but never quite reaches the target. The I-term accumulates that persistent small error and keeps increasing the command until the offset is eliminated.
 
-Currently, we are using the error in the servo's commanded vs. actual position to define the I-term error. That is, after each pose is set each servo's wheel has been moved to some position. When the PID algorithm kicks in it will start to set new incremental targets for the wrist_flex and wrist_roll in order to move the ball into the center. How well the servo does to reach that position defines the error. It can either do really well, fail misreably, or fall somewhere in between. In all cases we can get that information because the servo reports its position. 
+Currently, we are using the error in the servo's commanded vs. actual position to define the I-term error. That is, after each pose is set each servo's wheel has been moved to some position. When the PID algorithm kicks in it will start to set new incremental targets for the wrist_flex and wrist_roll in order to move the ball into the center. How well the servo does to reach that position defines the error. It can either do really well, fail misreably, or fall somewhere in between. In all cases we can get that information because the servo reports its new position. 
 
-Lets look at an actual scenario for one of the difficult scenarios in our test: pose 5. In this one, the arm tips the cup forward in a manner that puts significant strain on the wrist and elbow flex joints (essentially Servos 3 and 4). That is, it starts close to the wrist-flex-low pose shown in the figure above (position =  2.3 radians). Gravity makes it hard to do small moves. It can move in a single pose from there to the wrist-flex-high (position = 2.7 radians), but doing small incremental ones is more difficult for the XL-330's as is illustrated in this sequence below. The table output comes from the [corr_analysis.py](../balance/scripts/corr_analysis.py) script which analyzes the raw correction log output from the [wrist_balance_controller.py](../writing_robot_control/writing_robot_control/wrist_balance_controller.py). In this output it evaluates how well the two joints did in the sequence while the PID was operating. For each step the wrist flex was being commanded to move 1.719 radians but it is unable to make much headway. At step 1 it is being commanded to move from 2.2918 rad to 2.318 rad, but one can see that by the time step 2 fires it had only moved to 2.2933 (see the from in step 2). now the difference between the ending (2.2933 rad) and the start (2.2918 rad) is 0.0015 rad or 0.086 degrees. The flex servo was commanded to achieve 1.719 degrees, but only managed 0.086, that is 5% of goal. On the otherhand, the wrist_roll on the same steps did far better, achieving 92% of what it was targetted to do. This example also has no I-term influence.
+Lets look at an actual case for one of the difficult scenarios in our test: pose 5. In this one, the arm tips the cup forward in a manner that puts significant strain on the wrist and elbow flex joints (essentially Servos 3 and 4). That is, it starts close to the *wrist-flex-low pose* shown in the figure above (position =  2.3 radians). Gravity makes it hard to do small moves. Note the current pull on the XL330's for pose 5 (output from [pose test utility)](../writing_robot_control/writing_robot_control/pose_test.py). The elbow flex is drawing 250 mA and the wrist_flex 50 mA. The current draw for the wrist flex is almost 5x that of the wrist roll.
 
- On the otherhand, the wrist_roll on the same steps did far better, achieving 92% of what it was targetted to do. In this case, it was much easier to move side-to-side than forward to back. But the main point is that error in achievement by the wrist_flex joint needs to be fed back into the controller, else the outcome will (did) remain the same: the proportional movement will stay fixed (in this example a command to 1.719 degrees) without success. Since we know that larger steps are easier than smaller ones for the servo to achieve, the I contribution should grow 1.719 degrees into something larger. This wasn't being done in the case below, but has now been implemented.
+```
+[5/11] pose 5 - forward
+[pose_test_node]:   ✓ shoulder_pan: 1.500 rad (within [0.540, 2.044]) 
+[pose_test_node]:   ✓ shoulder_lift: 2.563 rad (within [2.200, 2.886])
+[pose_test_node]:   ✓ elbow_flex: 1.470 rad (within [0.726, 2.250])
+[pose_test_node]:   ✓ wrist_flex: 2.300 rad (within [0.297, 2.700])
+[pose_test_node]:   ✓ wrist_roll: 1.600 rad (within [-1.448, 1.900])
+[pose_test_node]:   ✓ pen_holder: 0.977 rad (within [0.190, 1.600])
+[pose_test_node]: → Sent: pose 5 - forward
+[pose_test_node]:    Waiting for ball to center (timeout: 20.0s)...
+[pose_test_node]:   ✓ Cup stable after 11.53s
+[pose_test_node]:   Joint States:
+[pose_test_node]:    shoulder_pan    [XL430] Pos:  1.499rad Load:  0.00% Volt:12.0V Temp: 36.0°C
+[pose_test_node]:    shoulder_lift   [XL430] Pos:  2.496rad Load: 24.30% Volt:12.0V Temp: 39.0°C
+[pose_test_node]:    elbow_flex      [XL330] Pos:  1.519rad Curr: -250mA Volt: 4.6V Temp: 29.0°C <----
+[pose_test_node]:    wrist_flex      [XL330] Pos:  2.507rad Curr:   50mA Volt: 4.6V Temp: 25.0°C <----
+[pose_test_node]:    wrist_roll      [XL330] Pos:  1.548rad Curr:   11mA Volt: 4.6V Temp: 24.0°C
+[pose_test_node]:    pen_holder      [XL330] Pos:  0.974rad Curr:   15mA Volt: 4.6V Temp: 26.0°C
+[pose_test_node]:   ⚡ Power Analysis for "pose 5 - forward":
+[pose_test_node]:      Peak 5V current (INA219):    0.386A
+[pose_test_node]:      Peak motor sum (XL330s):     0.391A
+[pose_test_node]:      5V voltage: 5.20V (min) / 5.66V (max)
+[pose_test_node]:      Peak 12V current:            0.192A
+[pose_test_node]:      Peak total power:            4.27W
+[pose_test_node]:      Holding current comparison:
+[pose_test_node]:        Supply current (INA219):     0.248A
+[pose_test_node]:        Motor current sum (XL330s):  0.326A
+
+
+```
+
+
+ It can move in a single pose from that low position to higher the *wrist-flex-high* (position = 2.7 radians), but doing small incremental adjustments turns out to be more difficult for the XL-330's as is illustrated in this sequence below. The table output comes from the [corr_analysis.py](../balance/scripts/corr_analysis.py) script which analyzes the raw correction log output from the [wrist_balance_controller.py](../writing_robot_control/writing_robot_control/wrist_balance_controller.py). In this output it evaluates how well the two joints did in the sequence while the PID was operating. For each step the wrist flex was being commanded to move 1.719 degrees but it is unable to make much headway. At step 1 it is being commanded to move from 2.2918 rad to 2.318 rad, but one can see that by the time step 2 fires it had only moved to 2.2933 (see the from in step 2). now the difference between the ending (2.2933 rad) and the start (2.2918 rad) is 0.0015 rad or 0.086 degrees. The flex servo was commanded to achieve 1.719 degrees, but only managed 0.086, that is 5% of goal. On the otherhand, the wrist_roll on the same steps did far better, achieving 92% of what it was targetted to do. This example also has no I-term influence.
+
+ 
 
 
 ```
@@ -128,9 +156,11 @@ Lets look at an actual scenario for one of the difficult scenarios in our test: 
 
 ```
 
+The main point is that error in achievement by the wrist_flex joint needs to be fed back into the controller, else the outcome will (did) remain the same: the proportional movement will stay fixed (in this example a command to 1.719 degrees) without success. Since we know that larger steps are easier than smaller ones for the servo to achieve, the I-term contribution should grow 1.719 degrees into something larger. This wasn't being done in the case below, but works now as we will cover below.
+
 The error of the servo accumulates `commanded_delta - achieved_delta` — the gap between what was asked and what was delivered. This is conceptually the same thing but measured at a different layer. Notice that we are not asking:  "how long has the ball been off-center?", but rather "how much have I asked the servo to do that it hasn't done yet?" The accumulated undelivered displacement represents a debt that the controller owes to the system.
 
-The example below illustrates I-term impact. Step 5 hard a target of 1.770 degress. but only achieved 20% of that. The I-term then boosts the next step to shoot for 3.272 degrees and its able to do much better with this request achieving 59% of the targetted goal. This illustrates an important point the I-term: it boosts in the direction that the P-term is going. In the end, we found that small flex steps working against gravity's pull on the cup were harder to achieve than bigger ones, so we raised the per-step radian cap so that it was more achievable.  This reduced the need for I-term additive correction.
+The example below illustrates our implemented I-term impact. Step 5 hard a target of 1.770 degress. but only achieved 20% of that. The I-term then boosts the next step to shoot for 3.272 degrees and its able to do much better with this request achieving 59% of the targetted goal. This illustrates an important point the I-term: it boosts in the direction that the P-term is going. In the end, we found that small flex steps working against gravity's pull on the cup were harder to achieve than bigger ones, so we raised the per-step radian cap so that it was more achievable.  This reduced the need for I-term additive correction.
 
 ```
 ================================================================================
@@ -151,12 +181,34 @@ The example below illustrates I-term impact. Step 5 hard a target of 1.770 degre
  
 ```
 
-**The one place where the characterization slightly diverges** from classic I-term: traditional integral is about error *persistence in the output space* (the ball hasn't moved enough). Our servo integral is about error *persistence in the input space* (the actuator hasn't responded). These are related but not identical — it's possible for the servo to underdeliver while the ball is actually moving (if gravity is doing some of the work), in which case our logic would accumulate less than logic based solely on the ball movement would. We will see how that plays out as more tuning continues.
 
 
 ### 2.3 IMU feedback as D-term to dampen PI 
 
  Our final term in the PID is the D-term (or Derivative term). It is meant to dampen or reduce the positions that the P & I terms are aiming for. In our case its trying to minimize the ball overshooting the center target because the cup was tilted too far in the other direction. The D-term responds to the rate of change of the cups tilt and the formula is `D = -kd × d(cup_angle)/dt`. If the ball is at position 0.7 in the cup (far from center) but moving toward center rapidly, the D-term reduces the correction command (i.e., "dampens the change") — because the error (ball_position - center(0,0)) is already improving fast and a full P-term or I-term correction would overshoot the center. 
+
+ An overshoot is illustrated in the pose-1 sequence below. The cup is tilted towards the arm and the wrist flex starts to bring it more level. After two steps in the PID the ball has overshot the center and the ball slides from one side to the other.
+
+ <p align="center">
+  <img src="../images/example_overshoot.jpg" alt="example overshoot " width="700">
+</p> 
+
+ ```
+ ================================================================================
+  POSE : pose 1 - initial
+  Start: flex=2.6676 rad  roll=1.5999 rad
+  Duration: 11.0s    CORR steps: 11
+================================================================================
+  step  ── FLEX ──────────────────────────────────────  ── ROLL ──────────────────────────────────────      cumul(f,r)    intv
+            from       to   tgt_deg  act_deg  ratio%      from       to   tgt_deg  act_deg  ratio%
+  --------------------------------------------------------------------------------------------------------------------------------
+     1  flex:   2.6676→  2.5898 tgt= -4.458 act= -4.744   +106%  roll:   1.5999→  1.5328 tgt= -3.850 act= -3.776    +98%  
+     2  flex:   2.5848→  2.5048 tgt= -4.584 act= -5.185   +113%  roll:   1.5340→  1.4625 tgt= -4.100 act= -4.045    +99%  
+     3  flex:   2.4943→  2.5218 tgt= +1.576 act= +0.264    +17%  roll:   1.4634→  1.5366 tgt= +4.190 act= +4.131    +98%  
+     4  flex:   2.4989→  2.4916 tgt= -0.418 act= -0.705   +168%  roll:   1.5355→  1.5054 tgt= -1.730 act= -1.667    +97%  
+      :
+      :
+ ```
 
 Why are we using the IMU and not the camera for the D-term?  One reason is the higher frequency of this signal. That is, if we used the camera computing `d(ball.y)/dt` from consecutive `/ball/position` topic readings seems reasonable at first: (ball.x, ball.y) move to (ball.x1, ball.y1) in time t. But it has a couple of problems. First, the camera runs at 35Hz with ~30ms latency with Nvidia inference (12 Hz or ~80 ms with Camera inference).  So by the time we compute the rate the cup has already moved. Second, the ball's position in the cup is an *effect* of cup tilt — by the time the ball has moved, the cup has already been tilted for some time. We'd be reacting to a more lagging indicator.
 
@@ -260,12 +312,12 @@ Three nodes participate in the correction pipeline, each running on its own inde
 timer. They are **not synchronized** to each other:
 
 ```
-imu_balance_node         publishes /imu/raw
-ball_detector_nvidia     publishes /ball/position         ~35fps   (28ms intervals)
-ball_balance_node        publishes /ball/balance_cmd      ~15Hz    (67ms intervals)  
-wrist_balance_controller executes corrections              1Hz      (1000ms intervals)
-wrist_balance_controller publishes /balance/cmd_delta      1Hz
-wrist_balance_controller publishes /balance/achieved_deta  1Hz
+imu_balance_node                  publishes /imu/raw
+ball_detector_nvidia (or _oak)    publishes /ball/position         ~35fps   (28ms intervals)
+ball_balance_node                 publishes /ball/balance_cmd      ~15Hz    (67ms intervals)  
+wrist_balance_controller          executes corrections              1Hz      (1000ms intervals)
+wrist_balance_controller          publishes /balance/cmd_delta      1Hz
+wrist_balance_controller          publishes /balance/achieved_deta  1Hz
 ```
 
 `ball_balance_node` runs a control loop at 15Hz. Each cycle it reads the latest:
@@ -406,6 +458,14 @@ to the next pose.
 ## 5. Pose-by-Pose Analysis
 
 The following provides an example of some of the PID operations that happen after each of the initial poses occur. In it we also reference the clock (t) which are expressed in Unix timestamps in seconds since epoch. The decimal part is fractional seconds — so an increment of 0.01 means 10 milliseconds.
+
+The examples are taken from a test run with the inferencing happening using the Nvidia Orin Nano (as oppose to happening 
+on the camera): 
+
+**Test run:** 042926 t2 torch  
+**Date:** April 29, 2026  
+**Configuration:** kp_flex=0.25, kp_roll=0.25, kd=0, ki=0, correction_hz=5Hz, move_duration=0.1s, max_step_rad=0.05, max_total_rad=0.5
+
 
 ### 5.1 Pose 1 — Initial (t ≈ 1777491881)
 
@@ -619,135 +679,7 @@ magnitude regardless of direction.
 
 ---
 
-## 6. Observed Behavior Summary
 
-### 6.1 What is working correctly
-
-- **Sign chain verified correct** across all four poses and all four directions.
-  Decreasing wrist_flex rolls ball from far side toward robot; increasing rolls it
-  away. Positive roll_cmd tilts cup to move ball from right to left. All four
-  combinations confirmed by visual inspection of RViz images correlated with log.
-
-- **Simultaneous dual-axis correction** works — both flex and roll are corrected
-  in every CMD cycle, with magnitudes proportional to their respective errors.
-
-- **Detector performance** — ball detected consistently at 0.62-0.73 confidence,
-  cup at 0.90-0.94, at ~35fps camera rate with ~28ms TRT inference. The ball size
-  filter removal eliminated false negatives during pose transitions.
-
-- **State transitions** — MOVING→SETTLED correctly resets the cup size reference
-  and activates the PID within ~500ms of arm reaching position.
-
-- **Topic rates** — all three pipeline nodes running at their intended rates:
-  ball position at 35fps, CMD at 15Hz, CORR at 5Hz.
-
-### 6.2 Root cause of non-convergence
-
-The system is **underdamped** — the ball oscillates around center rather than
-converging. The measured oscillation amplitude is ±0.7 (70% of cup radius) with
-a period of approximately 2-4 seconds.
-
-The cause is a timing mismatch between correction execution and ball dynamics. A
-6mm steel ball on a 29mm radius cup can roll from rim to center in approximately
-300-500ms. The total pipeline delay from "ball detected at position X" to "cup
-physically reaches corrected tilt" is:
-
-```
-TRT inference latency          13-29ms   (normal), 50-60ms (during spikes)
-ROS2 publish/subscribe          5-10ms   (DDS transport across containers)
-CMD timer jitter               0-67ms    (ball_balance_node at 15Hz)
-CORR timer jitter              0-200ms   (wrist_balance_controller at 5Hz)
-servo move_duration              100ms   (joint trajectory execution)
-──────────────────────────────────────
-typical total                ~120-400ms
-worst case (with spike)      ~400-860ms
-```
-
-At the typical 120-400ms total lag, by the time the cup reaches its corrected
-position the ball has already rolled past center to the opposite side. The PID
-then correctly reverses direction, but the ball overshoots again. This produces
-the ±0.7 limit cycle visible across all four poses.
-
-A key observation from the log: the CMD log line appears only once per second
-(throttled), which initially suggested 1Hz CMD updates. In fact CMDs publish at
-15Hz — the throttle is a logging artifact. However, 10 consecutive CORR steps
-were observed acting on the same CMD value in one window, each producing nearly
-identical -2.09° flex steps. This occurred because a pipeline spike blocked new
-ball detections for ~1 second, causing the CORR loop to consume stale CMD data
-for 5 consecutive cycles before a fresh ball position arrived.
-
-### 6.3 Pipeline latency spikes
-
-PIPELINE SPIKE warnings of 200-430ms were observed throughout the run at
-`[system_watchdog]`. These occur when TRT inference spikes to 50-60ms (vs the
-normal 13-28ms), causing MJPEG frames to queue behind the slow inference call.
-The watchdog measures the timestamp delta between frame capture and when the
-resulting `/ball/position` is consumed downstream.
-
-The inference spikes are caused by GPU clock throttling on the Orin Nano under
-sustained thermal load. During a spike, ball position updates effectively stop
-for 400-860ms, and the CORR loop runs 2-4 extra steps on stale CMD data before
-a fresh detection arrives. This significantly worsens overshoot.
-
-Fix: run `sudo nvpmodel -m 0 && sudo jetson_clocks` before each test session to
-lock GPU clocks at maximum frequency and prevent throttling.
-
----
-
-## 7. Parameter Changes and Next Steps
-
-The actual parameters used in this test run were:
-
-```bash
-# ball_balance_node
--p kp_flex:=0.25 -p kp_roll:=0.25
-
-# wrist_balance_controller  
--p correction_hz:=5.0 -p move_duration:=0.1 -p max_total_rad:=0.5
-```
-
-Note that `correction_hz` was already 5Hz (not 2Hz) in this run, giving 200ms
-correction intervals. The `max_step_rad` default of 0.05 rad was in effect.
-
-Based on the analysis, the following parameter changes are recommended for the next run:
-
-| Parameter | Node | This run | Proposed | Rationale |
-|-----------|------|----------|----------|-----------|
-| `kp_flex` | ball_balance_node | 0.25 | 0.10 | Reduce overshoot amplitude |
-| `kp_roll` | ball_balance_node | 0.25 | 0.10 | Reduce overshoot amplitude |
-| `max_step_rad` | wrist_balance_controller | 0.05 | 0.02 | Finer steps, same max rate |
-| `move_duration` | wrist_balance_controller | 0.1 | 0.08 | Slightly faster servo response |
-| `correction_hz` | wrist_balance_controller | 5.0 | 5.0 | Already at target rate |
-
-The primary lever is reducing `kp_flex` and `kp_roll`. With kp=0.25 and a typical
-ball error of 0.72, each CMD produces a flex command of 0.18 rad/s. Over two 200ms
-CORR cycles at max_step_rad=0.05 the cup moves 0.10 rad = 5.7° — enough to send the
-ball from one side of the cup to the other. Reducing to kp=0.10 halves the command
-magnitude to 0.072 rad/s, giving the ball less momentum and making overshooting
-less likely.
-
-A physical cup with higher concavity (currently being designed/printed) will also
-help significantly — a deeper bowl naturally limits ball speed and gives the controller
-more time to respond before the ball reaches the rim.
-
----
-
-## 8. Inference Performance Notes
-
-| Metric | Value |
-|--------|-------|
-| Normal inference | 13-29ms |
-| Spike inference | 50-60ms |
-| Camera rate | 35fps (IMX378 cap at 720P) |
-| Pipeline spikes | 200-430ms (during inference spikes) |
-| Ball confidence | 0.62-0.73 |
-| Cup confidence | 0.90-0.94 |
-| Frame drops | 69 accumulated over ~60s run |
-| Inference drops | 0 |
-
-The inference spikes are caused by GPU clock throttling on the Orin Nano under
-sustained load. Running `sudo nvpmodel -m 0 && sudo jetson_clocks` before the
-test will lock GPU clocks at maximum and eliminate the spikes.
 
 ---
 
