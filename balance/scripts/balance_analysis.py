@@ -107,11 +107,20 @@ class PIDSession:
         return sum(ratios)/len(ratios) if ratios else None
     @property
     def oscillation_index(self):
-        if len(self.corrs)<2: return None
-        revs=sum(1 for a,b in zip(self.corrs,self.corrs[1:])
-                 if abs(a.flex_to-a.flex_from)>1e-6 and abs(b.flex_to-b.flex_from)>1e-6
-                 and (a.flex_to-a.flex_from)*(b.flex_to-b.flex_from)<0)
-        return revs/(len(self.corrs)-1)
+        """Weighted oscillation index for flex axis.
+        = total displacement in reversing steps / total displacement all steps.
+        Unlike raw reversal count, small reversals near center score low (healthy)
+        while large back-and-forth swings score high (pathological).
+        0.0 = monotone approach, 1.0 = all displacement wasted on reversals."""
+        if len(self.corrs) < 2: return None
+        total = sum(abs(c.flex_to - c.flex_from) for c in self.corrs)
+        if total < 1e-6: return None
+        wasted = sum(abs(b.flex_to - b.flex_from)
+                     for a, b in zip(self.corrs, self.corrs[1:])
+                     if abs(a.flex_to - a.flex_from) > 1e-6
+                     and abs(b.flex_to - b.flex_from) > 1e-6
+                     and (a.flex_to - a.flex_from) * (b.flex_to - b.flex_from) < 0)
+        return wasted / total
     @property
     def travel_limit_fraction(self):
         """Fraction of CORR steps where flex delta was zero due to travel limit.
@@ -156,11 +165,20 @@ class PIDSession:
         return sum(ratios)/len(ratios) if ratios else None
     @property
     def roll_oscillation_index(self):
-        if len(self.corrs)<2: return None
-        revs=sum(1 for a,b in zip(self.corrs,self.corrs[1:])
-                 if abs(a.roll_to-a.roll_from)>1e-6 and abs(b.roll_to-b.roll_from)>1e-6
-                 and (a.roll_to-a.roll_from)*(b.roll_to-b.roll_from)<0)
-        return revs/(len(self.corrs)-1)
+        """Weighted oscillation index for roll axis.
+        = total displacement in reversing steps / total displacement all steps.
+        Roll legitimately reverses direction tracking ball drift, so this metric
+        must be interpreted with step magnitude context — small reversals are normal.
+        0.0 = monotone, 1.0 = all displacement wasted on reversals."""
+        if len(self.corrs) < 2: return None
+        total = sum(abs(c.roll_to - c.roll_from) for c in self.corrs)
+        if total < 1e-6: return None
+        wasted = sum(abs(b.roll_to - b.roll_from)
+                     for a, b in zip(self.corrs, self.corrs[1:])
+                     if abs(a.roll_to - a.roll_from) > 1e-6
+                     and abs(b.roll_to - b.roll_from) > 1e-6
+                     and (a.roll_to - a.roll_from) * (b.roll_to - b.roll_from) < 0)
+        return wasted / total
     @property
     def roll_stall_fraction(self):
         if len(self.corrs)<2: return None
@@ -210,20 +228,77 @@ class PoseWindow:
     @property
     def servo_quality_score(self):
         """Composite servo score: lower = worse servo behavior.
-        Combines tracking error, travel limit fraction, and effective correction rate.
-        Used for servo ranking — independent of ball position quality."""
+
+        Scores flex and roll axes independently, then combines them weighted
+        by each axis's demand (cumulative displacement).  The axis that was
+        asked to do more work dominates the score — a good roll axis cannot
+        mask a stalled flex axis when flex was the critical one (e.g. pose 5).
+
+        Per-axis sub-score (0=bad, 1=perfect):
+          flex_score = (1 - travel_limit_fraction) * effective_correction_rate
+                       * (1 - clamped_flex_tracking_error) * flex_achievement_ratio
+          roll_score = (1 - roll_stall_fraction) * (1 - clamped_roll_tracking_error)
+                       * roll_achievement_ratio  (no ECR — bidirectional roll is correct)
+
+        Final score = weighted average of flex_score and roll_score,
+        where each weight = fraction of total demand on that axis.
+        If one axis did >80% of the work, the other axis has <20% weight.
+        """
+        def _axis_achievement(corrs, get_cmd, get_act, large_thresh=0.010):
+            """Mean |achieved/commanded| for large steps (mirrors corr_analysis logic).
+            get_cmd(a) = commanded delta for step a.
+            get_act(a,b) = actually achieved between step a start and step b start."""
+            ratios = []
+            for a, b in zip(corrs, corrs[1:]):
+                cmd = get_cmd(a)
+                if abs(cmd) < large_thresh:
+                    continue
+                act = get_act(a, b)
+                ratios.append(min(abs(act) / abs(cmd), 2.0))
+            return sum(ratios) / len(ratios) if ratios else 1.0
+
         scores = []
         for s in self.sessions:
-            if s.tracking_lag_ratio is None: continue
-            # Penalize travel limit clamping heavily
-            tlf = s.travel_limit_fraction or 0
-            # Penalize poor effective correction rate (oscillation waste)
-            ecr = s.effective_correction_rate or 1.0
-            # Penalize tracking error
-            te  = min(s.servo_tracking_error or 0, 0.1) / 0.1
-            # Score: 0=bad, 1=perfect
-            score = (1 - tlf) * ecr * (1 - te)
-            scores.append(score)
+            if not s.corrs: continue
+
+            # -- flex axis --
+            tlf       = s.travel_limit_fraction or 0
+            ecr       = s.effective_correction_rate or 1.0
+            flex_errs = [abs(a.flex_to - b.flex_from)
+                         for a, b in zip(s.corrs, s.corrs[1:])]
+            flex_te   = min(sum(flex_errs)/len(flex_errs), 0.1) / 0.1 if flex_errs else 0
+            flex_ach  = _axis_achievement(s.corrs,
+                            get_cmd=lambda a: a.flex_to - a.flex_from,
+                            get_act=lambda a, b: b.flex_from - a.flex_from)
+            # flex_score: penalize travel-limit clamping, oscillation waste,
+            # tracking error, AND low achievement ratio (the main missing term).
+            flex_score = (1 - tlf) * ecr * (1 - flex_te) * flex_ach
+
+            # -- roll axis --
+            # Roll corrections legitimately reverse direction as the ball drifts
+            # left/right, so effective_correction_rate is NOT used here — it would
+            # penalize correct bidirectional tracking as if it were oscillation waste.
+            # Roll quality: did each commanded step actually execute at the right magnitude?
+            roll_stall = s.roll_stall_fraction or 0
+            roll_total = sum(abs(c.roll_to - c.roll_from) for c in s.corrs)
+            roll_errs  = [abs(a.roll_to - b.roll_from)
+                          for a, b in zip(s.corrs, s.corrs[1:])]
+            roll_te    = min(sum(roll_errs)/len(roll_errs), 0.1) / 0.1 if roll_errs else 0
+            roll_ach   = _axis_achievement(s.corrs,
+                            get_cmd=lambda a: a.roll_to - a.roll_from,
+                            get_act=lambda a, b: b.roll_from - a.roll_from)
+            roll_score = (1 - roll_stall) * (1 - roll_te) * roll_ach
+
+            # -- demand-weighted combination --
+            flex_demand  = sum(abs(c.flex_to - c.flex_from) for c in s.corrs)
+            roll_demand  = roll_total
+            total_demand = flex_demand + roll_demand
+            if total_demand < 1e-6:
+                continue
+            flex_w = flex_demand / total_demand
+            roll_w = roll_demand / total_demand
+            score  = flex_w * flex_score + roll_w * roll_score
+            scores.append(min(score, 1.0))  # cap at 1.0; overshoot ratios can exceed it
         return sum(scores)/len(scores) if scores else None
 
 def parse_log(path):
@@ -314,8 +389,14 @@ def fmt_slope(v):
     return f'{v:+.4f}/s {arr}'
 def fmt_pct(v):  return f'{100*v:.0f}%' if v is not None else ' --- '
 def fmt_osc(v):
+    # Weighted oscillation: fraction of total displacement wasted on reversals.
+    # Thresholds are lower than the old raw-reversal metric because small
+    # reversals near center no longer inflate the score.
+    # <0.15 = low (healthy, mostly monotone or tiny reversals)
+    # 0.15-0.40 = med (some oscillation, typical for converging PID)
+    # >0.40 = HIGH (significant displacement wasted — tuning needed)
     if v is None: return '  ---  '
-    lbl='HIGH' if v>0.6 else 'med' if v>0.3 else 'low'
+    lbl = 'HIGH' if v > 0.40 else 'med' if v > 0.15 else 'low'
     return f'{v:.2f}({lbl})'
 
 def report(poses, stable_thresh, near_thresh, centered_hold, logfile):
@@ -443,7 +524,7 @@ def report(poses, stable_thresh, near_thresh, centered_hold, logfile):
         print(f'\n  Servo quality (all sessions):')
         print(f'    Mean tracking error : {fmt(sum(all_te)/len(all_te))} rad per CORR step')
         print(f'    Mean lag ratio      : {fmt_pct(sum(all_lag)/len(all_lag))}  (of cmd displacement achieved before next correction)')
-        print(f'    Mean oscillation    : {fmt_osc(sum(all_osc)/len(all_osc))}  (fraction of steps reversing direction)')
+        print(f'    Mean oscillation    : {fmt_osc(sum(all_osc)/len(all_osc))}  (weighted: displacement wasted on reversals / total displacement)')
 
     print()
     print('─'*76)
@@ -467,35 +548,52 @@ def report(poses, stable_thresh, near_thresh, centered_hold, logfile):
     print('  Measures: travel limit clamping, oscillation waste, tracking error')
     print('  Independent of ball position — compare with pose ranking to find root cause')
     print('─'*76)
+    def _axis_ach(corrs, get_cmd, get_act, thr=0.010):
+        ratios = [min(abs(get_act(a,b))/abs(get_cmd(a)),2.0)
+                  for a,b in zip(corrs,corrs[1:]) if abs(get_cmd(a))>=thr]
+        return sum(ratios)/len(ratios) if ratios else 1.0
+
+    def _pose_axis_scores(pw):
+        """Return (flex_score, roll_score, flex_demand_deg, roll_demand_deg) averaged over sessions."""
+        flex_scores, roll_scores, flex_demands, roll_demands = [], [], [], []
+        for s in pw.sessions:
+            if not s.corrs: continue
+            tlf   = s.travel_limit_fraction or 0
+            ecr   = s.effective_correction_rate or 1.0
+            fe    = [abs(a.flex_to-b.flex_from) for a,b in zip(s.corrs,s.corrs[1:])]
+            fte   = min(sum(fe)/len(fe),0.1)/0.1 if fe else 0
+            fach  = _axis_ach(s.corrs, lambda a: a.flex_to-a.flex_from,
+                                        lambda a,b: b.flex_from-a.flex_from)
+            flex_scores.append((1-tlf)*ecr*(1-fte)*fach)
+            rs    = s.roll_stall_fraction or 0
+            rt    = sum(abs(c.roll_to-c.roll_from) for c in s.corrs)
+            re    = [abs(a.roll_to-b.roll_from) for a,b in zip(s.corrs,s.corrs[1:])]
+            rte   = min(sum(re)/len(re),0.1)/0.1 if re else 0
+            rach  = _axis_ach(s.corrs, lambda a: a.roll_to-a.roll_from,
+                                        lambda a,b: b.roll_from-a.roll_from)
+            roll_scores.append((1-rs)*(1-rte)*rach)  # no ECR: roll reversals are correct PID behavior
+            flex_demands.append(math.degrees(sum(abs(c.flex_to-c.flex_from) for c in s.corrs)))
+            roll_demands.append(math.degrees(rt))
+        def avg(lst): return sum(lst)/len(lst) if lst else 0
+        return avg(flex_scores), avg(roll_scores), avg(flex_demands), avg(roll_demands)
+
     servo_ranked = sorted(
-        [(pw.name, pw.servo_quality_score,
-          pw.worst_travel_limit,
-          sum(s.effective_correction_rate or 0 for s in pw.sessions)/max(len(pw.sessions),1),
-          sum(abs(s.cumulative_flex_rad or 0) for s in pw.sessions))
+        [(pw.name, pw.servo_quality_score, *_pose_axis_scores(pw))
          for pw in poses if pw.servo_quality_score is not None],
         key=lambda x: -x[1])  # higher score = better
-    print(f'  {"":2s}  {"Pose":<34s}  {"score":>5s}  {"travel_lim":>10s}  {"eff_rate":>8s}  {"cumul_flex":>10s}')
-    for rank,(name,score,tlf,ecr,cf) in enumerate(servo_ranked,1):
-        tlf_str = f'{100*tlf:.0f}% clamped' if tlf is not None else '  ---  '
-        # eff_rate is unreliable when clamping is significant — clamped steps
-        # contribute zero to both numerator and denominator, hiding the real picture
-        if tlf is not None and tlf > 0.20:
-            ecr_str = f'{100*ecr:.0f}% (unreliable—clamped)'
-        else:
-            ecr_str = f'{100*ecr:.0f}%' if ecr else ' --- '
-        cf_str  = f'{math.degrees(cf):+.1f}deg'
-        print(f'  {rank:2d}. {name:<34s}  {score:.3f}  {tlf_str:>10s}  {ecr_str:>28s}  {cf_str:>10s}')
+    print(f'  {"":2s}  {"Pose":<34s}  {"score":>5s}  {"flex_score":>10s}  {"roll_score":>10s}  {"flex_demand":>11s}  {"roll_demand":>11s}')
+    for rank,(name,score,fscore,rscore,fdeg,rdeg) in enumerate(servo_ranked,1):
+        # Flag the weaker axis with an arrow when demand-weighted gap is significant
+        dominant = '<--FLEX WEAK' if (fscore < rscore - 0.15 and fdeg > rdeg*0.5) else \
+                   '<--ROLL WEAK' if (rscore < fscore - 0.15 and rdeg > fdeg*0.5) else ''
+        print(f'  {rank:2d}. {name:<34s}  {score:.3f}  {fscore:>10.3f}  {rscore:>10.3f}  {fdeg:>10.1f}deg  {rdeg:>10.1f}deg  {dominant}')
     print()
     print('  Interpretation:')
-    print('    travel_lim  = fraction of steps where servo hit max_total_rad and could not move')
-    print('    eff_rate    = net displacement / total attempted displacement')
-    print('                  low  = corrections cancelling each other (oscillation waste)')
-    print('                  100% = all corrections in same direction (monotone)')
-    print('                  NOTE: marked unreliable when travel_lim > 20% because')
-    print('                        clamped steps (Δ=0) are excluded from both numerator')
-    print('                        and denominator, making 100% look perfect when the')
-    print('                        servo was actually stuck against its travel limit')
-    print('    cumul_flex  = total signed flex travel (large = needed more range than available)')
+    print('    score      = demand-weighted average of flex_score and roll_score (higher=better)')
+    print('    flex_score = flex axis quality: penalizes travel-limit clamping, oscillation, tracking error')
+    print('    roll_score = roll axis quality: penalizes stall fraction, oscillation, tracking error')
+    print('    flex/roll_demand = total displacement commanded on each axis (deg)')
+    print('    <--FLEX/ROLL WEAK = that axis underperformed AND was a significant demand axis')
     print('  If servo ranking matches ball ranking: gains/travel limits are the issue.')
     print('  If they diverge: servo is misbehaving independently of the command quality.')
 
@@ -557,9 +655,11 @@ def report(poses, stable_thresh, near_thresh, centered_hold, logfile):
 
         # Rule 5: oscillation waste — only flag when NOT primarily travel-limited
         # If clamped >20%, eff_rate is unreliable (clamped steps hidden from calculation)
-        if ecr_avg < 0.25 and (sr or n_poses) > n_poses//2 and tlf < 0.20:
-            causes.append(f'Low correction efficiency {100*ecr_avg:.0f}% — corrections cancelling out')
-            fixes.append('reduce kp to cut overshoot, or add D-term damping')
+        # Use weighted oscillation_index (fraction of displacement wasted) > 0.40
+        osc_avg = sum(s.oscillation_index or 0 for s in pw.sessions) / max(len(pw.sessions), 1)
+        if osc_avg > 0.40 and (sr or n_poses) > n_poses//2 and tlf < 0.20:
+            causes.append(f'High weighted oscillation {osc_avg:.2f} — significant displacement wasted on reversals')
+            fixes.append('reduce kp to cut overshoot, or increase kd damping')
 
         # Rule 6: servo good but ball bad — only meaningful if not travel-limited
         # (when clamped, the servo isn't truly 'executing well', it's stuck)

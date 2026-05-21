@@ -146,11 +146,15 @@ def analyse_session(sess, max_steps):
         print('  (insufficient CORR data)')
         return
 
-    header = (f'  {"step":>4}  {"flex_from":>9}  {"flex_to":>9}  '
-              f'{"tgt_deg":>8}  {"act_deg":>8}  {"ratio%":>7}  '
-              f'{"cumul_deg":>10}  {"interval_ms":>12}')
-    print(header)
-    print('  ' + '-'*78)
+    print(f'  {"step":>4}  '
+          f'{"── FLEX ──────────────────────────────────────":>44}  '
+          f'{"── ROLL ──────────────────────────────────────":>44}  '
+          f'{"cumul(f,r)":>14}  {"intv":>6}')
+    print(f'  {"":>4}  '
+          f'{"from":>8} {"to":>8}  {"tgt_deg":>8} {"act_deg":>8} {"ratio%":>7}  '
+          f'{"from":>8} {"to":>8}  {"tgt_deg":>8} {"act_deg":>8} {"ratio%":>7}  '
+          f'{"":>14}  {"":>6}')
+    print('  ' + '-'*128)
 
     achieved_sum = 0.0
     limit = min(n, max_steps) if max_steps else n
@@ -204,20 +208,45 @@ def analyse_session(sess, max_steps):
                 elif r > 2.0:  flag = ' ← LG_OVERSHOOT'
                 elif r > 1.15: flag = ' ← SM_OVERSHOOT'
 
-        print(f'  {i+1:>4}  {c.flex_from:>9.4f}  {c.flex_to:>9.4f}  '
-              f'{tgt_deg:>+8.3f}  {act_str:>8}  {ratio_str:>7}  '
-              f'{cumul_str:>10}  {interval_str:>12}{flag}')
+        # Roll axis achieved
+        if i + 1 < n:
+            roll_act_rad = corrs[i+1].roll_from - c.roll_from
+            roll_tgt_rad = c.roll_to - c.roll_from
+            roll_act_deg = roll_act_rad * 57.296
+            roll_tgt_deg = c.tgt_roll_deg
+            if abs(roll_tgt_rad) > 1e-6:
+                roll_ratio = roll_act_rad / roll_tgt_rad * 100
+                roll_ratio_str = f'{roll_ratio:+.0f}%'
+            else:
+                roll_ratio_str = '  N/A'
+            roll_act_str = f'{roll_act_deg:+.3f}'
+            roll_tgt_str = f'{roll_tgt_deg:+.3f}'
+        else:
+            roll_act_str = roll_tgt_str = roll_ratio_str = '  ---'
+
+        print(f'  {i+1:>4}  '
+              f'flex: {c.flex_from:>8.4f}→{c.flex_to:>8.4f} '
+              f'tgt={tgt_deg:>+7.3f} act={act_str:>7} {ratio_str:>7}  '
+              f'roll: {c.roll_from:>8.4f}→{c.roll_to:>8.4f} '
+              f'tgt={roll_tgt_str:>7} act={roll_act_str:>7} {roll_ratio_str:>7}  '
+              f'cumul=({cumul_str},{c.cumul_roll_deg:+.2f})  '
+              f'{interval_str:>7}{flag}')
 
     if limit < n:
         print(f'  ... ({n - limit} more steps not shown, use --max-steps 0 for all)')
 
     # Summary stats
-    pairs = []
+    pairs_flex = []
+    pairs_roll = []
     for i in range(min(n-1, limit)):
         c = corrs[i]
-        tgt = c.flex_to - c.flex_from
-        act = corrs[i+1].flex_from - c.flex_from
-        pairs.append((tgt, act))
+        flex_tgt = c.flex_to   - c.flex_from
+        flex_act = corrs[i+1].flex_from - c.flex_from
+        roll_tgt = c.roll_to   - c.roll_from
+        roll_act = corrs[i+1].roll_from - c.roll_from
+        pairs_flex.append((flex_tgt, flex_act))
+        pairs_roll.append((roll_tgt, roll_act))
+    pairs = pairs_flex  # keep for backward compat
 
     if pairs:
         # HOLD: |tgt| < 0.003 rad (~0.17 deg)  SMALL: 0.003-0.010  LARGE: >=0.010
@@ -241,8 +270,26 @@ def analyse_session(sess, max_steps):
             print(f'    wrong dir     : {wrong}  ({100*wrong/len(grp):.0f}%)')
 
         print(f'  Step breakdown:  hold={len(hold)}  small={len(small)}  large={len(large)}')
+        print('\n  ── FLEX AXIS ──')
         stats(large, 'LARGE (>=0.57 deg, meaningful correction)')
         stats(small, 'SMALL (0.17-0.57 deg, fine correction)')
+
+        # Roll axis stats
+        roll_hold  = [(t,a) for t,a in pairs_roll if abs(t) < 0.003]
+        roll_small = [(t,a) for t,a in pairs_roll if 0.003 <= abs(t) < 0.010]
+        roll_large = [(t,a) for t,a in pairs_roll if abs(t) >= 0.010]
+        print('\n  ── ROLL AXIS ──')
+        stats(roll_large, 'LARGE (>=0.57 deg, meaningful correction)')
+        stats(roll_small, 'SMALL (0.17-0.57 deg, fine correction)')
+        if roll_hold:
+            HOLD_THRESH = 0.003
+            drifted_r = [(t,a) for t,a in roll_hold if abs(a) > HOLD_THRESH * 3]
+            held_r    = [(t,a) for t,a in roll_hold if abs(a) <= HOLD_THRESH * 3]
+            print(f'\n  ROLL HOLD (<0.17 deg) steps: {len(roll_hold)}  '
+                  f'held={len(held_r)}  drift={len(drifted_r)}')
+            if drifted_r:
+                avg_dr = sum(abs(a)*57.3 for t,a in drifted_r)/len(drifted_r)
+                print(f'    HOLD_DRIFT: {len(drifted_r)} steps moved avg {avg_dr:.3f} deg')
         if hold:
             HOLD_THRESH = 0.003
             drifted = [(t,a) for t,a in hold if abs(a) > HOLD_THRESH * 3]
