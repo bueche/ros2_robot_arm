@@ -65,12 +65,32 @@
 - Raw test results: [here](https://drive.google.com/drive/folders/1mLVPdBu6hI8HkZgBizKYOD7f58EED1n5)
 
 #### 05-10-2026
-- Summary: 
-- Best run: 8 out of 11 poses balanced
+- Summary: big progress with testing and tuning. 
+  - t1:  -p max_step_rad:=0.02
+  - t2: first attempt at D-term (calibrated IMU) -p kd_flex:=0.02 -p kd_roll:=0.02
+  - t3: 2nd attempt ... arm shook too much total fail
+  - t4: -p correction_hz:=2.0 ... reduced correction rate from once every 200ms to once every 500 ms .. still shaking
+  - t5: -p correction_hz:=1.0 <--- this was the big win!  to get rid of shakes
+
+- Best run: 8 out of 11 poses balanced (t5)
 - Raw test results: [here](https://drive.google.com/drive/folders/1Aw71SPTRNM2B8XkhZjr-hQcE9Nj0HguZ)
 
 #### 05-09-2026
-- Summary: 
+- Summary: Initial use of anaysis metrics. Only P-term is being used. cup version 3 is being used.
 - Best run: 1 out of 11 poses balanced
 - Raw test results: [here](https://drive.google.com/drive/folders/1wS2cby8JCwtBqDidsu8bunQUOJk2VjV8)
 
+#### 05-08-2026
+- Summary:
+- Best Run: 0 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/185mo2L-VGnIdWO9HgOUCZFh2qUUFjhYf)
+
+#### 05-07-2026
+- Summary:
+- Best Run: 0 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1N0kzlyP1XtdEWTQaDBJjzfdu7e6nE75E)
+
+#### 04-29-2026
+- Summary:
+- Best Run: 0 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1ONip-Px7ZV83DV2gUOei6lk9gwigBbRP)
