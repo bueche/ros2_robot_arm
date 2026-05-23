@@ -2,10 +2,30 @@
 ## Sections
 ## Balance Test results v1
 ### Summary
+The following notes outline the test results so far and provide links to the details for each. 
+
+The main metric for success in the V1 of the balancing effort is a "centered event". This is measured as 2 consecutive seconds in which the ball is within 15% of the center (pos < 0.15 on the unit circle). This event can happen only once for each pose as the test moves on to the next pose once it has been achieved. The following graph below charts the progress over the tests. 
 
 <p align="center">
   <img src="../images/test.result.summary.jpg" alt="summary " width="800">
 </p> 
+
+Another interesting metric to track is the percentage of ball coordinate samples that fall within the tight range (pos<15%) or the near range (pos<30%). This is a useful metric to know if one is making incremental progress even if the ball centered metric does not increase or stays the same. 
+
+<p align="center">
+  <img src="../images/ball_tight_and_near_progress.jpg" alt="summary " width="800">
+</p> 
+
+### Detailed Test Result Conventions
+There are several reporting conventions covered the results.
+1. Each report file is tagged by date and test-number-of-the-day. We use YYMMDD.tN, where YY=2 digit year, MM = month, DD = day, and N = the test number of that day.
+2. The raw test results are stored in a file with a naming convention: `test.results.YYMMDD.tN.cv3.txt`. Inside this file are the concatenated log output for (1) the `pose_test.py` utility, (2) the `wrist_balance_controller.py` node, (3) the `ball_balance_node.py`, (4) the `ball_detector_oak.py` or the `ball_detector_nvidia.py` (whichever was used in the test), and (5) the output from `system_watchdog.py`. In addition, some summary notes as to what was the main change from this test vs. the previous one are also provided.
+3. The summary analysis is stored in a file with the naming convention: `test.analysis.YYMMDD.tN.cv3.txt`. This is created by running the `test_analysis.py` on the raw test results. This summarizes the entire test and also summarizes and ranks how each pose did.
+4. Some corr (or correction) analysis is stored in a file with the naming convention: `test.corr.YYMMDD.tN.cv3.txt`. This provides a detailed analysis on how each correction did for a particular pose. Useful to spot the details of servo issues and to tune the PID values.
+5. A  video of the rviz2 output is stored in a file with the naming convention: `test.video.YYMMDD.tN.cv3.txt`. 
+6. Power logging output is stored in a file named `power_log_YYYYMMDD_NNNNNN.csv` this is a csv log output of the voltage, current, and temperature for the servos.
+
+More details on the actual metric definitions can be found [here](./balance_metrics.md).
 
 ### Detailed Results by Date
 #### 05-21-2026

@@ -18,7 +18,7 @@ The key camera interface is the [ball_detector_oak.py](../balance/balance/ball_d
 This sub-project builds upon the earlier work to accurately measure the robot's input current and voltage. The importance of gathering 
 those measurements becomes clearer as fine adjustments and error correction could lead to undesiable current spikes (and voltage drops).  
 
-The video clip below shows the rviz output for a portion of the test (as of 04/24/2026). Currrently the ball never makes it to the center but tuning is underway.
+The video clip below shows the rviz output for a portion of the test (as of 04/24/2026). The system has been tuned such that the ball does make it into the middle (balanced) see [current test results](./balance_test_results.md) for more details and additional videos.
 
 <p align="center">
   <img src="../images/balance_video_camera_inference.gif" alt="using the camera's inferencing ability to detect cup and ball" width="700">
@@ -42,11 +42,14 @@ The rest of this page provides more detail or links to more detail on this sub-p
 
 
 ## Current Status and Next Steps
-- 05/2026 - Entire architecture is more or less working, but the task is not complete (ball not balanced).
-  1. The imu readings are not calibrated and hence although collected  unused to impact the servo movements.
-  2. More tuning of the PID controller is required to complete the balance task.
-  3. We are likely to build the version 3 cup so that the surface is a bit more concave.
-  
+- 05/22/2026 - We have been successful at getting the ball to reach the center for each of the 11 initial poses defined in [`balance_v1.yaml`](../writing_robot_description/config/balance_v1.yaml). See [test results](./balance_test_results.md) for more details. There will be a bit of code cleanup and additonal documentation and then we will publish version 2 of this repository and then move on to V2 of the balance effort. 
+
+Some of the todo work for V1 of balance includes:
+ - more notes on the details of the metrics and their evolution for future releases
+ - updating the electrical wiring diagrams 
+ - adding notes on the evolution of the cup design 
+ - notes on the torque analysis of the arm lifting the cup and ball
+ - notes on the learnings so far (see below)
 
 
 ## FAQ
