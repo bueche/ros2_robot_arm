@@ -22,18 +22,17 @@ The ball balancing system consists of five nodes working in a pipeline:
 
 2. The `ball_balance_node.py` then uses this information to work out the ball's coordinates within the cup. Then it formulates the Proportional adjustment portion of the PID command and publishes this as the topic `/imu/balance_cmd`. Note this is labeled as the node `/imu` due to originally all I had was the imu and not the camera. Need to clean this up. Also, note that the ball balance node doesn't know the position of the servos. So the pid command still needs to be translated into servo radian positions by the `wrist_balance_controller`.
 
-3. The IMU (BNO085/MPU-6050 on ESP32, mounted on wrist) publishes `/imu/balance_error` 
-and `/imu/raw` for monitoring and optional Derivative or D-term feedforward, but in this test run 
+3. The `imu_balance_node.py` interfaces with the IMU (BNO085/MPU-6050 on ESP32, mounted on wrist) and publishes `/imu/balance_error` and `/imu/raw` for monitoring and optional Derivative or D-term feedforward, but in this test run 
 D-term gains were zero so it contributed no corrections.
 
-4. The `wrist_balance_controller` takes in the input from the camera (now formulated as a PID command), tge servo positions, and the IMU and does the last bit of PID operation by translating this into servo radian targets. It publishes these to make this happen.
+4. The `wrist_balance_controller` takes in the input from the camera (now formulated as a PID command), the servo positions, and the IMU and does the last bit of PID operation by translating this into servo radian targets. It publishes these to make this happen.
 
 
 ---
 
 ## 2. Visual Coordinate Conventions
 
-The ML model returns coordinates on the image, not within the cup. It has no concept of the cup at all — it just returns bounding boxes for whatever objects it detects that meet the confidence threshold. For each detection it outputs four numbers: the pixel coordinates of the top-left and bottom-right corners of the bounding box (xmin, ymin, xmax, ymax), along with a class label (0=ball, 1=cup) and a confidence score. The model was trained to recognize both objects but it treats them as completely independent detections — it doesn't know or care that the ball should be inside the cup.
+The ML model takes as input the camera image returns the cup's and ball's coordinates on that image. It returns bounding boxes for whatever objects it detects that meet the confidence threshold. For each detection it outputs four numbers: the pixel coordinates of the top-left and bottom-right corners of the bounding box (xmin, ymin, xmax, ymax), along with a class label (0=ball, 1=cup) and a confidence score. The model was trained to recognize both objects but it treats them as completely independent detections — it doesn't know or care that the ball should be inside the cup. The ball detector code, however, does use the containment relationship in some subsequent hueristics add additional confidence to the output.
 
  The next challenge in translating ball position into servo commands is establishing a shared coordinate system that makes the math simple and the control logic intuitive.   The approach here is to express the ball's position relative to the cup center — not in pixels, but as a normalized offset divided by the cup radius. This gives a coordinate space where (0,0) always means "ball is centered" regardless of how large the cup appears in the camera frame, and where the rim of the cup is at magnitude 1.0 in any direction. 
  
@@ -63,6 +62,21 @@ A value of (±1.0, 0.0) means the ball is at the cup rim on the roll axis.
 <p align="center">
   <img src="../images/ball_coordinate_orientation.jpg" alt="ball_orientation " width="700">
 </p> 
+
+This ball position on this unit circle is used then to derive our P-term (Proportional term). Anything that is non-zero is essentially defines the x or y distance of the ball from (0,0).
+
+```
+error_x = ball.x   (positive = ball right     → need to roll left  → positive wrist_roll)
+                   (negative = ball left      → need to roll right → negative wrist_roll)
+
+error_y = ball.y   (positive = ball forward   → need to flex back     → positive wrist_flex)
+                   (negative = ball back      → need to flex forward  → negative wrist_flex)
+
+── P-term ──────────────────────────────────────────────────────
+Pflex = +kp_flex × error_y
+Proll = +kp_roll × error_x
+
+```
 
 ### 2.2 Robot Joint Frame and Understanding Past Errors
 
@@ -181,7 +195,21 @@ The example below illustrates our implemented I-term impact. Step 5 hard a targe
  
 ```
 
+Our I-term then is defined as:
 
+```
+── I-term (ki_mode=servo) ──────────────────────────────────────
+# Accumulates undelivered servo delta each step.
+# Only grows when wrist_balance_controller underdelivers.
+# Resets to zero on MOVING→SETTLED state transition.
+
+i_flex += ki_flex × (cmd_delta_flex - achieved_delta_flex) × dt
+i_roll += ki_roll × (cmd_delta_roll - achieved_delta_roll) × dt
+Iflex   = i_flex
+Iroll   = i_roll
+
+```
+where `cmd_delta_flex/roll` are the commanded radian movements and `achieved_delta_flex/roll` are what where actually achieved.
 
 ### 2.3 IMU feedback as D-term to dampen PI 
 
@@ -217,15 +245,32 @@ Why IMU-based D-term is better: The IMU measures angular_velocity of the cup dir
 The concrete scenario where this should help our system: During pose 1 (initial), the ball starts at y=-0.73 (far side). The P-term commands a strong negative flex correction. The cup starts tilting, the ball rolls toward center. Without D-term, the P-term stays large until the ball reaches 0.0 — but by then the cup has built up angular momentum and the ball overshoots to +0.7 on the other side. With IMU D-term: as the cup tilts at increasing pitch rate, imu_pitch_rate grows negative, `-kd × negative_rate` adds a positive contribution to flex_cmd, partially canceling the P-term. The cup decelerates before the ball reaches center. The ball arrives at center with less momentum. This is the damping behavior we need to stop the oscillation.
 The "prediction" framing applied properly: The IMU is sensing the cup's angular velocity right now. Since the ball's future position is determined by current cup tilt rate (a ball on a tilting surface accelerates proportionally to tilt angle), the IMU rate is a leading indicator of where the ball will be in 200-500ms. In that sense the D-term from the IMU is genuinely predictive — it hopefully acts on cup motion before the ball has moved, rather than reacting after the ball has already overshot.
 
+Our D-term is then defined as:
+
+```
+── D-term ──────────────────────────────────────────────────────
+# IMU angular velocity — cup tilt rate, not d(ball_error)/dt.
+# Opposes all cup motion regardless of direction.
+# Damps overshoot (main purpose) but also slightly resists
+# intentional corrections — trade-off controlled by kd.
+# imu_pitch_rate ← angular_velocity.y (dp) from /imu/raw
+# imu_roll_rate  ← angular_velocity.x (dr) from /imu/raw
+# NOTE: x=roll, y=pitch — opposite to ROS REP-103 convention.
+Dflex = -kd_flex × imu_pitch_rate
+Droll = -kd_roll × imu_roll_rate
+
+```
 
 ### 2.4 Summary of PID logic
 **this section needs and update**
-The full sign chain from ball position to joint correction:
+The full sign chain from ball position to joint correction. This first section has already been stated above.
 
 ```
-error_x = ball.x   (positive = ball right  → need to roll left  → positive wrist_roll)
-error_y = ball.y   (positive = ball near   → need to flex back  → positive wrist_flex)
+error_x = ball.x   (positive = ball right     → need to roll left  → positive wrist_roll)
+                   (negative = ball left      → need to roll right → negative wrist_roll)
 
+error_y = ball.y   (positive = ball forward   → need to flex back     → positive wrist_flex)
+                   (negative = ball back      → need to flex forward  → negative wrist_flex)
 ── P-term ──────────────────────────────────────────────────────
 Pflex = +kp_flex × error_y
 Proll = +kp_roll × error_x
@@ -251,11 +296,20 @@ Iroll   = i_roll
 Dflex = -kd_flex × imu_pitch_rate
 Droll = -kd_roll × imu_roll_rate
 
+```
+Now all of these are combined to give us our correction.
+
+```
 ── Combined command ────────────────────────────────────────────
 flex_cmd = Pflex + Iflex + Dflex    } published to
 roll_cmd = Proll + Iroll + Droll    } /imu/balance_cmd at ~15Hz
 flex_cmd = clamp(flex_cmd, -max_cmd, +max_cmd)
 roll_cmd = clamp(roll_cmd, -max_cmd, +max_cmd)
+
+```
+The observant reader will question how this works: What reconciled the different term units? How can you combine a unitless value (Pflex & Proll) with other terms (I-term and D-term) that are in radians/s? Great question. I didn't have any rigorous mathematical framework that converts ball position into radian correction for servo motors. I essentially used the `kp` factors and the clamp (or max) values to get something that works in practice. Also, I started tuning the system with the P-term and layered on the I-term and D-term afterwards. This was the right approach because the P-term should dominate and the ball position was the best indicator of how to move the two servos. The clamp (or max) values kept things "in bounds". That all being true, it gives on a sense of how changing the system in some fashion (like a new version of the cup or a heavier version of the ball or faster corrections) will lead to the need for more tuning. Its a little fragile.
+
+```
 
 ── Wrist controller ────────────────────────────────────────────
 # Receives flex_cmd/roll_cmd, converts to joint trajectory.
