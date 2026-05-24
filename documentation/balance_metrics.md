@@ -16,6 +16,9 @@ As noted earlier this position topic is published by the ball_detector_nvidia.py
 [INFO] [1778622300.315666024] [ball_balance_node]: Ball centered — held within stable_thresh=0.15 for 2.0s  
 
 ```
+<p align="center">
+  <img src="../images/tight_and_near_positions.jpg" alt="tight and near " width="800">
+</p> 
 
 ### Percentage of Center transits and Near center transits
 That is, even if the ball is not stable at the center, if we are increasing the number of transits then the system is getting better. This is also tallied by the ball_balance_node.py and written to the log at the end of PID run.
@@ -29,8 +32,12 @@ Now the near center represents ball coordinates that were within 30% of less of 
 ### Ball Lost Events
 One key component of the system is the ML model to locate the ball and cup. Turns out that the cup is found 100% of the time, but the ball is not. If the model can't find the ball. then the whole system is running blind. Hence, keeping this number as low as possible is critical for task success.
 
+<p align="center">
+  <img src="../images/example.ball.lost.jpg" alt="ball lost " width="800">
+</p> 
+
 ### Ratio of Actual to Targetted servo position
-This was discussed earlier in our [I logic](./ball_balance_pid_documentation.md#22-robot-joint-frame-and-understanding-past-errors). In that example we showed how knowing that the servo is unable to achieve the position goal drives the values of the Intergral compoent of the PID to adjust. If this ratio is really low then this I component should grow so that the servo can make a much larger adustment.
+This was discussed earlier in our [I term logic](./ball_balance_pid_documentation.md#22-robot-joint-frame-and-understanding-past-errors). In that example we showed how knowing that the servo is unable to achieve the position goal drives the values of the Intergral compoent of the PID to adjust. If this ratio is really low then this I component should grow so that the servo can make a much larger adustment.
 
 ### 
 

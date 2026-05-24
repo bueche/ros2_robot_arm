@@ -123,8 +123,8 @@ Lets look at an actual case for one of the difficult scenarios in our test: pose
 [pose_test_node]:   Joint States:
 [pose_test_node]:    shoulder_pan    [XL430] Pos:  1.499rad Load:  0.00% Volt:12.0V Temp: 36.0°C
 [pose_test_node]:    shoulder_lift   [XL430] Pos:  2.496rad Load: 24.30% Volt:12.0V Temp: 39.0°C
-[pose_test_node]:    elbow_flex      [XL330] Pos:  1.519rad Curr: -250mA Volt: 4.6V Temp: 29.0°C <----
-[pose_test_node]:    wrist_flex      [XL330] Pos:  2.507rad Curr:   50mA Volt: 4.6V Temp: 25.0°C <----
+[pose_test_node]:    elbow_flex      [XL330] Pos:  1.519rad Curr: -250mA Volt: 4.6V Temp: 29.0°C <------
+[pose_test_node]:    wrist_flex      [XL330] Pos:  2.507rad Curr:   50mA Volt: 4.6V Temp: 25.0°C <------
 [pose_test_node]:    wrist_roll      [XL330] Pos:  1.548rad Curr:   11mA Volt: 4.6V Temp: 24.0°C
 [pose_test_node]:    pen_holder      [XL330] Pos:  0.974rad Curr:   15mA Volt: 4.6V Temp: 26.0°C
 [pose_test_node]:   ⚡ Power Analysis for "pose 5 - forward":
@@ -153,7 +153,7 @@ Lets look at an actual case for one of the difficult scenarios in our test: pose
   Duration: 19.5s    CORR steps: 17
 ================================================================================
   step  ── FLEX ──────────────────────────────────────  ── ROLL ──────────────────────────────────────      
-            from       to   tgt_deg  act_deg  ratio%      from       to   tgt_deg  act_deg  ratio%
+            from_rad       to_rad   tgt_deg  act_deg  ratio%      from_rad       to_rad   tgt_deg  act_deg  ratio%
   --------------------------------------------------------------------------------------------------------------------------------
      1  flex:   2.2918→  2.3218 tgt= +1.719 act= +0.086     +5%  roll:   1.5999→  1.5699 tgt= -1.720 act= -1.581    +92%  
      2  flex:   2.2933→  2.3233 tgt= +1.719 act= +0.178    +10%  roll:   1.5723→  1.5423 tgt= -1.720 act= -1.667    +97%  
@@ -183,7 +183,7 @@ The example below illustrates our implemented I-term impact. Step 5 hard a targe
   Duration: 19.5s    CORR steps: 19
 ================================================================================
   step  ── FLEX ──────────────────────────────────────  ── ROLL ──────────────────────────────────────      cumul(f,r)    intv
-            from       to   tgt_deg  act_deg  ratio%      from       to   tgt_deg  act_deg  ratio%
+            from_rad       to_rad   tgt_deg  act_deg  ratio%      from_rad       to_rad   tgt_deg  act_deg  ratio%
   --------------------------------------------------------------------------------------------------------------------------------
      :
      :
@@ -228,7 +228,7 @@ where `cmd_delta_flex/roll` are the commanded radian movements and `achieved_del
   Duration: 11.0s    CORR steps: 11
 ================================================================================
   step  ── FLEX ──────────────────────────────────────  ── ROLL ──────────────────────────────────────      cumul(f,r)    intv
-            from       to   tgt_deg  act_deg  ratio%      from       to   tgt_deg  act_deg  ratio%
+            from_rad       to_rad   tgt_deg  act_deg  ratio%      from_rad       to_rad   tgt_deg  act_deg  ratio%
   --------------------------------------------------------------------------------------------------------------------------------
      1  flex:   2.6676→  2.5898 tgt= -4.458 act= -4.744   +106%  roll:   1.5999→  1.5328 tgt= -3.850 act= -3.776    +98%  
      2  flex:   2.5848→  2.5048 tgt= -4.584 act= -5.185   +113%  roll:   1.5340→  1.4625 tgt= -4.100 act= -4.045    +99%  
@@ -307,7 +307,7 @@ flex_cmd = clamp(flex_cmd, -max_cmd, +max_cmd)
 roll_cmd = clamp(roll_cmd, -max_cmd, +max_cmd)
 
 ```
-The observant reader will question how this works: What reconciled the different term units? How can you combine a unitless value (Pflex & Proll) with other terms (I-term and D-term) that are in radians/s? Great question. I didn't have any rigorous mathematical framework that converts ball position into radian correction for servo motors. I essentially used the `kp` factors and the clamp (or max) values to get something that works in practice. Also, I started tuning the system with the P-term and layered on the I-term and D-term afterwards. This was the right approach because the P-term should dominate and the ball position was the best indicator of how to move the two servos. The clamp (or max) values kept things "in bounds". That all being true, it gives on a sense of how changing the system in some fashion (like a new version of the cup or a heavier version of the ball or faster corrections) will lead to the need for more tuning. Its a little fragile.
+The observant reader will question how this works: What reconciled the different term units? How can you combine a unitless value (Pflex & Proll) with other terms (I-term and D-term) that are in radians/s? Great question. We didn't have any rigorous mathematical framework that converts ball position into radian correction for servo motors. We essentially used the `kp` factors and the clamp (or max) values to get something that works in practice. Also, I started tuning the system with the P-term and layered on the I-term and D-term afterwards. This was the right approach because the P-term should dominate and the ball position was the best indicator of how to move the two servos. The clamp (or max) values kept things "in bounds". That all being true, it gives on a sense of how changing the system in some fashion (like a new version of the cup or a heavier version of the ball or faster corrections) will lead to the need for more tuning. Its a little fragile.
 
 ```
 
