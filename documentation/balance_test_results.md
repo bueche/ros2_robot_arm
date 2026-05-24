@@ -28,6 +28,20 @@ There are several reporting conventions covered the results.
 More details on the actual metric definitions can be found [here](./balance_metrics.md).
 
 ### Detailed Results by Date
+#### 05-23-2026
+- Summary: Introduced a new approach for the D-term instead of using the IMU now using the joint state data to compute the velocity of the servos. The imu values were really static.
+
+- Best run: 10 out of 11 poses balanced
+
+- Raw test results: [here](https://drive.google.com/drive/folders/137WMwzBV4Gz3MZBRj6hqDPUynfYLXZxf)
+
+#### 05-23-2026
+- Summary: No parameter changes from the last run on the previous day. created a new logger that is logging the pid output so I can study the sensors and their impact on the pid.
+
+- Best run: 10 out of 11 poses balanced
+
+- Raw test results: [here](https://drive.google.com/drive/folders/1NK0KE4UHPHZIe5EuDD7gsrXKRxyBEQ2-)
+
 #### 05-21-2026
 - Summary: No parameter changes from the last run on the previous day. The all 11 poses reached balance state. The system watchdog was moved from the Nvidia Nano to the PI in order to get an accurate inter-system latency measurement. In addition, the oscillation metric has been modified to take into  account the distance of the overshoot. The previous days data has not been updated with the new metric.
 - Best run: 11 out of 11 poses balanced
