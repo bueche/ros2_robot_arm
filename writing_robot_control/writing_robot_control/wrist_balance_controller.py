@@ -26,6 +26,13 @@ Parameters:
   flex_max_rad       Flex hard maximum                       default: 2.700
   roll_min_rad       Roll hard minimum                       default: -1.448
   roll_max_rad       Roll hard maximum                       default: 1.900
+
+Publishes:
+  /balance/wrist_velocity (Vector3) — x=d(wrist_flex)/dt, y=d(wrist_roll)/dt (rad/s)
+    Finite difference at joint_states rate (~100Hz).
+    Use as D-term source in ball_balance_node (d_term_source:=joints) instead
+    of MPU-6050 gyro which quantizes at 0.000133 rad/s/LSB — too coarse for
+    the slow angular velocities during 1Hz wrist corrections.
 """
 
 import math
@@ -105,6 +112,17 @@ class WristBalanceController(Node):
         self._prev_cmd_flex    = None  # commanded delta for previous step
         self._prev_cmd_roll    = None
 
+        # Finite difference state for /balance/wrist_velocity
+        # Provides d(wrist_flex_pos)/dt and d(wrist_roll_pos)/dt at joint_states rate.
+        # Used by ball_balance_node as a gyro-independent D-term source.
+        # Published at joint_states rate (~100Hz), far above the 1Hz correction rate,
+        # so ball_balance_node gets a fresh velocity reading at every PID tick.
+        self._prev_flex_pos  = None
+        self._prev_roll_pos  = None
+        self._prev_vel_time  = None
+        self._dwrist_flex_dt = 0.0   # rad/s
+        self._dwrist_roll_dt = 0.0   # rad/s
+
         # Publishers
         self._traj_pub = self.create_publisher(
             JointTrajectory,
@@ -116,6 +134,13 @@ class WristBalanceController(Node):
             Vector3, '/balance/cmd_delta', 10)
         self._pub_achieved_delta = self.create_publisher(
             Vector3, '/balance/achieved_delta', 10)
+        # Wrist angular velocity from joint state finite difference.
+        # x = d(wrist_flex_pos)/dt  (rad/s)   — pitch axis D-term source
+        # y = d(wrist_roll_pos)/dt  (rad/s)   — roll axis D-term source
+        # Published at ~100Hz. More reliable than MPU-6050 for slow motions
+        # due to gyro quantization at ±250°/s range (0.000133 rad/s per LSB).
+        self._pub_wrist_vel = self.create_publisher(
+            Vector3, '/balance/wrist_velocity', 10)
 
         # Subscribers
         self.create_subscription(
@@ -155,9 +180,33 @@ class WristBalanceController(Node):
             self._last_cmd_time = time.monotonic()
 
     def _joint_state_callback(self, msg: JointState):
+        now = time.monotonic()
         with self._lock:
             for name, pos in zip(msg.name, msg.position):
                 self._joint_positions[name] = pos
+
+            # Compute finite difference wrist velocity and publish.
+            # Done inside the lock so _prev values are consistent.
+            fj = self._p_flex_joint
+            rj = self._p_roll_joint
+            fp = self._joint_positions.get(fj)
+            rp = self._joint_positions.get(rj)
+            if (fp is not None and rp is not None and
+                    self._prev_flex_pos is not None and
+                    self._prev_vel_time is not None):
+                dt = now - self._prev_vel_time
+                if 0.001 < dt < 0.5:
+                    self._dwrist_flex_dt = (fp - self._prev_flex_pos) / dt
+                    self._dwrist_roll_dt = (rp - self._prev_roll_pos) / dt
+            self._prev_flex_pos = fp
+            self._prev_roll_pos = rp
+            self._prev_vel_time = now
+
+        # Publish outside the lock — publisher is thread-safe
+        vel_msg = Vector3()
+        vel_msg.x = self._dwrist_flex_dt
+        vel_msg.y = self._dwrist_roll_dt
+        self._pub_wrist_vel.publish(vel_msg)
 
     def _balance_enabled_callback(self, msg: Bool):
         if msg.data == self._balance_active:

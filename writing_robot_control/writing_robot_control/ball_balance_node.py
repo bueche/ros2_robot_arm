@@ -27,6 +27,9 @@ Publishes:
                                                    Causes pose_test to advance immediately.
                                                    Distinct from /imu/is_stable (IMU-based).
   /ball/balance_error (geometry_msgs/Vector3)   — (ball_x, ball_y, magnitude) for debug
+  /ball/pid_detail_flex (geometry_msgs/Vector3) — (P_flex, I_flex, D_flex) per tick
+  /ball/pid_detail_roll (geometry_msgs/Vector3) — (P_roll, I_roll, D_roll) per tick
+                                                   x+y+z = pre-clamp flex/roll cmd
 
 Control law:
   error_x = ball_pos.x   (positive = ball right  → roll  cup left  → +wrist_roll)
@@ -106,6 +109,23 @@ class BallBalanceNode(Node):
         self.declare_parameter('kp_roll',        0.3)
         self.declare_parameter('kd_flex',        0.02)  # conservative default — tune up carefully
         self.declare_parameter('kd_roll',        0.02)
+        # d_term_source: where to read angular velocity for the D-term.
+        #   'imu'    — /imu/raw angular_velocity (MPU-6050 gyro, 50Hz)
+        #              KNOWN ISSUE: quantizes at 0.000133 rad/s/LSB — frozen
+        #              at slow angular velocities typical of 1Hz corrections.
+        #   'joints' — /balance/wrist_velocity (finite difference of joint_states, ~100Hz)
+        #              More reliable for slow servo motion; directly measures
+        #              what the servo did rather than cup vibration.
+        #              Requires wrist_balance_controller_v25+.
+        self.declare_parameter('d_term_source',  'joints')
+        # Anti-windup decay factor applied when ball error changes sign (ball
+        # crosses center axis). Decays the I-term to prevent windup from
+        # pushing the ball further past center on overshoot.
+        # 0.0 = full reset on sign change, 1.0 = no decay (disabled).
+        # 0.2 = decay to 20% — recommended starting value.
+        # Applied independently per axis: flex when error_y changes sign,
+        # roll when error_x changes sign.
+        self.declare_parameter('antiwindup_decay', 0.2)
         self.declare_parameter('ki_flex',        0.01)
         self.declare_parameter('ki_roll',        0.01)
         self.declare_parameter('max_cmd',        0.3)
@@ -161,6 +181,13 @@ class BallBalanceNode(Node):
         self._imu_pitch_rate    = 0.0   # rad/s — low-pass filtered angular velocity
         self._imu_roll_rate     = 0.0   # rad/s
         self._imu_raw_time      = None
+
+        # Joint-state-derived angular velocity from /balance/wrist_velocity.
+        # Published by wrist_balance_controller_v25+ at ~100Hz.
+        # Used as D-term source when d_term_source='joints'.
+        self._wrist_flex_vel    = 0.0   # d(wrist_flex_pos)/dt  rad/s
+        self._wrist_roll_vel    = 0.0   # d(wrist_roll_pos)/dt  rad/s
+        self._wrist_vel_time    = None  # monotonic time of last message
         # Low-pass filter coefficient for gyro smoothing.
         # alpha=0.3 means 30% new reading + 70% history — smooths noise
         # without adding significant lag at 50Hz IMU rate.
@@ -176,6 +203,11 @@ class BallBalanceNode(Node):
         self._integral_roll     = 0.0
         self._integral_flex_servo  = 0.0   # ki_mode='servo'/'combined': undelivered flex
         self._integral_roll_servo  = 0.0   # ki_mode='servo'/'combined': undelivered roll
+
+        # Previous error signs — used for anti-windup sign-change detection.
+        # None until first valid ball reading.
+        self._prev_error_x_sign = None   # sign of error_x on previous tick
+        self._prev_error_y_sign = None   # sign of error_y on previous tick
         self._last_control_time = None
 
         # Servo achievement ratio — exponential moving average of (achieved/commanded).
@@ -213,6 +245,14 @@ class BallBalanceNode(Node):
             Bool,    '/ball/is_centered',   10)
         self._pub_err     = self.create_publisher(
             Vector3, '/ball/balance_error', 10)
+        # Publishes full PID term breakdown for pid_logger and offline analysis.
+        # Two messages per control tick — one for flex axis, one for roll axis.
+        # Format: x=P_term  y=I_term  z=D_term
+        # Total cmd = x + y + z (before max_cmd clamp).
+        self._pub_pid_flex = self.create_publisher(
+            Vector3, '/ball/pid_detail_flex', 10)
+        self._pub_pid_roll = self.create_publisher(
+            Vector3, '/ball/pid_detail_roll', 10)
 
         # Subscribers
         self.create_subscription(
@@ -239,6 +279,12 @@ class BallBalanceNode(Node):
         self.create_subscription(
             Imu, '/imu/raw',
             self._imu_raw_cb, 10)
+        # Joint-state-derived wrist velocity from wrist_balance_controller_v25+.
+        # x = d(wrist_flex_pos)/dt, y = d(wrist_roll_pos)/dt  (rad/s, ~100Hz).
+        # Used as D-term source when d_term_source='joints'.
+        self.create_subscription(
+            Vector3, '/balance/wrist_velocity',
+            self._wrist_vel_cb, 10)
         self.create_subscription(
             String,     '/arm_state',
             self._arm_state_cb,  10)
@@ -413,6 +459,19 @@ class BallBalanceNode(Node):
                                     (1 - a) * self._imu_roll_rate)
             self._imu_raw_time   = time.monotonic()
 
+    def _wrist_vel_cb(self, msg: Vector3):
+        """Joint-state finite difference velocity from wrist_balance_controller_v25+.
+        x = d(wrist_flex_pos)/dt  (rad/s) — pitch axis, replaces imu_pitch_rate
+        y = d(wrist_roll_pos)/dt  (rad/s) — roll axis,  replaces imu_roll_rate
+        Published at ~100Hz. No quantization artifacts — resolution is the servo
+        encoder resolution (~0.088°) divided by the 10ms sample interval.
+        Sign convention: positive = wrist_flex increasing (cup tilting forward).
+        Same sign as imu_pitch_rate when IMU is working correctly."""
+        with self._lock:
+            self._wrist_flex_vel = msg.x
+            self._wrist_roll_vel = msg.y
+            self._wrist_vel_time = time.monotonic()
+
     def _arm_state_cb(self, msg: String):
         """Arm state machine: MOVING or SETTLED."""
         state = msg.data
@@ -428,6 +487,8 @@ class BallBalanceNode(Node):
                 self._integral_roll        = 0.0
                 self._integral_flex_servo  = 0.0
                 self._integral_roll_servo  = 0.0
+                self._prev_error_x_sign    = None
+                self._prev_error_y_sign    = None
                 self._centered_since       = None
                 self._flex_achievement     = 1.0   # reset — new pose may have different load
                 self._roll_achievement     = 1.0
@@ -514,6 +575,9 @@ class BallBalanceNode(Node):
             imu_pitch_rate = self._imu_pitch_rate
             imu_roll_rate  = self._imu_roll_rate
             imu_raw_time   = self._imu_raw_time
+            wrist_flex_vel = self._wrist_flex_vel
+            wrist_roll_vel = self._wrist_roll_vel
+            wrist_vel_time = self._wrist_vel_time
 
         # Camera freshness check
         cam_timeout = self.get_parameter('camera_timeout').value
@@ -665,12 +729,43 @@ class BallBalanceNode(Node):
         self._integral_flex += error_y * dt
         self._integral_roll += error_x * dt
 
-        # Anti-windup clamp
+        # Anti-windup clamp — hard magnitude limit
         max_integral = max_cmd / max(ki_flex, 1e-6)
         self._integral_flex = max(-max_integral,
                                    min(max_integral, self._integral_flex))
         self._integral_roll = max(-max_integral,
                                    min(max_integral, self._integral_roll))
+
+        # Anti-windup sign-change decay — when the ball crosses center on
+        # either axis the accumulated I-term is now pushing the wrong way.
+        # Decay it toward zero so the P-term can respond cleanly.
+        # Applied to both ball-mode and servo-mode integrals independently.
+        antiwindup_decay = self.get_parameter('antiwindup_decay').value
+        curr_y_sign = 1 if error_y > 0 else (-1 if error_y < 0 else 0)
+        curr_x_sign = 1 if error_x > 0 else (-1 if error_x < 0 else 0)
+
+        if (antiwindup_decay < 1.0 and
+                self._prev_error_y_sign is not None and
+                curr_y_sign != 0 and self._prev_error_y_sign != 0 and
+                curr_y_sign != self._prev_error_y_sign):
+            old_i = self._integral_flex_servo
+            self._integral_flex       *= antiwindup_decay
+            self._integral_flex_servo *= antiwindup_decay
+            self.get_logger().info(
+                f'ANTI-WINDUP flex: error_y {self._prev_error_y_sign:+d}→{curr_y_sign:+d} '                f'i_flex {old_i:+.4f}→{self._integral_flex_servo:+.4f} '                f'(decay={antiwindup_decay})')
+
+        if (antiwindup_decay < 1.0 and
+                self._prev_error_x_sign is not None and
+                curr_x_sign != 0 and self._prev_error_x_sign != 0 and
+                curr_x_sign != self._prev_error_x_sign):
+            old_i = self._integral_roll_servo
+            self._integral_roll       *= antiwindup_decay
+            self._integral_roll_servo *= antiwindup_decay
+            self.get_logger().info(
+                f'ANTI-WINDUP roll: error_x {self._prev_error_x_sign:+d}→{curr_x_sign:+d} '                f'i_roll {old_i:+.4f}→{self._integral_roll_servo:+.4f} '                f'(decay={antiwindup_decay})')
+
+        self._prev_error_y_sign = curr_y_sign
+        self._prev_error_x_sign = curr_x_sign
 
         # PID computation
         kp_flex = self.get_parameter('kp_flex').value
@@ -679,17 +774,32 @@ class BallBalanceNode(Node):
         kd_roll = self.get_parameter('kd_roll').value
         use_imu = self.get_parameter('use_imu').value
 
-        # IMU derivative term — uses angular RATE (rad/s) from /imu/raw,
-        # NOT tilt angle.  The rate is the true derivative of cup tilt:
-        # positive pitch_rate = cup tilting toward robot (near side rising).
-        # When the cup is tilting toward center, D-term reduces the command
-        # to prevent overshoot.  Uses imu_timeout for freshness check.
-        imu_timeout = self.get_parameter('imu_timeout').value
-        imu_raw_fresh = (use_imu and
-                         imu_raw_time is not None and
-                         now - imu_raw_time < imu_timeout)
-        d_flex = imu_pitch_rate if imu_raw_fresh else 0.0
-        d_roll = imu_roll_rate  if imu_raw_fresh else 0.0
+        # D-term source selection — controlled by d_term_source parameter.
+        # 'imu'    — MPU-6050 gyro via /imu/raw. Known issue: quantizes at
+        #            0.000133 rad/s/LSB, effectively frozen at slow angular
+        #            velocities typical of 1Hz wrist corrections.
+        # 'joints' — finite difference of joint_states via /balance/wrist_velocity
+        #            published by wrist_balance_controller_v25+. No quantization;
+        #            resolution ~0.0015 rad/s at 100Hz. Default.
+        imu_timeout   = self.get_parameter('imu_timeout').value
+        d_term_source = self.get_parameter('d_term_source').value
+
+        if d_term_source == 'joints':
+            joints_fresh = (wrist_vel_time is not None and
+                            now - wrist_vel_time < imu_timeout)
+            d_flex = wrist_flex_vel if joints_fresh else 0.0
+            d_roll = wrist_roll_vel if joints_fresh else 0.0
+            if not joints_fresh and use_imu:
+                self.get_logger().warn(
+                    'wrist_velocity stale — D-term zeroed. '
+                    'Is wrist_balance_controller_v25+ running?',
+                    throttle_duration_sec=5.0)
+        else:  # 'imu'
+            imu_raw_fresh = (use_imu and
+                             imu_raw_time is not None and
+                             now - imu_raw_time < imu_timeout)
+            d_flex = imu_pitch_rate if imu_raw_fresh else 0.0
+            d_roll = imu_roll_rate  if imu_raw_fresh else 0.0
 
         # Control law (validated signs from balance_v1.yaml):
         #   ball right (+x) → roll left  → +wrist_roll → roll_cmd positive
@@ -729,12 +839,26 @@ class BallBalanceNode(Node):
         cmd.y = roll_cmd   # → wrist_roll in wrist_balance_controller
         cmd.z = 0.0
         self._pub_cmd.publish(cmd)
+
+        # Publish individual PID terms for pid_logger.
+        # x=P_term, y=I_term, z=D_term — sum equals pre-clamp flex/roll cmd.
+        pid_flex = Vector3()
+        pid_flex.x = +kp_flex * error_y          # P
+        pid_flex.y = +ki_flex * i_flex            # I
+        pid_flex.z = -kd_flex * d_flex            # D (negative = damping)
+        self._pub_pid_flex.publish(pid_flex)
+
+        pid_roll = Vector3()
+        pid_roll.x = +kp_roll * error_x          # P
+        pid_roll.y = +ki_roll * i_roll            # I
+        pid_roll.z = -kd_roll * d_roll            # D
+        self._pub_pid_roll.publish(pid_roll)
         self.get_logger().info(
             f'CMD | ball=({error_x:+.3f},{error_y:+.3f}) '
             f'Pflex={+kp_flex*error_y:+.4f} Proll={+kp_roll*error_x:+.4f} '
             f'Dflex={-kd_flex*d_flex:+.4f} Droll={-kd_roll*d_roll:+.4f} '
             f'→ flex={flex_cmd:+.4f} roll={roll_cmd:+.4f} '
-            f'imu_pitch_rate={d_flex:+.4f}rad/s imu_roll_rate={d_roll:+.4f}rad/s '
+            f'd_src={d_term_source} flex_rate={d_flex:+.4f}rad/s roll_rate={d_roll:+.4f}rad/s '
             f'ach_flex={self._flex_achievement:.2f} ach_roll={self._roll_achievement:.2f} '
             f'i_flex={i_flex:+.4f} i_roll={i_roll:+.4f} ki_mode={self.get_parameter("ki_mode").value} '
             f'stable={is_stable} '

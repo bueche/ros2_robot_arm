@@ -33,6 +33,7 @@ setup(
             'joint_nudge = writing_robot_control.joint_nudge:main',
             'ball_balance_node = writing_robot_control.ball_balance_node:main',
             'system_watchdog = writing_robot_control.system_watchdog:main',
+            'pid_logger = writing_robot_control.pid_logger:main',
        ],
     },
 )
