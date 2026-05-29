@@ -536,7 +536,9 @@ class BallDetectorOakNode(Node):
                         jump = max(abs(dw - lw) / lw, abs(dh_d - lh) / lh)
                         if jump > self._cup_jump_frac:
                             self.get_logger().warn(
-                                f'Cup  size jump {jump:.0%} -- rejected',
+                                f'Cup  size jump {jump:.0%} -- rejected '
+                                f'(det={int(dw*w)}x{int(dh_d*h)}px conf={d.confidence:.3f} '
+                                f'prev={int(lw*w)}x{int(lh*w)}px)',
                                 throttle_duration_sec=1.0)
                             continue
                 if d.confidence > best_cup_c:
