@@ -88,6 +88,9 @@ class BallDetectorOakNode(Node):
         self.declare_parameter('debug_height',  320)
         self.declare_parameter('publish_hz',    12.0)
         self.declare_parameter('log_spikes',   True)   # log publish time spikes >half budget
+        self.declare_parameter('containment_margin', 0.30)  # slack around cup bbox
+        self.declare_parameter('warmup_frames',      10)    # bypass containment for first N cups
+        self.declare_parameter('min_ball_conf',      0.50)  # min conf for ball without cup anchor
 
         # Publishers
         self._pub_pos   = self.create_publisher(
@@ -130,7 +133,11 @@ class BallDetectorOakNode(Node):
         self._ball_jump_frac  = 0.50
         self._ball_det_count  = 0   # number of accepted ball detections so far
         self._cup_det_count   = 0
-        self._warmup_frames   = 10  # ignore size jumps for first N detections
+
+        # Cached parameters
+        self._p_warmup_frames      = self.get_parameter('warmup_frames').value
+        self._p_containment_margin = self.get_parameter('containment_margin').value
+        self._p_min_ball_conf      = self.get_parameter('min_ball_conf').value
 
         # Cached parameters — read once at startup to avoid get_parameter()
         # calls in the hot publish loop (each call involves a ROS2 service
@@ -187,7 +194,9 @@ class BallDetectorOakNode(Node):
         self.get_logger().info(
             f'ball_detector_oak ready (depthai {dai.__version__}, '
             f'MyriadX event-driven  '
-            f'image={pub_img} {dbg_w}x{dbg_h}  depth={ena_depth})')
+            f'image={pub_img} {dbg_w}x{dbg_h}  depth={ena_depth}  '
+            f'containment_margin={self._p_containment_margin}  '
+            f'min_ball_conf={self._p_min_ball_conf})')
 
     def _on_arm_state(self, msg):
         """Reset bbox size references when arm transitions MOVING → SETTLED.
@@ -460,39 +469,60 @@ class BallDetectorOakNode(Node):
             if remaining > 0:
                 time.sleep(remaining)
 
+    def _ball_inside_cup(self, ball_norm, cup_norm):
+        """Return True if ball center falls within cup bbox + containment_margin."""
+        bx = (ball_norm[0] + ball_norm[2]) / 2.0
+        by = (ball_norm[1] + ball_norm[3]) / 2.0
+        m  = self._p_containment_margin
+        return (cup_norm[0] - m < bx < cup_norm[2] + m and
+                cup_norm[1] - m < by < cup_norm[3] + m)
+
     def _process_and_publish(self, dets, frame, depth_frame):
-        """Process one detection result and publish all topics."""
+        """Containment-based detection, normalised position publish.
+
+        Mirrors ball_detector_nvidia_v7 filter strategy:
+
+        Pass 1: collect highest-confidence ball and cup candidates,
+                applying only the size-jump sanity filter.
+
+        Pass 2: containment validation:
+          Both found, ball inside cup  -> mutually validating, accept both.
+          Both found, ball outside cup -> discard lower-confidence detection.
+          Ball only, no cup            -> accept if conf >= min_ball_conf.
+          Cup only, no ball            -> accepted (ball may be occluded).
+
+        During warmup (first _p_warmup_frames cup detections after SETTLED
+        reset) containment check is bypassed so the system can anchor.
+        """
         h, w = (frame.shape[:2] if frame is not None
                 else (self._p_debug_height, self._p_debug_width))
 
-        # Detection selection with temporal size sanity filter
+        # Pass 1 -- collect best raw candidates with size-jump filter
         best_ball_norm = None;  best_ball_c = 0.0
         best_cup_norm  = None;  best_cup_c  = 0.0
 
         for d in dets:
-            dw = d.xmax - d.xmin
+            dw   = d.xmax - d.xmin
             dh_d = d.ymax - d.ymin
 
-            if d.label == BALL_IDX and d.confidence > best_ball_c:
-                # Only apply size jump filter after warmup period
-                if self._last_ball_wh is not None and self._ball_det_count >= self._warmup_frames:
+            if d.label == BALL_IDX and d.confidence > self._p_conf_threshold:
+                if self._last_ball_wh is not None and self._ball_det_count >= self._p_warmup_frames:
                     lw, lh = self._last_ball_wh
                     if lw > 0 and lh > 0:
                         jump = max(abs(dw - lw) / lw, abs(dh_d - lh) / lh)
                         if jump > self._ball_jump_frac:
                             self.get_logger().warn(
-                                f'Ball size jump {jump:.0%} — rejected',
+                                f'Ball size jump {jump:.0%} -- rejected',
                                 throttle_duration_sec=1.0)
                             continue
-                best_ball_c    = d.confidence
-                best_ball_norm = (d.xmin, d.ymin, d.xmax, d.ymax)
-                self._ball_det_count += 1
-                self.get_logger().info(
-                    f'Ball bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={d.confidence:.3f}',
-                    throttle_duration_sec=1.0)
+                if d.confidence > best_ball_c:
+                    best_ball_c    = d.confidence
+                    best_ball_norm = (d.xmin, d.ymin, d.xmax, d.ymax)
+                    self.get_logger().info(
+                        f'Ball bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={d.confidence:.3f}',
+                        throttle_duration_sec=1.0)
 
-            elif d.label == CUP_IDX and d.confidence > best_cup_c:
-                # ROI sanity: cup centre must be in lower 75% and middle 80% of frame
+            elif d.label == CUP_IDX and d.confidence > self._p_conf_threshold:
                 cx_n = (d.xmin + d.xmax) / 2.0
                 cy_n = (d.ymin + d.ymax) / 2.0
                 if cy_n < 0.25 or cx_n < 0.10 or cx_n > 0.90:
@@ -500,22 +530,24 @@ class BallDetectorOakNode(Node):
                         f'Cup rejected by ROI: cx={cx_n:.2f} cy={cy_n:.2f}',
                         throttle_duration_sec=2.0)
                     continue
-                # Only apply size jump filter after warmup period
-                if self._last_cup_wh is not None and self._cup_det_count >= self._warmup_frames:
+                if self._last_cup_wh is not None and self._cup_det_count >= self._p_warmup_frames:
                     lw, lh = self._last_cup_wh
                     if lw > 0 and lh > 0:
                         jump = max(abs(dw - lw) / lw, abs(dh_d - lh) / lh)
                         if jump > self._cup_jump_frac:
                             self.get_logger().warn(
-                                f'Cup  size jump {jump:.0%} — rejected',
+                                f'Cup  size jump {jump:.0%} -- rejected '
+                                f'(det={int(dw*w)}x{int(dh_d*h)}px conf={d.confidence:.3f} '
+                                f'prev={int(lw*w)}x{int(lh*w)}px)',
                                 throttle_duration_sec=1.0)
                             continue
-                best_cup_c    = d.confidence
-                best_cup_norm = (d.xmin, d.ymin, d.xmax, d.ymax)
-                self._cup_det_count += 1
-                self.get_logger().info(
-                    f'Cup  bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={d.confidence:.3f}',
-                    throttle_duration_sec=1.0)
+                if d.confidence > best_cup_c:
+                    best_cup_c    = d.confidence
+                    best_cup_norm = (d.xmin, d.ymin, d.xmax, d.ymax)
+                    self._cup_det_count += 1
+                    self.get_logger().info(
+                        f'Cup  bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={d.confidence:.3f}',
+                        throttle_duration_sec=1.0)
 
         # Update temporal size trackers
         if best_cup_norm is not None:
@@ -524,21 +556,52 @@ class BallDetectorOakNode(Node):
         if best_ball_norm is not None:
             xmin, ymin, xmax, ymax = best_ball_norm
             self._last_ball_wh = (xmax - xmin, ymax - ymin)
+            self._ball_det_count += 1
 
+        # Pass 2 -- containment validation
         cup_found  = best_cup_norm  is not None
         ball_found = best_ball_norm is not None
+        in_warmup  = self._cup_det_count < self._p_warmup_frames
 
-        if not cup_found and not ball_found:
+        if cup_found and ball_found:
+            if in_warmup:
+                self.get_logger().info(
+                    f'Warmup ({self._cup_det_count}/{self._p_warmup_frames}): '                    f'containment check bypassed',
+                    throttle_duration_sec=2.0)
+            elif self._ball_inside_cup(best_ball_norm, best_cup_norm):
+                pass  # mutually validating -- accept both
+            else:
+                bx = (best_ball_norm[0] + best_ball_norm[2]) / 2.0
+                by = (best_ball_norm[1] + best_ball_norm[3]) / 2.0
+                if best_ball_c >= best_cup_c:
+                    self.get_logger().warn(
+                        f'Ball outside cup -- discarding cup '                        f'(ball={best_ball_c:.3f} >= cup={best_cup_c:.3f}) '                        f'ball_center=({bx:.3f},{by:.3f})',
+                        throttle_duration_sec=1.0)
+                    cup_found = False
+                else:
+                    self.get_logger().warn(
+                        f'Ball outside cup -- discarding ball '                        f'(cup={best_cup_c:.3f} > ball={best_ball_c:.3f}) '                        f'ball_center=({bx:.3f},{by:.3f})',
+                        throttle_duration_sec=1.0)
+                    ball_found = False
+
+        elif ball_found and not cup_found:
+            if best_ball_c < self._p_min_ball_conf:
+                self.get_logger().warn(
+                    f'Ball (conf={best_ball_c:.3f}) without cup and below '                    f'min_ball_conf={self._p_min_ball_conf} -- discarding',
+                    throttle_duration_sec=2.0)
+                ball_found = False
+            else:
+                self.get_logger().warn(
+                    f'Ball (conf={best_ball_c:.3f}) found but NO CUP',
+                    throttle_duration_sec=2.0)
+
+        elif cup_found and not ball_found:
+            self.get_logger().warn(
+                f'Cup (conf={best_cup_c:.3f}) found but NO BALL',
+                throttle_duration_sec=2.0)
+
+        else:
             self.get_logger().warn('No detections', throttle_duration_sec=2.0)
-        elif not cup_found:
-            self.get_logger().warn(
-                f'Ball found (conf={best_ball_c:.3f}) but NO CUP',
-                throttle_duration_sec=2.0)
-        elif not ball_found:
-            self.get_logger().warn(
-                f'Cup found (conf={best_cup_c:.3f}) but NO BALL',
-                throttle_duration_sec=2.0)
-
         # Position calculation in normalised 0-1 space
         cup_cx_n = cup_cy_n = cup_r_n = None
         if cup_found:
