@@ -72,8 +72,9 @@ Parameters:
   camera_timeout  Seconds before camera stale      default: 2.0
   imu_timeout     Seconds before IMU stale         default: 0.5
   ball_lost_timeout  Seconds ball undetected before suspend  default: 1.0
-  jiggle_amplitude   Flex cmd amplitude during jiggle (rad/s) default: 0.04
+  jiggle_amplitude   Roll cmd amplitude during jiggle (rad/s) default: 0.04
   jiggle_start_delay Seconds lost before jiggle starts       default: 2.0
+  jiggle_hz          Jiggle rate Hz — should match correction_hz default: 1.0
   attempt_timeout    Seconds before giving up balancing      default: 5.0
   dry_run         Log only, don't publish cmd      default: False
   use_imu         Use IMU derivative term          default: True
@@ -136,8 +137,9 @@ class BallBalanceNode(Node):
         self.declare_parameter('camera_timeout',    2.0)
         self.declare_parameter('imu_timeout',       0.5)
         self.declare_parameter('ball_lost_timeout', 1.0)
-        self.declare_parameter('jiggle_amplitude',  0.04)  # rad/s flex cmd during jiggle
+        self.declare_parameter('jiggle_amplitude',  0.04)  # rad/s roll cmd during jiggle
         self.declare_parameter('jiggle_start_delay',2.0)   # seconds lost before jiggle starts
+        self.declare_parameter('jiggle_hz',         1.0)   # jiggle rate — match correction_hz
         self.declare_parameter('attempt_timeout',     30.0)
         self.declare_parameter('centered_hold_time',  2.0)  # seconds ball must stay within stable_thresh
         self.declare_parameter('near_thresh',          0.30)  # near-center zone for summary stats
@@ -223,8 +225,9 @@ class BallBalanceNode(Node):
         # is published True and the PID session ends.
         self._centered_since    = None
 
-        # Jiggle state — alternating flex direction when ball is lost
-        self._jiggle_phase      = 1  # +1 or -1, flips each tick
+        # Jiggle state — alternating roll direction when ball is lost
+        self._jiggle_phase      = 1  # +1 or -1, flips each wrist correction cycle
+        self._last_jiggle_time  = None  # monotonic time of last jiggle publish
 
         # 1Hz PID_SUMMARY accumulator — collects every /ball/position reading
         # at full 15Hz rate during active PID for accurate proximity stats.
@@ -608,18 +611,24 @@ class BallBalanceNode(Node):
                 f'(>{ball_lost_timeout:.1f}s) — suspending PID.',
                 throttle_duration_sec=1.0)
             if lost_duration > jiggle_start_delay and jiggle_amplitude > 0.0:
-                # Alternate flex direction each tick to rock the cup
-                self._jiggle_phase *= -1
-                jiggle_cmd = Vector3()
-                jiggle_cmd.x = jiggle_amplitude * self._jiggle_phase
-                jiggle_cmd.y = 0.0
-                jiggle_cmd.z = 0.0
-                if not self.get_parameter('dry_run').value:
-                    self._pub_cmd.publish(jiggle_cmd)
-                self.get_logger().info(
-                    f'JIGGLE | lost={lost_duration:.1f}s '
-                    f'flex_cmd={jiggle_cmd.x:+.3f} (phase={self._jiggle_phase:+d})',
-                    throttle_duration_sec=0.5)
+                # Rate-limit jiggle to match wrist controller correction rate
+                # (default 1Hz). Publishing at 15Hz PID rate is meaningless —
+                # the wrist controller only reads the latest command at 1Hz,
+                # making the 15Hz alternation random relative to corrections.
+                jiggle_period = 1.0 / max(self.get_parameter('jiggle_hz').value, 0.1)
+                if (self._last_jiggle_time is None or
+                        now - self._last_jiggle_time >= jiggle_period):
+                    self._jiggle_phase     *= -1
+                    self._last_jiggle_time  = now
+                    jiggle_cmd = Vector3()
+                    jiggle_cmd.x = 0.0
+                    jiggle_cmd.y = jiggle_amplitude * self._jiggle_phase
+                    jiggle_cmd.z = 0.0
+                    if not self.get_parameter('dry_run').value:
+                        self._pub_cmd.publish(jiggle_cmd)
+                    self.get_logger().info(
+                        f'JIGGLE | lost={lost_duration:.1f}s '
+                        f'roll_cmd={jiggle_cmd.y:+.3f} (phase={self._jiggle_phase:+d})')
             return
 
         # Attempt timeout — give up if not achieved within limit.
