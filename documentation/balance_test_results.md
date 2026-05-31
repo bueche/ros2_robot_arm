@@ -28,6 +28,42 @@ There are several reporting conventions covered the results.
 More details on the actual metric definitions can be found [here](./balance_metrics.md).
 
 ### Detailed Results by Date
+#### 05-29-2026
+- Summary: fixed the jiggle hammering bug. basically dialed back the number of gjiggle corrections to match the standard corrections (1 Hz). The D-term is still not working as desired leading to lower scores.
+  - t1: duplicated issue from previous day
+  - t2: jiggle logic fix tested. success!
+  - t3: repeat of this fix
+
+- Best run: 9 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1wSghBDd543bUKWQG9RnK3jbwVvqRSKE1)
+
+#### 05-28-2026
+- Summary: Continued with ball detection and d-term issues.
+  - t1: The jiggle logic that was in the ball_detector_nvidia (used to move the test forward if the ball was lost 
+   by the ai model) was ported to the ball_detector_oak. This had a bug and it started to hammer the the servos with corrections causing a big dip in the ball centered events.
+  - t2: same parameters but ball_detector_oak also updated to have the same containment heuristic added that ball_detector_nvidia had. still did poorly because the jiggle hammering issue was still present.
+  
+- Best run: 6 out of 11
+
+- Raw test results: [here](https://drive.google.com/drive/folders/10qBUlCMGZYeKDe79L3tgGdXgbY-VFf6b)
+#### 05-27-2026
+- Summary: working through issues with ball detection and the new D-term approach.
+   - t1: Redo of the imu for the Dterm due to the bug in the other approach antiwindup_decay:=0.2  and kd=0.07
+Camera not setup well. Lots of ball and cup missing.
+   - t2: Camera not setup well. Lots of ball and cup missing....repositioned the cup but it still needs to be higher.
+   - t3: repositioned the cup but it still needs to be higher.
+   
+- Best run: 9 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/15OMOpQnW5coZrSKTk-wGhg9X7tkWkngf)
+
+#### 05-25-2026
+- Summary: 
+  - t1: same parameters as previous last run. testing pid logger v5. end result: not feeling good about imu velocity values. they are too static. and the theory is that this is due to sampling of the imu values.
+  - t2: New approach for D-term: defined by the dwrist_flex_dt (joint trajectory approach) vs. the imu. now supporting d_term_source:=joints (and imu --> legacy)
+  - t3: same as a above tweaked the kd parameters
+  - t4: same as a above and introduce some additional logic to handle the ball quickly passing the center.  antiwindup_decay:=0.2  and kd=0.05 
+- Best run: 10 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/137WMwzBV4Gz3MZBRj6hqDPUynfYLXZxf)
 #### 05-23-2026
 - Summary: Introduced a new approach for the D-term instead of using the IMU now using the joint state data to compute the velocity of the servos. The imu values were really static.
 
