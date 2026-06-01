@@ -10,6 +10,8 @@ The main metric for success in the V1 of the balancing effort is a "centered eve
   <img src="../images/test.result.summary.jpg" alt="summary " width="800">
 </p> 
 
+This particular metric is the most important at the moment, but doesn't tell the whole story. It has been possible to center the ball in all 11 poses, but achieving this is not consistent. Essentially, there is in general too much jitter in the movement cup and this causes the ball to fall out of the center once its there. The current effort is to reduce this jitter and this leads to experimentation that exposes bugs and otherwise unsuccessful tuning attempts. Hence, at times progress is much worse.
+
 Another interesting metric to track is the percentage of ball coordinate samples that fall within the tight range (pos<15%) or the near range (pos<30%). This is a useful metric to know if one is making incremental progress even if the ball centered metric does not increase or stays the same. 
 
 <p align="center">
