@@ -12,7 +12,7 @@ Features:
 - Temperature, current, voltage monitoring
 - Thermal and overload detection
 - Validation with URDF limits
-- **NEW**: Optional power monitoring with INA219 sensors (v17)
+- **NEW**: Optional power monitoring with INA226 sensors (primary), INA219 fallback
 
 Usage:
   ros2 run writing_robot_control pose_test --ros-args -p poses_file:=poses.yaml
@@ -126,15 +126,20 @@ class PowerMonitor:
     def _power_callback(self, msg):
         """Collect power samples during pose transitions."""
         if self.tracking_active:
+            # Use INA226 fields as primary; fall back to INA219 when INA226 fields are zero
+            ina226_12v_active = msg.bus_12v_voltage_226 > 0.0
+            ina226_5v_active  = msg.bus_5v_voltage_226  > 0.0
             self.power_samples.append({
-                'timestamp': time.time(),
-                'bus_12v': msg.bus_12v_voltage,
-                'current_12v': msg.current_12v,
-                'power_12v': msg.power_12v,
-                'bus_5v': msg.bus_5v_voltage,
-                'current_5v': msg.current_5v,
-                'power_5v': msg.power_5v,
-                'total_power': msg.total_power
+                'timestamp':   time.time(),
+                'bus_12v':     msg.bus_12v_voltage_226  if ina226_12v_active else msg.bus_12v_voltage,
+                'current_12v': msg.current_12v_226      if ina226_12v_active else msg.current_12v,
+                'power_12v':   msg.power_12v_226        if ina226_12v_active else msg.power_12v,
+                'bus_5v':      msg.bus_5v_voltage_226   if ina226_5v_active  else msg.bus_5v_voltage,
+                'current_5v':  msg.current_5v_226       if ina226_5v_active  else msg.current_5v,
+                'power_5v':    msg.power_5v_226         if ina226_5v_active  else msg.power_5v,
+                'total_power': msg.total_power,
+                'source_12v':  'INA226' if ina226_12v_active else 'INA219',
+                'source_5v':   'INA226' if ina226_5v_active  else 'INA219',
             })
     
     def start_tracking(self, pose_name, pose_number):
@@ -204,7 +209,9 @@ class PowerMonitor:
         
         # Report peak comparison
         self.node.get_logger().info(f'  ⚡ Power Analysis for "{pose_name}":')
-        self.node.get_logger().info(f'     Peak 5V current (INA219):    {peak_5v_current:.3f}A')
+        source_5v  = self.power_samples[-1]['source_5v']  if self.power_samples else 'INA219'
+        source_12v = self.power_samples[-1]['source_12v'] if self.power_samples else 'INA219'
+        self.node.get_logger().info(f'     Peak 5V current ({source_5v}):  {peak_5v_current:.3f}A')
         if xl330_peak_sum_A > 0:
             self.node.get_logger().info(f'     Peak motor sum (XL330s):     {xl330_peak_sum_A:.3f}A')
             benefit = xl330_peak_sum_A - peak_5v_current
@@ -214,18 +221,18 @@ class PowerMonitor:
             elif benefit < -0.05:  # Supply using >50mA more than expected
                 self.node.get_logger().warn(f'     ⚠ Supply higher than motor sum by {abs(benefit):.3f}A!')
         self.node.get_logger().info(f'     5V voltage: {min_5v_voltage:.2f}V (min) / {peak_5v_voltage:.2f}V (max)')
-        self.node.get_logger().info(f'     Peak 12V current:            {peak_12v_current:.3f}A')
+        self.node.get_logger().info(f'     Peak 12V current ({source_12v}): {peak_12v_current:.3f}A')
         self.node.get_logger().info(f'     Peak total power:            {peak_total_power:.2f}W')
         
-        # Compare final holding currents (INA219 vs Servo)
+        # Compare final holding currents (power sensor vs servo-reported)
         if len(self.final_samples) > 0 and servo_telemetry:
-            # Average the last few INA219 samples
+            # Average the last few power sensor samples (INA226 or INA219)
             avg_final_5v = sum(s['current_5v'] for s in self.final_samples) / len(self.final_samples)
             avg_final_12v = sum(s['current_12v'] for s in self.final_samples) / len(self.final_samples)
             
             if xl330_holding_sum_A > 0:
                 self.node.get_logger().info(f'     Holding current comparison:')
-                self.node.get_logger().info(f'       Supply current (INA219):     {avg_final_5v:.3f}A')
+                self.node.get_logger().info(f'       Supply current ({source_5v}):  {avg_final_5v:.3f}A')
                 self.node.get_logger().info(f'       Motor current sum (XL330s):  {xl330_holding_sum_A:.3f}A')
                 benefit = xl330_holding_sum_A - avg_final_5v
                 if benefit > 0.05:  # Controller saving >50mA
