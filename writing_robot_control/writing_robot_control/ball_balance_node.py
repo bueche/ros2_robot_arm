@@ -72,9 +72,11 @@ Parameters:
   camera_timeout  Seconds before camera stale      default: 2.0
   imu_timeout     Seconds before IMU stale         default: 0.5
   ball_lost_timeout  Seconds ball undetected before suspend  default: 1.0
-  jiggle_amplitude   Roll cmd amplitude during jiggle (rad/s) default: 0.04
-  jiggle_start_delay Seconds lost before jiggle starts       default: 2.0
-  jiggle_hz          Jiggle rate Hz — should match correction_hz default: 1.0
+  jiggle_amplitude   Cmd amplitude per axis during jiggle (rad/s) default: 0.02
+  jiggle_start_delay Seconds lost before jiggle starts            default: 2.0
+  jiggle_hz          Jiggle rate Hz — should match correction_hz  default: 1.0
+                     4-phase circular: flex+, roll+, flex-, roll- over 4 steps.
+                     Wrist controller hard limits naturally clamp any axis near its wall.
   attempt_timeout    Seconds before giving up balancing      default: 5.0
   dry_run         Log only, don't publish cmd      default: False
   use_imu         Use IMU derivative term          default: True
@@ -137,9 +139,12 @@ class BallBalanceNode(Node):
         self.declare_parameter('camera_timeout',    2.0)
         self.declare_parameter('imu_timeout',       0.5)
         self.declare_parameter('ball_lost_timeout', 1.0)
-        self.declare_parameter('jiggle_amplitude',  0.04)  # rad/s roll cmd during jiggle
-        self.declare_parameter('jiggle_start_delay',2.0)   # seconds lost before jiggle starts
-        self.declare_parameter('jiggle_hz',         1.0)   # jiggle rate — match correction_hz
+        self.declare_parameter('jiggle_amplitude',   0.02)  # rad/s per axis during jiggle
+        self.declare_parameter('jiggle_start_delay', 2.0)   # seconds lost before jiggle starts
+        self.declare_parameter('jiggle_hz',          1.0)   # jiggle rate — match correction_hz
+        # Jiggle uses a 4-phase circular pattern: (+x,0), (0,+y), (-x,0), (0,-y).
+        # This naturally avoids limit-slamming — any clamped axis just doesn't move
+        # while the other axis still rocks the cup. No need to duplicate URDF limits.
         self.declare_parameter('attempt_timeout',     30.0)
         self.declare_parameter('centered_hold_time',  2.0)  # seconds ball must stay within stable_thresh
         self.declare_parameter('near_thresh',          0.30)  # near-center zone for summary stats
@@ -190,6 +195,7 @@ class BallBalanceNode(Node):
         self._wrist_flex_vel    = 0.0   # d(wrist_flex_pos)/dt  rad/s
         self._wrist_roll_vel    = 0.0   # d(wrist_roll_pos)/dt  rad/s
         self._wrist_vel_time    = None  # monotonic time of last message
+        # wrist_roll_pos removed — 4-phase jiggle doesn't need limit tracking
         # Low-pass filter coefficient for gyro smoothing.
         # alpha=0.3 means 30% new reading + 70% history — smooths noise
         # without adding significant lag at 50Hz IMU rate.
@@ -226,7 +232,7 @@ class BallBalanceNode(Node):
         self._centered_since    = None
 
         # Jiggle state — alternating roll direction when ball is lost
-        self._jiggle_phase      = 1  # +1 or -1, flips each wrist correction cycle
+        self._jiggle_phase      = 0  # 0-3 cycles through 4-phase circular pattern
         self._last_jiggle_time  = None  # monotonic time of last jiggle publish
 
         # 1Hz PID_SUMMARY accumulator — collects every /ball/position reading
@@ -611,24 +617,42 @@ class BallBalanceNode(Node):
                 f'(>{ball_lost_timeout:.1f}s) — suspending PID.',
                 throttle_duration_sec=1.0)
             if lost_duration > jiggle_start_delay and jiggle_amplitude > 0.0:
-                # Rate-limit jiggle to match wrist controller correction rate
-                # (default 1Hz). Publishing at 15Hz PID rate is meaningless —
-                # the wrist controller only reads the latest command at 1Hz,
-                # making the 15Hz alternation random relative to corrections.
+                # Rate-limit jiggle to correction rate (default 1Hz).
+                # Uses a 4-phase circular pattern so both axes are exercised:
+                #   phase 0: flex+,  roll=0   (cup tips forward)
+                #   phase 1: flex=0, roll+    (cup tilts right)
+                #   phase 2: flex-,  roll=0   (cup tips back)
+                #   phase 3: flex=0, roll-    (cup tilts left)
+                # Any axis that is clamped by the wrist controller's hard limits
+                # simply doesn't move — no need to duplicate URDF limits here.
+                # All four directions are tried across 4 seconds, so the ball
+                # is rocked in every direction and should become visible.
                 jiggle_period = 1.0 / max(self.get_parameter('jiggle_hz').value, 0.1)
                 if (self._last_jiggle_time is None or
                         now - self._last_jiggle_time >= jiggle_period):
-                    self._jiggle_phase     *= -1
-                    self._last_jiggle_time  = now
+                    self._jiggle_phase = (self._jiggle_phase + 1) % 4
+                    self._last_jiggle_time = now
+
+                    # 4-phase: (flex+, roll=0), (flex=0, roll+),
+                    #          (flex-, roll=0), (flex=0, roll-)
+                    _phases = [
+                        ( jiggle_amplitude,  0.0),   # phase 0
+                        ( 0.0,  jiggle_amplitude),   # phase 1
+                        (-jiggle_amplitude,  0.0),   # phase 2
+                        ( 0.0, -jiggle_amplitude),   # phase 3
+                    ]
+                    fx, ry = _phases[self._jiggle_phase]
+
                     jiggle_cmd = Vector3()
-                    jiggle_cmd.x = 0.0
-                    jiggle_cmd.y = jiggle_amplitude * self._jiggle_phase
+                    jiggle_cmd.x = fx
+                    jiggle_cmd.y = ry
                     jiggle_cmd.z = 0.0
                     if not self.get_parameter('dry_run').value:
                         self._pub_cmd.publish(jiggle_cmd)
                     self.get_logger().info(
                         f'JIGGLE | lost={lost_duration:.1f}s '
-                        f'roll_cmd={jiggle_cmd.y:+.3f} (phase={self._jiggle_phase:+d})')
+                        f'flex={fx:+.3f} roll={ry:+.3f} '
+                        f'(phase={self._jiggle_phase}/4)')
             return
 
         # Attempt timeout — give up if not achieved within limit.
