@@ -30,6 +30,50 @@ There are several reporting conventions covered the results.
 More details on the actual metric definitions can be found [here](./balance_metrics.md).
 
 ### Detailed Results by Date
+#### 06-04-2026
+- Summary:  There were three main changes to the code and environment today. 
+ 1. The jiggle logic was tweaked to make it happen sooner and ensure that it was not conflicting with the last pid command. In addition, I boosted the rad step to make the jiggle more pronounced. 
+ 2. the heuristic logic around ball and cup resizing was changed to reduce the number of false negatives. I'm every so often shifting the camera position and lighting. This puts stress on the ball detector code and ML model. The latest changes were to make them more robust.
+ 3. Some backgrounding lighting was added. I ran somne experiments and found that the model did worse if the light was shining directly on the cup and ball. Indirect lighting was better.
+
+  -t1: Changed position of camera. neutralize last command when jiggle starts and increase rad for jiggle (to 0.05) and reduce the time before the jiggle is kicked off to 1s from 2s:  -p jiggle_start_delay:=1.0 -p jiggle_amplitude :=0.05
+  -t2: Added some background light. the light points to the wall next to the robot (vs. shining directly on it....the latter reduced the detection confidence). The results of this test showed that some of the heuristic logic to deal with the ball resizing failed to work well. This could be seen in the ball_detector_oak output:
+  ```
+  [INFO] [1780609725.940261277] [ball_detector_oak]: Cup  bbox: 174x166px  conf=0.888
+[INFO] [1780609726.276870288] [ball_detector_oak]: Ball bbox: 25x27px  conf=0.716
+[INFO] [1780609726.943048081] [ball_detector_oak]: Cup  bbox: 174x167px  conf=0.895
+[INFO] [1780609727.278684645] [ball_detector_oak]: Ball bbox: 25x28px  conf=0.720
+[WARN] [1780609727.861333661] [ball_detector_oak]: Cup  size jump 47% -- rejected (det=192x252px conf=0.804 prev=188x171px)
+[WARN] [1780609727.869730031] [ball_detector_oak]: Ball (conf=0.733) found but NO CUP
+[INFO] [1780609727.944465241] [ball_detector_oak]: Cup  bbox: 189x179px  conf=0.827
+[INFO] [1780609728.037485079] [ball_detector_oak]: [publish] proc=8.9ms  budget=83.3ms  OK
+[INFO] [1780609728.281429976] [ball_detector_oak]: Ball bbox: 28x33px  conf=0.747
+[WARN] [1780609728.792159683] [ball_detector_oak]: Ball size jump 63% -- rejected
+[WARN] [1780609728.794800026] [ball_detector_oak]: No detections
+[WARN] [1780609728.861737284] [ball_detector_oak]: Cup  size jump 56% -- rejected (det=280x164px conf=0.533 prev=179x183px)
+[WARN] [1780609729.865171246] [ball_detector_oak]: Cup  size jump 56% -- rejected (det=280x163px conf=0.558 prev=179x183px)
+[WARN] [1780609729.866666527] [ball_detector_oak]: Ball size jump 64% -- rejected
+[WARN] [1780609729.949579924] [ball_detector_oak]: Cup rejected by ROI: cx=0.58 cy=0.25
+[WARN] [1780609730.867158314] [ball_detector_oak]: Cup  size jump 56% -- rejected (det=280x164px conf=0.456 prev=179x183px)
+[WARN] [1780609730.868813984] [ball_detector_oak]: No detections
+[WARN] [1780609730.953893979] [ball_detector_oak]: Ball size jump 58% -- rejected
+[WARN] [1780609731.950955862] [ball_detector_oak]: Cup  size jump 56% -- rejected (det=280x164px conf=0.494 prev=179x183px)
+[WARN] [1780609732.033131954] [ball_detector_oak]: Ball size jump 63% -- rejected
+[WARN] [1780609732.034281304] [ball_detector_oak]: Cup rejected by ROI: cx=0.53 cy=0.23
+[WARN] [1780609732.956211676] [ball_detector_oak]: No detections
+[WARN] [1780609733.035989130] [ball_detector_oak]: Ball size jump 60% -- rejected
+[WARN] [1780609733.038049518] [ball_detector_oak]: Cup  size jump 57% -- rejected (det=280x164px conf=0.517 prev=179x183px)
+[INFO] [1780609733.728210463] [ball_detector_oak]: Arm SETTLED — ball/cup size reference reset
+[INFO] [1780609733.787434670] [ball_detector_oak]: Cup  bbox: 278x164px  conf=0.574
+[WARN] [1780609733.789367949] [ball_detector_oak]: Cup (conf=0.574) found but NO BALL
+[INFO] [1780609733.871361412] [ball_detector_oak]: Ball bbox: 20x16px  conf=0.413
+[INFO] [1780609733.872748913] [ball_detector_oak]: Warmup (2/10): containment check bypassed
+
+  ```
+  -t3: Made the heuristic more robust. However, calls into question the resizing heurstic anyway now that we have a containment heurstic in play (i.e., ball is always within the cup...the ML model doesn't use this fact in its calculations)
+
+- Best run: 11 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1Cqwexwd-s7kCWslHpN-VQlZsz4dfavEb)
 
 #### 06-03-2026
 - Summary: The run from yesterday exposed some weaknesses in the jiggle algorithm. This kicks in during the pid phase if the ball becomes missing for 2 seconds. The new algorithm will rotate in each direction to try to get the ball noticed by the AI model...but we simultaneously dialed back on the rad ... which caused each "jiggle" to be too slight. In addition they were applied with lots of delay leading to the following behavior below. This is a tilt left, so the roll needs to start decreasing ... but instead the jiggle logic is slowly cycling through and it isn't until 8 seconds later that the ball is noticed. 
