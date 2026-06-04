@@ -213,6 +213,9 @@ where `cmd_delta_flex/roll` are the commanded radian movements and `achieved_del
 
 ### 2.3 IMU feedback as D-term to dampen PI 
 
+*NOTE: as of 05-25-26 we've backed off of using the IMU as our approach had some issues (sampled the rate vs. tracking the rate of change. See [detailed test results](./balance_test_results.md#05-25-2026) for more details). This section will be rewritten once that shakes out.*
+
+
  Our final term in the PID is the D-term (or Derivative term). It is meant to dampen or reduce the positions that the P & I terms are aiming for. In our case its trying to minimize the ball overshooting the center target because the cup was tilted too far in the other direction. The D-term responds to the rate of change of the cups tilt and the formula is `D = -kd × d(cup_angle)/dt`. If the ball is at position 0.7 in the cup (far from center) but moving toward center rapidly, the D-term reduces the correction command (i.e., "dampens the change") — because the error (ball_position - center(0,0)) is already improving fast and a full P-term or I-term correction would overshoot the center. 
 
  An overshoot is illustrated in the pose-1 sequence below. The cup is tilted towards the arm and the wrist flex starts to bring it more level. After two steps in the PID the ball has overshot the center and the ball slides from one side to the other.
