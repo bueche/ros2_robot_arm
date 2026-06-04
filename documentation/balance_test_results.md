@@ -30,6 +30,86 @@ There are several reporting conventions covered the results.
 More details on the actual metric definitions can be found [here](./balance_metrics.md).
 
 ### Detailed Results by Date
+
+#### 06-03-2026
+- Summary: The run from yesterday exposed some weaknesses in the jiggle algorithm. This kicks in during the pid phase if the ball becomes missing for 2 seconds. The new algorithm will rotate in each direction to try to get the ball noticed by the AI model...but we simultaneously dialed back on the rad ... which caused each "jiggle" to be too slight. In addition they were applied with lots of delay leading to the following behavior below. This is a tilt left, so the roll needs to start decreasing ... but instead the jiggle logic is slowly cycling through and it isn't until 8 seconds later that the ball is noticed. 
+```
+================================================================================
+  POSE : pose 3 - tilt cup left
+  Start: flex=2.6691 rad  roll=1.8975 rad
+  Duration: 19.5s    CORR steps: 19
+================================================================================
+  step  ── FLEX ──────────────────────────────────────  ── ROLL ──────────────────────────────────────      cumul(f,r)    intv
+            from       to   tgt_deg  act_deg  ratio%      from       to   tgt_deg  act_deg  ratio%
+  --------------------------------------------------------------------------------------------------------------------------------
+     1  flex:   2.6691→  2.6691 tgt= +0.000 act= -0.527     N/A  roll:   1.8975→  1.9000 tgt= +0.140 act= +0.000     +0%  
+     2  flex:   2.6599→  2.6399 tgt= -1.146 act= -1.495   +130%  roll:   1.8975→  1.8975 tgt= +0.000 act= -0.086     N/A 
+     3  flex:   2.6338→  2.6338 tgt= +0.000 act= -0.613     N/A  roll:   1.8960→  1.8760 tgt= -1.150 act= -1.318   +115% 
+     4  flex:   2.6231→  2.6431 tgt= +1.146 act= +0.086     +8%  roll:   1.8730→  1.8730 tgt= +0.000 act= -0.086     N/A  
+     5  flex:   2.6246→  2.6246 tgt= +0.000 act= -0.172     N/A  roll:   1.8715→  1.8915 tgt= +1.150 act= +1.054    +92%  
+     6  flex:   2.6216→  2.6016 tgt= -1.146 act= -1.409   +123%  roll:   1.8899→  1.8899 tgt= +0.000 act= +0.000     N/A  
+     7  flex:   2.5970→  2.5970 tgt= +0.000 act= -0.699     N/A  roll:   1.8899→  1.8699 tgt= -1.150 act= -1.232   +107%  
+     8  flex:   2.5848→  2.5640 tgt= -1.192 act= -1.673   +140%  roll:   1.8684→  1.7884 tgt= -4.580 act= -4.658   +102% 
+     9  flex:   2.5556→  2.5357 tgt= -1.140 act= -1.404   +123%  roll:   1.7871→  1.7071 tgt= -4.580 act= -4.658   +102% 
+    10  flex:   2.5311→  2.5128 tgt= -1.049 act= -1.232   +117%  roll:   1.7058→  1.6258 tgt= -4.580 act= -4.481    +98%  
+
+```
+See the output from the `ball_balance_node` for more insight on the jiggle logic:
+```
+INFO] [1780518630.235783385] [ball_balance_node]: PID active — ball balancing started.
+[WARN] [1780518630.237707821] [ball_balance_node]: Ball lost for 6.2s (>1.0s) — suspending PID.
+[INFO] [1780518630.239231866] [ball_balance_node]: JIGGLE | lost=6.2s flex=+0.000 roll=+0.020 (phase=1/4)
+[INFO] [1780518630.569876434] [ball_balance_node]: PID_SUMMARY | frames=0/3  near(30%)=0(0%)  tight(15%)=0(0%)  min=nan  mean=nan  ball=(-0.592,-0.159)
+[INFO] [1780518631.237597290] [ball_balance_node]: JIGGLE | lost=7.2s flex=-0.020 roll=+0.000 (phase=2/4)
+[WARN] [1780518631.302362104] [ball_balance_node]: Ball lost for 7.2s (>1.0s) — suspending PID.
+[INFO] [1780518631.569677829] [ball_balance_node]: PID_SUMMARY | frames=0/12  near(30%)=0(0%)  tight(15%)=0(0%)  min=nan  mean=nan  ball=(-0.592,-0.159)
+[INFO] [1780518632.238128707] [ball_balance_node]: JIGGLE | lost=8.2s flex=+0.000 roll=-0.020 (phase=3/4)
+[WARN] [1780518632.302614871] [ball_balance_node]: Ball lost for 8.2s (>1.0s) — suspending PID.
+[INFO] [1780518632.569652224] [ball_balance_node]: PID_SUMMARY | frames=0/12  near(30%)=0(0%)  tight(15%)=0(0%)  min=nan  mean=nan  ball=(-0.592,-0.159)
+[INFO] [1780518633.304062941] [ball_balance_node]: JIGGLE | lost=9.2s flex=+0.020 roll=+0.000 (phase=0/4)
+[WARN] [1780518633.369163942] [ball_balance_node]: Ball lost for 9.3s (>1.0s) — suspending PID.
+[INFO] [1780518633.569665305] [ball_balance_node]: PID_SUMMARY | frames=0/12  near(30%)=0(0%)  tight(15%)=0(0%)  min=nan  mean=nan  ball=(-0.592,-0.159)
+[INFO] [1780518634.370647457] [ball_balance_node]: JIGGLE | lost=10.3s flex=+0.000 roll=+0.020 (phase=1/4)
+[WARN] [1780518634.436073311] [ball_balance_node]: Ball lost for 10.4s (>1.0s) — suspending PID.
+[INFO] [1780518634.569999147] [ball_balance_node]: PID_SUMMARY | frames=0/12  near(30%)=0(0%)  tight(15%)=0(0%)  min=nan  mean=nan  ball=(-0.592,-0.159)
+[WARN] [1780518635.436208226] [ball_balance_node]: Ball lost for 11.4s (>1.0s) — suspending PID.
+[INFO] [1780518635.438830444] [ball_balance_node]: JIGGLE | lost=11.4s flex=-0.020 roll=+0.000 (phase=2/4)
+[INFO] [1780518635.569633559] [ball_balance_node]: PID_SUMMARY | frames=0/12  near(30%)=0(0%)  tight(15%)=0(0%)  min=nan  mean=nan  ball=(-0.592,-0.159)
+[WARN] [1780518636.504604288] [ball_balance_node]: Ball lost for 12.4s (>1.0s) — suspending PID.
+[INFO] [1780518636.506492706] [ball_balance_node]: JIGGLE | lost=12.4s flex=+0.000 roll=-0.020 (phase=3/4)
+[INFO] [1780518636.570784998] [ball_balance_node]: PID_SUMMARY | frames=0/12  near(30%)=0(0%)  tight(15%)=0(0%)  min=nan  mean=nan  ball=(-0.592,-0.159)
+[WARN] [1780518637.569079422] [ball_balance_node]: Ball lost for 13.5s (>1.0s) — suspending PID.
+[INFO] [1780518637.571047025] [ball_balance_node]: JIGGLE | lost=13.5s flex=+0.020 roll=+0.000 (phase=0/4)
+[INFO] [1780518637.573350630] [ball_balance_node]: PID_SUMMARY | frames=0/12  near(30%)=0(0%)  tight(15%)=0(0%)  min=nan  mean=nan  ball=(-0.592,-0.159)
+[INFO] [1780518637.704017652] [ball_balance_node]: CMD | ball=(-0.582,-0.112) Pflex=-0.0168 Proll=-0.0873 Dflex=-0.0000 Droll=-0.0000 → flex=-0.0196 roll=-0.0870 d_src=joints flex_rate=+0.0000rad/s roll_rate=+0.0000rad/s ach_flex=0.88 ach_roll=0.55 i_flex=-0.0139 i_roll=+0.0046 ki_mode=servo stable=False hold=--
+[INF
+```
+The next step for tomorrow is to:
+  1. try an improved camera angle
+  2. improve the lighting
+  3. increase the rad displacement per jiggle.
+
+- Best run: X out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1WA9LMy54XejF2JSjdkdwshkppXqY-kUk)
+
+#### 06-02-2026
+- Summary: Rewired the current sensors today to get rid of the INA219's in favor or INA226's. Although the wiring is likely going to stay I might swap out these current sensors because they have a limit to the amount of current they can measure ( ~800 mA). The servo's don't draw more than that on either rail but the 5V can get close. The only run in the day was to test that all of this worked and the sagging I noticed yesterday is gone now. 
+
+  -t1: However, this exposed some weaknesses in the current jiggle logic. This logic is used to move the test along when some random placement of the camera to the scene increases the ball lost scenarios.
+
+- Best run: X out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/13c0EM7T6yLeo7l8810AU4jfCrHldAIPe)
+
+#### 06-01-2026
+- Summary: Lots of basic issues. The flex portions of the arm are losing steam and can't hold up. Even the XL430's were having trouble. I think this is power related and will rewire on 06-02.
+<p align="center">
+  <img src="../images/shoulder_drift_example.jpg" alt="shoulder drift" width="700">
+</p> 
+
+Next step: rewire to simplify and replace the INA219 sensors (currently not working) with INA226's.
+- Best run: X out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1TimDMd6rem7nxbwhNGYvp0gClrepPWb9)
+
 #### 05-29-2026
 - Summary: fixed the jiggle hammering bug. basically dialed back the number of gjiggle corrections to match the standard corrections (1 Hz). The D-term is still not working as desired leading to lower scores.
   - t1: duplicated issue from previous day
