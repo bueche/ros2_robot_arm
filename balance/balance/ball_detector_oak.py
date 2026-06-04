@@ -91,6 +91,9 @@ class BallDetectorOakNode(Node):
         self.declare_parameter('containment_margin', 0.30)  # slack around cup bbox
         self.declare_parameter('warmup_frames',      10)    # bypass containment for first N cups
         self.declare_parameter('min_ball_conf',      0.50)  # min conf for ball without cup anchor
+        self.declare_parameter('ball_jump_frac',     0.80)  # max ball size change per frame
+        self.declare_parameter('cup_jump_frac',      0.35)  # max cup size change per frame
+        self.declare_parameter('size_ema_alpha',     0.30)  # EMA weight for size reference update
 
         # Publishers
         self._pub_pos   = self.create_publisher(
@@ -129,8 +132,9 @@ class BallDetectorOakNode(Node):
         # that post-move scale changes don't permanently block detection.
         self._last_cup_wh     = None
         self._last_ball_wh    = None
-        self._cup_jump_frac   = 0.35
-        self._ball_jump_frac  = 0.50
+        self._cup_jump_frac   = 0.35   # overridden from parameter at runtime
+        self._ball_jump_frac  = 0.80   # overridden from parameter at runtime
+        self._size_ema_alpha  = 0.30   # overridden from parameter at runtime
         self._ball_det_count  = 0   # number of accepted ball detections so far
         self._cup_det_count   = 0
 
@@ -138,6 +142,9 @@ class BallDetectorOakNode(Node):
         self._p_warmup_frames      = self.get_parameter('warmup_frames').value
         self._p_containment_margin = self.get_parameter('containment_margin').value
         self._p_min_ball_conf      = self.get_parameter('min_ball_conf').value
+        self._cup_jump_frac        = self.get_parameter('cup_jump_frac').value
+        self._ball_jump_frac       = self.get_parameter('ball_jump_frac').value
+        self._size_ema_alpha       = self.get_parameter('size_ema_alpha').value
 
         # Cached parameters — read once at startup to avoid get_parameter()
         # calls in the hot publish loop (each call involves a ROS2 service
@@ -549,13 +556,28 @@ class BallDetectorOakNode(Node):
                         f'Cup  bbox: {int(dw*w)}x{int(dh_d*h)}px  conf={d.confidence:.3f}',
                         throttle_duration_sec=1.0)
 
-        # Update temporal size trackers
+        # Update temporal size trackers using EMA so the reference gradually
+        # follows legitimate size changes (cup tilting changes apparent size)
+        # rather than snapping to the latest accepted detection.
+        # EMA: new_ref = alpha * new_sample + (1-alpha) * old_ref
+        # alpha=0.30 means reference tracks changes but resists single-frame jumps.
+        a = self._size_ema_alpha
         if best_cup_norm is not None:
             xmin, ymin, xmax, ymax = best_cup_norm
-            self._last_cup_wh = (xmax - xmin, ymax - ymin)
+            new_wh = (xmax - xmin, ymax - ymin)
+            if self._last_cup_wh is None:
+                self._last_cup_wh = new_wh
+            else:
+                self._last_cup_wh = (a * new_wh[0] + (1-a) * self._last_cup_wh[0],
+                                     a * new_wh[1] + (1-a) * self._last_cup_wh[1])
         if best_ball_norm is not None:
             xmin, ymin, xmax, ymax = best_ball_norm
-            self._last_ball_wh = (xmax - xmin, ymax - ymin)
+            new_wh = (xmax - xmin, ymax - ymin)
+            if self._last_ball_wh is None:
+                self._last_ball_wh = new_wh
+            else:
+                self._last_ball_wh = (a * new_wh[0] + (1-a) * self._last_ball_wh[0],
+                                      a * new_wh[1] + (1-a) * self._last_ball_wh[1])
             self._ball_det_count += 1
 
         # Pass 2 -- containment validation
