@@ -234,6 +234,7 @@ class BallBalanceNode(Node):
         # Jiggle state — alternating roll direction when ball is lost
         self._jiggle_phase      = 0  # 0-3 cycles through 4-phase circular pattern
         self._last_jiggle_time  = None  # monotonic time of last jiggle publish
+        self._ball_lost_neutralized = False  # True once neutral cmd sent on ball-lost
 
         # 1Hz PID_SUMMARY accumulator — collects every /ball/position reading
         # at full 15Hz rate during active PID for accurate proximity stats.
@@ -344,6 +345,11 @@ class BallBalanceNode(Node):
             self._ball_pos             = msg
             self._ball_time            = time.monotonic()
             self._last_valid_ball_time = time.monotonic()
+            # Ball redetected — reset jiggle and neutral-cmd state so next
+            # ball-lost event starts fresh.
+            self._ball_lost_neutralized = False
+            self._last_jiggle_time      = None
+            self._jiggle_phase          = 0
 
             if self._pid_active:
                 import math as _m
@@ -507,6 +513,9 @@ class BallBalanceNode(Node):
                 self._acc_valid            = 0
                 self._acc_invalid          = 0
                 self._acc_near             = 0
+                self._ball_lost_neutralized = False
+                self._last_jiggle_time      = None
+                self._jiggle_phase          = 0
                 self._acc_tight            = 0
                 self._pub_enabled.publish(Bool(data=False))
             elif state == 'SETTLED':
@@ -602,9 +611,12 @@ class BallBalanceNode(Node):
             return
 
         # Ball-lost check — ball undetected for too long.
-        # After ball_lost_timeout: suspend normal PID.
-        # After jiggle_start_delay: issue small alternating flex commands to
-        # physically rock the cup and make the ball visible to the detector.
+        # After ball_lost_timeout: suspend normal PID and neutralize the last
+        # PID command so the wrist controller stops applying it. Without this,
+        # the wrist controller keeps executing the stale PID command for up to
+        # cmd_timeout=2.0s, potentially moving the cup further from the ball.
+        # After jiggle_start_delay: issue 4-phase circular jiggle commands to
+        # rock the cup and make the ball visible to the detector.
         # Jiggle stops immediately when ball is redetected (z>=0 in _ball_cb).
         ball_lost_timeout  = self.get_parameter('ball_lost_timeout').value
         jiggle_amplitude   = self.get_parameter('jiggle_amplitude').value
@@ -616,6 +628,19 @@ class BallBalanceNode(Node):
                 f'Ball lost for {lost_duration:.1f}s '
                 f'(>{ball_lost_timeout:.1f}s) — suspending PID.',
                 throttle_duration_sec=1.0)
+
+            # Publish neutral command once on ball-lost entry to cancel any
+            # stale PID command the wrist controller is still executing.
+            if not self._ball_lost_neutralized:
+                neutral = Vector3()
+                neutral.x = 0.0
+                neutral.y = 0.0
+                neutral.z = 0.0
+                if not self.get_parameter('dry_run').value:
+                    self._pub_cmd.publish(neutral)
+                self._ball_lost_neutralized = True
+                self.get_logger().info('Ball lost: published neutral cmd to cancel stale PID command')
+
             if lost_duration > jiggle_start_delay and jiggle_amplitude > 0.0:
                 # Rate-limit jiggle to correction rate (default 1Hz).
                 # Uses a 4-phase circular pattern so both axes are exercised:
