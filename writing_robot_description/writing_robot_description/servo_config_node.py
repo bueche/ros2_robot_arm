@@ -67,12 +67,12 @@ SERVO_CONFIG = {
     #        prof_vel=200, prof_acc=50,
     #        goal_current=0),
 #
-    #2: dict(name='shoulder_lift  [XL430]',
-    #        operating_mode=OP_MODE_POSITION,
-    #        P=800,  I=0, D=0, FF1=0, FF2=0,
-    #        prof_vel=200, prof_acc=50,
-    #        goal_current=0),
-#
+    2: dict(name='shoulder_lift  [XL430]',
+            operating_mode=OP_MODE_POSITION,
+            P=640,  I=0, D=4000, FF1=0, FF2=0,
+            prof_vel=0, prof_acc=0,
+            goal_current=0),
+
     3: dict(name='elbow_flex     [XL330]',
             operating_mode=OP_MODE_CURRENT_POSITION,
             P=2000, I=0, D=0, FF1=0, FF2=0,
