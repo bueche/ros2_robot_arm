@@ -69,7 +69,7 @@ SERVO_CONFIG = {
 #
     2: dict(name='shoulder_lift  [XL430]',
             operating_mode=OP_MODE_POSITION,
-            P=640,  I=0, D=8000, FF1=0, FF2=0,
+            P=640,  I=0, D=9000, FF1=0, FF2=0,
             prof_vel=0, prof_acc=0,
             goal_current=0),
 
