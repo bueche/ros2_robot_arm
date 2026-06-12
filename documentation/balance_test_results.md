@@ -30,6 +30,214 @@ There are several reporting conventions covered the results.
 More details on the actual metric definitions can be found [here](./balance_metrics.md).
 
 ### Detailed Results by Date
+#### 06-11-2026
+- Summary: Finally some good D-term tuning tests for the XL430 shoulder lift. Three different configurations tried:
+  -t1: D=8000 (same as yesterday's last run)
+  -t2: D=7000 (to reduce the current load on the XL330s)
+  -t3: D=9000
+
+  All had 11 out of 11 poses reach balance. So the difference was more about how many corrections it took to get there:
+  - D=7000 : 126 corrections
+  - D=8000 : 112 corrections
+  - D=9000 : 109 corrections
+
+  In addition, we added a new analysis program to compute to the peak-to-peak amplitude for the shoulder lift. This is discussed more in this [Robotis discord thread](https://discord.com/channels/1377230275393884170/1439850230475526195/threads/1512555080572866692). A lower amplitude means less jitter and fewer situations where the ball is bouncing around in the cup (more stable). here for example in pose 5 (smaller is better):
+  - D=7000 pose 5: 0.012272 rad
+  - D=8000 pose 5: 0.012272 rad
+  - D=9000 pose 5: 0.009204 rad
+
+The full result comparison were as follows:
+```
+D=7000
+
+Pose  Name                           Dur  Corrs   SL_pp_rad  SL_pp_deg   Tight%   Near%  Overshoot
+--------------------------------------------------------------------------------------------------
+   1  pose 1 - initial              16.6      9    0.013806      0.791    22.7%   29.6%       1142
+   2  pose 2 -tilt cup right        18.9     12    0.010738     0.6152    31.6%   48.9%        681
+   3  pose 3 - tilt cup left        16.3     10    0.010738     0.6152    31.2%   35.6%        710
+   4  pose 4 - center               16.8     10    0.012272     0.7031    43.3%   59.0%        678
+   5  pose 5 - forward              17.4     11    0.012272     0.7031    17.0%   27.1%       1269
+   6  pose 6 - back                 18.4     12    0.019941     1.1425    38.0%   49.0%        935
+   7  pose 6 - center               24.7     18    0.061359     3.5156    26.9%   61.2%        956
+   8  pose 7 - tilt cup right       22.0     15    0.012272     0.7031    34.2%   50.5%       1015
+   9  pose 8 - tilt cup left        17.8     10    0.012272     0.7031    25.2%   33.7%        841
+  10  pose 9 - back                 15.5      9     0.01534     0.8789    34.6%   40.2%        925
+  11  pose 10 - center              83.8     24    0.061359     3.5156    11.9%   15.8%       7056
+
+
+D=8000
+
+Pose  Name                           Dur  Corrs   SL_pp_rad  SL_pp_deg   Tight%   Near%  Overshoot
+--------------------------------------------------------------------------------------------------
+   1  pose 1 - initial              16.2      8    0.012272     0.7031    18.2%   21.9%       1212
+   2  pose 2 -tilt cup right        20.1     13    0.012272     0.7031    32.4%   56.9%        683
+   3  pose 3 - tilt cup left        19.7     13    0.013806      0.791    31.9%   38.8%        795
+   4  pose 4 - center               19.1     12    0.012272     0.7031    68.3%   76.7%        425
+   5  pose 5 - forward              17.1     10    0.012272     0.7031    17.7%   23.0%       1312
+   6  pose 6 - back                 14.5      8     0.01534     0.8789    31.1%   34.7%        874
+   7  pose 6 - center               19.2     12    0.058291     3.3398    32.2%   49.2%        976
+   8  pose 7 - tilt cup right       24.5     18    0.013806      0.791    28.8%   41.5%       1275
+   9  pose 8 - tilt cup left        24.1     17     0.01534     0.8789    22.9%   46.2%       1025
+  10  pose 9 - back                 17.0     10    0.016874     0.9668    41.4%   50.0%        639
+  11  pose 10 - center              62.8      7    0.059825     3.4277    84.1%   86.3%        857
+
+
+D=9000
+
+Pose  Name                           Dur  Corrs   SL_pp_rad  SL_pp_deg   Tight%   Near%  Overshoot
+--------------------------------------------------------------------------------------------------
+   1  pose 1 - initial              13.8      6    0.010738     0.6152    21.2%   23.6%        993
+   2  pose 2 -tilt cup right        21.9     15    0.010738     0.6152    28.5%   35.4%       1268
+   3  pose 3 - tilt cup left        18.4     11    0.010738     0.6152    25.0%   29.2%        975
+   4  pose 4 - center               17.7     11    0.010738     0.6152    70.0%   81.9%        314
+   5  pose 5 - forward              17.1     10    0.009204     0.5274    21.7%   33.9%       1128
+   6  pose 6 - back                 19.1     12    0.018407     1.0546    44.6%   53.0%        858
+   7  pose 6 - center               13.4      7    0.059825     3.4277    28.8%   33.9%        885
+   8  pose 7 - tilt cup right       17.9     11     0.01534     0.8789    29.0%   34.3%        853
+   9  pose 8 - tilt cup left        15.9     10    0.010738     0.6152    23.0%   26.8%       1145
+  10  pose 9 - back                 22.9     17    0.018407     1.0546    28.7%   39.1%       1386
+  11  pose 10 - center              57.8     15    0.059825     3.4277    75.0%   78.2%       1254
+```
+So it looks like for now D=9000 is the best. but this causes the XL330 servos to work harder sometimes and the voltage to sag. I will study this in more detail as time progresses.
+
+- Best run: X out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1_ny9C2bt0pQm7SO0CW-gZ2vh3djyG4CG)
+
+#### 06-10-2026
+- Summary: The goal for this day was to work out the best Position D-term value for the XL430 powering the shoulder lift joint. However, some timing and protocol issues occurred between the PI and the Nano.  This caused the results to be terrible until it was fixed. The symptoms were picked up by the watchdog as messages that should have been flowing to the PI from the Nano were not:
+
+```
+[INFO] [1781125482.725336968] [system_watchdog]: === System Watchdog ===
+  /ball/position: STALLED 6.3s  (msgs=4088)
+  /ball/cup_detected: STALLED 6.3s  (msgs=4088)
+  ✅ /imu/balance_error: 50.0Hz  max_gap=21ms  spikes=0  msgs=17500
+  /imu/balance_cmd: STALLED 45.9s  (msgs=2911)
+  ✅ /imu/is_stable: 50.0Hz  max_gap=22ms  spikes=0  msgs=17500
+  /balance_enabled: STALLED 45.8s  (msgs=26)
+  ✅ /joint_states: 100.0Hz  max_gap=12ms  spikes=0  msgs=34999
+  ⚠️  /ball/image: 0.0Hz  max_gap=340662ms  spikes=1  msgs=8
+  Pipeline latency: calibrating...
+  Overall: ⚠️  ISSUES DETECTED
+[INFO] [1781125487.725362755] [system_watchdog]: === System Watchdog ===
+  /ball/position: STALLED 11.3s  (msgs=4088)
+  /ball/cup_detected: STALLED 11.3s  (msgs=4088)
+  ✅ /imu/balance_error: 50.0Hz  max_gap=21ms  spikes=0  msgs=17750
+  /imu/balance_cmd: STALLED 50.9s  (msgs=2911)
+  ✅ /imu/is_stable: 50.0Hz  max_gap=22ms  spikes=0  msgs=17750
+  /balance_enabled: STALLED 50.8s  (msgs=26)
+  ✅ /joint_states: 100.0Hz  max_gap=12ms  spikes=0  msgs=35499
+  /ball/image: STALLED 9.7s  (msgs=8)
+  Pipeline latency: calibrating...
+  Overall: ⚠️  ISSUES DETECTED
+[INFO] [1781125492.725338005] [system_watchdog]: === System Watchdog ===
+  /ball/position: STALLED 16.3s  (msgs=4088)
+  /ball/cup_detected: STALLED 16.3s  (msgs=4088)
+  ✅ /imu/balance_error: 50.0Hz  max_gap=21ms  spikes=0  msgs=18000
+  /imu/balance_cmd: STALLED 55.9s  (msgs=2911)
+  ✅ /imu/is_stable: 50.0Hz  max_gap=22ms  spikes=0  msgs=18000
+  /balance_enabled: STALLED 55.8s  (msgs=26)
+  ✅ /joint_states: 100.0Hz  max_gap=13ms  spikes=0  msgs=35999
+  /ball/image: STALLED 14.7s  (msgs=8)
+  Pipeline latency: calibrating...
+  Overall: ⚠️  ISSUES DETECTED
+
+```
+The first fix was to change the Nano to use `chrony` instead of `systemd-timesyncd` and then to have the Nano use the PI as a time sync server (this would align their clocks better).
+
+This got the messages flowing but still at a reduced rate. On the pi (receiving end):
+
+```
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 topic hz /ball/position
+average rate: 10.655
+	min: 0.011s max: 0.336s std dev: 0.09442s window: 11
+average rate: 7.787
+	min: 0.007s max: 0.437s std dev: 0.12979s window: 19
+average rate: 8.145
+	min: 0.007s max: 0.437s std dev: 0.11568s window: 30
+average rate: 8.315
+	min: 0.007s max: 0.437s std dev: 0.11049s window: 39
+average rate: 8.074
+	min: 0.007s max: 0.437s std dev: 0.11328s window: 46
+average rate: 8.102
+	min: 0.006s max: 0.437s std dev: 0.11070s window: 56
+average rate: 8.174
+	min: 0.006s max: 0.437s std dev: 0.10814s window: 65
+average rate: 7.900
+	min: 0.005s max: 0.483s std dev: 0.11941s window: 73
+average rate: 8.168
+	min: 0.005s max: 0.483s std dev: 0.11787s window: 84
+^Cubuntu@bueche-rpi5:~/robot_ws$ ros2 topic hz /ball/image
+average rate: 0.323
+	min: 1.952s max: 4.239s std dev: 1.14336s window: 2
+
+```
+vs. on the Nano:
+```
+ubuntu@bueche-nvidia-nano:~/robot_ws$ ros2 topic hz /ball/position
+average rate: 12.011
+	min: 0.081s max: 0.084s std dev: 0.00076s window: 13
+average rate: 11.999
+	min: 0.081s max: 0.084s std dev: 0.00058s window: 25
+average rate: 11.996
+	min: 0.081s max: 0.084s std dev: 0.00056s window: 37
+average rate: 11.994
+	min: 0.081s max: 0.084s std dev: 0.00051s window: 49
+average rate: 11.994
+	min: 0.081s max: 0.084s std dev: 0.00047s window: 61
+average rate: 11.992
+	min: 0.081s max: 0.084s std dev: 0.00046s window: 73
+average rate: 11.992
+	min: 0.081s max: 0.084s std dev: 0.00047s window: 85
+average rate: 11.992
+	min: 0.081s max: 0.084s std dev: 0.00046s window: 97
+^Cubuntu@bueche-nvidia-nano:~/robot_ws$ ros2 topic hz /ball/image
+average rate: 3.998
+	min: 0.250s max: 0.250s std dev: 0.00027s window: 5
+average rate: 3.997
+	min: 0.250s max: 0.251s std dev: 0.00041s window: 9
+average rate: 3.997
+	min: 0.250s max: 0.251s std dev: 0.00037s window: 13
+average rate: 3.997
+	min: 0.250s max: 0.251s std dev: 0.00035s window: 17
+average rate: 3.997
+	min: 0.250s max: 0.251s std dev: 0.00034s window: 21
+average rate: 3.996
+	min: 0.250s max: 0.251s std dev: 0.00034s window: 25
+```
+To fix this the pi's udp buffer size was increased and the host rebooted:
+```
+bueche@bueche-rpi5:~$ sudo sysctl -w net.core.rmem_max=26214400
+sudo sysctl -w net.core.rmem_default=26214400
+[sudo] password for bueche: 
+net.core.rmem_max = 26214400
+net.core.rmem_default = 26214400
+bueche@bueche-rpi5:~$ sync
+bueche@bueche-rpi5:~$ reboot
+```
+and this cleared up the issue.
+
+Aside from the last run (t4), all tests should be considered hosed.
+  
+
+- Best run: 11 out of 11 (last one ... others were terrible)
+- Raw test results: [here](https://drive.google.com/drive/folders/1NihKmjOPDQXxpBmLHh7cGpb9e3qIfNjM)
+
+#### 06-09-2026
+- Summary:  This is the start of trying to tune the XL430 for the shoulder lift. Previous analysis has shown that it needs some damping during the pid phase. 
+
+  -t1: initiate the servo tuning with the XL430. should have the same parameters as the default so achieve the same result as yesterday. D=4000
+  - t2: try out D=8000. ... noticed high current but onlu 93 corrections (a new low)
+  - t3: try out D=6000 ... higher number of corrections 116 vs. 93 in t2
+
+- Best run: 11 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1nD5HUg7fXMEKyE6TlY9y8KC3_g1m4dyK)
+
+#### 06-08-2026
+- Summary:  robot setup in new environment. most of the effort around getting the camera postion right. 
+
+- Best run: 11 out of 11
+- Raw test results: [here](https://drive.google.com/drive/folders/1J09zW2qGBZkC6eC7I8WdvZEpE4VXiENz)
+
 #### 06-04-2026
 - Summary:  There were three main changes to the code and environment today. 
  1. The jiggle logic was tweaked to make it happen sooner and ensure that it was not conflicting with the last pid command. In addition, I boosted the rad step to make the jiggle more pronounced. 
