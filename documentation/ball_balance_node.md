@@ -46,7 +46,10 @@ The `ball_balance_node` implements the core of the PID logic in this system. It 
 ## Example Invocation
 
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control ball_balance_node --ros-args   -p kp_flex:=0.15 -p kp_roll:=0.15   -p ki_flex:=0.20 -p ki_roll:=0.05   -p kd_flex:=0.05 -p kd_roll:=0.05 -p d_term_source:=joints  -p max_cmd:=0.3   -p dry_run:=false -p attempt_timeout:=40.0 -p ki_mode:=servo -p use_imu:=true -p  antiwindup_decay:=0.2  -p jiggle_start_delay:=1.0 -p jiggle_amplitude:=0.05
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control ball_balance_node --ros-args   -p kp_flex:=0.15 \
+-p kp_roll:=0.15   -p ki_flex:=0.20 -p ki_roll:=0.05   -p kd_flex:=0.05 -p kd_roll:=0.05 -p d_term_source:=joints  \
+-p max_cmd:=0.3   -p dry_run:=false -p attempt_timeout:=40.0 -p ki_mode:=servo -p use_imu:=true \
+-p  antiwindup_decay:=0.2  -p jiggle_start_delay:=1.0 -p jiggle_amplitude:=0.05
 
 
 [INFO] [1781131297.451881075] [ball_balance_node]: ball_balance_node started.
