@@ -1,10 +1,10 @@
-# Ros2 Robot Arm and PID Controller Using Koch v1.1 Follower
+# Ros2 Robot Arm and Balance PID Controller Using Koch v1.1 Follower
 
 ## Summary
 The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/)) and its powered by The Robot Operating System v2 [ROS2](https://github.com/ros2).  
 
 (**NEW**) The current effort is focused on enabling this robotic arm to balance a cup containing a metal ball bearing. Balancing is a perennial challenge with robotics (as humanoid robots often fall at embarrassing times ;-)). The koch v1.1 hardware is a bit limited to explore all aspects of balance, but useful as a starter task. This is being 
-accomplished by enhancing the robot with additinoal hardware (IMU sensor and inferencing camera) and software, including a [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) (PID = Proportional–integral–derivative) and a vision ML model among other modules. [Learn more ..](./documentation/balance.md)
+accomplished by enhancing the robot with additinoal hardware (IMU sensor and inferencing camera) and software, including a Balance [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) (PID = Proportional–integral–derivative) and a vision ML model among other modules. [Learn more ..](./documentation/balance.md)
 
 This branch supports Ros2 Jazzy (4.2+) and a combination with Humble for the ball bearing detection inferencing.
 
@@ -31,13 +31,13 @@ The documentation for this repository covers the following:
 - **NEW** [Balancing a cup with the robotic arm ](./documentation/balance.md): These notes include detailed descriptions of the add-ons to the Koch v1.1 hardware (3D Inferencing camera and IMU) and software: PID related nodes and Machine Learning models for inferencing on the Camera and on an Nvidia Orin Nano.
 
 <p align="center">
-  <img src="./images/robot_arm_in_motion.gif" alt="Real Robot Arm" width="400">
-<img src="./images/balance_video_camera_inference.gif" alt="balance video" width="600">
+  <img src="./images/robot_arm_in_motion.gif" alt="Real Robot Arm" width="500">
+<img src="./images/balance_video_camera_inference.gif" alt="balance video" width="700">
 </p>
 
 Animations above:
 1. The digital twin executing a series of poses that exercise all of the robotic joints.
-2. The full rviz output showing a small excerpt of the pose and PID operations. The lower lefthand side is an bounding box annotated view of the camera (image after inferencing) and the right hand side 3D view shows the corresponding movement of the cup, ball, and robot.
+2. The full rviz output showing a small excerpt of the pose and PID operations. The lower lefthand side is an bounding box annotated view of the camera (image after inferencing) and the right hand side 3D view shows the corresponding movement of the cup, ball, and robot. In this video 5 different tipping poses are set moving the ball bearing to one of the cup. Following each the balance pid controller kicks in and balances the ball within the cup.
 
 ## FAQ
 ### How can this repository be useful?

@@ -530,3 +530,6 @@ ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control ball_balance_node 
 ^CTraceback (most recent call last):
 
 ```
+
+## FAQ
+### FAQ 1 
