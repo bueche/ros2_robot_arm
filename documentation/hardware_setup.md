@@ -99,6 +99,16 @@ The following are the components added to support the cup balancing effort.
 ## 3D Print of Hardware
 There are a number of ways to print the various custom pieces of the robot arm. We have both printed pieces via a local 3D print and used the [Craftcloud](https://craftcloud3d.com/) service. The meshes used in this print are located [here](../writing_robot_description/meshes). These are derived as binary representations of the ones located in the original [koch v1.1](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL) version.
 
+The Balance PID controller exercise requires an additional 3D printed cup. This is shown below. This is the third version of the cup which improved upon the other two designs by being more smoothly concave. Indeed cup v1 had a flat bottom which made it impossible for a robot (or a human) to balance the ball bearing.
+
+<p align="center">
+  <img src="../images/cup.v3.jpg" alt="cup v3" width="500">
+</p>
+
+The STL and Free cad files for this version of the cup found as:
+1. [cup.v3.FCStd](../writing_robot_description/meshes/cup.v3.FCStd),
+2. [cup.v3-Body.stl](../writing_robot_description/meshes/cup.v3-Body.stl)
+
 ## Assembly of Robot
 - **Arm Assembly**: The basic assembly of the koch v1.1 robot is outlined in detail in the [Jess Moss Youtube video](https://www.youtube.com/watch?v=8nQIg9BwwTk) (follower assembly starts around 8:22 min into the video). The key divergence from this work is the shoulder link. In this version the XL430 servo is positioned upright (vs. horizontal) and we use a standard Robotis bracket (see BOM) instead of the one defined by Jess.
 - **Anchoring of arm**: TBD
@@ -112,7 +122,8 @@ There are a number of ways to print the various custom pieces of the robot arm. 
 
 ## Electrical Notes
 
-The following is an electrical schematic of the robot with the external current sensors.
+The following is an electrical schematic of the robot with the external current sensors. Note that although you can use the INA219 or the INA226 sensors we recommend the INA226 sensors with R002 resistors (vs either with R100 resistors). This ensures that the reading of the sensor can be larger than 1 amp (otherwise as the current gets that large the sensor maxes out on its reading).
+
 <p align="center">
   <img src="../images/koch_v11_with_IN219_sensors.jpg" alt="electrical wiring" width="900">
 </p>
@@ -123,8 +134,7 @@ Those sensors are really optional for the running of the robot and are meant to 
 </p>
 
 Some additional notes:
-- **The integration of the INA226 sensor is not shown in the diagrams above**: The schematic diagram doesn't include the wiring of the INA226 sensor into the 5V rail. It was added for comparision studies with the INA219, and is redundant and optional. The software supports simultaneous measuring from an INA219 and an INA226, but it biases to the INA219.
-  
+ 
 - **Operating 12V and 5V servos on the same robot**: The XL430's are 12V and the XL330's operate on 5V. There are a number of ways to power these servo's and we decided to use a 12V power supply into the U2D2 and then feed some of that into a buck converter for the XL330's and openRB150. The OpenRB will feed data, VCC, and GND into the XL330 path but only Data and GND into the XL430 path. There is a connection from the U2D2 to the OpenRB that has the VCC line physically cut for this. This allows the U2D2-2-XL430 path to carry power, data, and gnd to the XL430's.
   
 - **Cable Length issues - part 1 "range of motion"**: A single 180mm X3P cable from the OpenRB150 to the first XL330 isn't quite long enough to allow the joint with that XL330 to have adequate range of motion (see picture below). 7.75 inches ~= 200 mm, which is beyond the max size cable that (I think) Robotis supports. So we looped in a light weight SMPS2Dynamixel power adapter that allows two 180mm X3P convertable cables to be used effectively doubling the length. Although that power adapter can accept external power it also can be powered just by the incoming cables. There are other ways to extend the reach of these cables (higher guage cable). 
