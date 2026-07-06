@@ -139,3 +139,4 @@ INA226 ina226_5v(0x44, &I2C_Bus1);
 
 ```
 
+The approach is a little different for INA226 sensors in that for certain brands their addresses are pre-programmed to be different when sold in a set. Then it is necessary to probe the bus to attempt to find the addresses that have been set. 

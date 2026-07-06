@@ -64,7 +64,8 @@ Koch v1.1 6-DOF Robotic Arm — Bill of Materials
 | Qty | Component | Description | Link | Unit Price | Total |
 |-----|-----------|-------------|------|-----------|-------|
 | 2 | INA219 Current Sensor | I²C current/voltage monitoring; spares recommended | [Amazon B0FKBDX2R2](https://www.amazon.com/dp/B0FKBDX2R2) | $10 (pack) | $10 |
-| 1 | INA226 Current Sensor | Higher-precision I²C power monitor; spares recommended | [Amazon B0FC656459](https://www.amazon.com/dp/B0FC656459) | $16 | $16 |
+| 2 | INA226 Current Sensor R100| Higher-precision I²C power monitor; spares recommended | [Amazon B0FC656459](https://www.amazon.com/dp/B0FC656459) | $16 | $32 |
+| 2 | INA226 Voltage Current Monitor 0-36V 20A Tester I2C IIC Power Monitoring Sensor Module | [Amazon B0DRNG1VKM](https://www.amazon.com/dp/B0DRNG1VKM) | $13 | $26 |
 | 1 | ESP32 Dev Kit | Microcontroller for telemetry and sensor aggregation | [Amazon B0FNQVZJ6D](https://www.amazon.com/dp/B0FNQVZJ6D) | $20 | $20 |
 
 ## Prototyping & Wiring
@@ -109,6 +110,8 @@ The STL and Free cad files for this version of the cup found as:
 1. [cup.v3.FCStd](../writing_robot_description/meshes/cup.v3.FCStd),
 2. [cup.v3-Body.stl](../writing_robot_description/meshes/cup.v3-Body.stl)
 
+Note that the koch v1.1 hand is incapable of holding the cup without it rocking as the pitch changes. This is partly due to the design of the hand (or more accurately: the claw). Adding tape around the claw was unsuccessful in solving the issue. We respeted to tieing the base of the cup to the hand with a rubber band. 
+
 ## Assembly of Robot
 - **Arm Assembly**: The basic assembly of the koch v1.1 robot is outlined in detail in the [Jess Moss Youtube video](https://www.youtube.com/watch?v=8nQIg9BwwTk) (follower assembly starts around 8:22 min into the video). The key divergence from this work is the shoulder link. In this version the XL430 servo is positioned upright (vs. horizontal) and we use a standard Robotis bracket (see BOM) instead of the one defined by Jess.
 - **Anchoring of arm**: TBD
@@ -134,6 +137,7 @@ Those sensors are really optional for the running of the robot and are meant to 
 </p>
 
 Some additional notes:
+- **For the Balance project a USB hub with external power is required**: I still need to update the electrical diagrams to reflect this. The PI does not have enough juice to power the openRB150, the ESP32 for the power sensors, and the ESP32 for the IMU. Its possible to perhaps work with a single board (openRB150) but for simplicity of the sketches I didn't do that. This is left as an exercise to the reader.
  
 - **Operating 12V and 5V servos on the same robot**: The XL430's are 12V and the XL330's operate on 5V. There are a number of ways to power these servo's and we decided to use a 12V power supply into the U2D2 and then feed some of that into a buck converter for the XL330's and openRB150. The OpenRB will feed data, VCC, and GND into the XL330 path but only Data and GND into the XL430 path. There is a connection from the U2D2 to the OpenRB that has the VCC line physically cut for this. This allows the U2D2-2-XL430 path to carry power, data, and gnd to the XL430's.
   
