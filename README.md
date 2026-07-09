@@ -55,5 +55,16 @@ This repository can be of use to someone building robotics in several ways:
    
 ### What is a leader-follower robotic arm?
 A leader-follower robotic arm system consists of two robotic manipulators where one arm (the leader) is manually controlled by a human operator, and the second arm (the follower) replicates those movements in real-time. It's essentially a form of bilateral teleoperation. In this project we are primarily focused on the follower arm.
+
 ### Why is this project focused on the follower?
-In general leader arms are meant more for human manipulation as they define the poses that the follower will replicate. That limited operational scope for the leader means that its likely that the arm is under powered and/or has a design that is for human manipulation vs. automation. In this project we use the follower as the leader (to predefine poses and collect the measurements) albiet in a less automatic fashion. We also want to study the follower's load and physical characeteristics (e.g., temperature) as it repeatedly performs the activity.
+In general leader arms are meant more for human manipulation as they define the poses that the follower will replicate. That limited operational scope for the leader means that its likely that the arm is under powered and/or has a design that is for human manipulation vs. automation. In this project we use the follower as the leader (to predefine poses and collect the measurements) albiet in a less automatic fashion. We also want to study the follower's load and physical characeteristics (e.g., temperature) as it repeatedly performs the activity. In addition, the cup balancing sub-project doesn't quite fit the leader/follower paradigm. 
+
+## Upcoming sub-projects
+### Upgrade of Nvidia Orin Nano to JetPack 7.2 with Jetson Linux 39.2
+This upgrade to JetPack 7.2 with Jetson Linux 39.2 will allow this project to by-pass the inferencing on the camera and increase the frames per sec inferencing from 12 to 35 FPS. Aside from performance the benefit is an all Jazzy architecture with that approach.
+
+### Extend the software to support the SO-arm101 and Feetech servos
+This sub-project is about extending the software and hardware support to a different robotic arm the SO-ARM101 which is based on Feetech servos rather than Dynamixel servos. 
+
+## Extend model to use 3D capabilities of OAK-D lite camera
+Currently we are not using the 3D capabilities of the OAK-D lite camera due to its computational load on the camera. Once we have a Jazzy-based Nvidia inferencing stack, then this becomes something we can potentially leverage.
