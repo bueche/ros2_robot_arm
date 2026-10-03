@@ -31,6 +31,7 @@ $ git config --global user.email "youremail@example.com"
 
 ```
 $ mkdir -p ~/robot_ws
+$ cd ~/robot_ws
 $ git clone https://github.com/bueche/ros2_robot_arm.git src
 ```
 The act of cloning it to a directory named `src` is intentional. Also, this `robot_ws` will be mirrored into the docker container.
@@ -52,7 +53,25 @@ $ sudo docker info | grep -i runtime
 
 ## Docker image and container setup
 1. Build the docker image
-In the example below the user id that cloned this environment has a UID and GID of 1002. The default is 1000, so if different then pass in the alternative value (in this case 1002 ... see below).
+
+In the example below we assume that the calling user id is 1000.
+
+```
+$ id | grep 1000
+uid=1000(arduino) gid=1000
+
+```
+If so, then run.
+
+```
+$ cd ~/robot_ws/src
+$ # create base ros 
+$ sudo docker build --platform linux/arm64 -t ros-jazzy-arm64 --load  --no-cache -f docker/Dockerfile.ros-jazzy-arm64 .
+$ # create image upon base
+$ sudo docker build --platform linux/arm64 -t robot-jazzy-arm64 --load  --no-cache -f docker/Dockerfile.jazzy.arm64  .
+```
+
+if not, as in the example below, the user id that cloned this environment has a UID and GID of 1002. Again, the default is 1000, so if different then pass in the alternative value (in this case 1002 ... see below).
 
 ```
 $ cd ~/robot_ws/src
@@ -69,14 +88,31 @@ robot-jazzy-arm64   latest    7ad21e00ddc5   44 hours ago    5.52GB
 ros-jazzy-arm64     latest    3756d0e83149   9 months ago    3.98GB
 ```
 2. Start the container
+
+Now when the container is initially started with the `docker/run.sh` script you must be running your terminal from within the windowed interface of the host device. This is due to the fact that the container is configured to be able to run windowed apps like `ms-code` and `rviz2`. TODO: This restriction should be removed optionally with a parameter.
+
 ```
 $ cd ~/robot_ws/src
 $ docker/run.sh 
 ```
-Note: there may be some errors that print related to key setup failure. These can be ignored.
+
+Now there are three parameters to the `run.sh` script:
+1. `-i` or `--image_name`: This is the input image name and the default is `robot-jazzy-arm64`.
+2. `-c` or `--container_name`: This is what the running container will be named. The default is `robot_container`.
+3. `-w` or `--workspace`: This is the name of the workspace that will be shared with the container file system. The default is `robot_ws` but that unlikely the name you gave to your workspace.
+
+so lets suppose we want to call the container `robot_jazzy_container` and our workspace is `robot_jazzy_ws`, then the invocation is:
+
+```
+$ cd ~/robot_ws/src
+$ docker/run.sh -i robot-jazzy-arm64 -c robot_jazzy_container -w robot_jazzy_ws 
+```
+
+note: there may be some errors that print related to key setup failure. These can be ignored.
 
 3. Run the post-container start script
-There is a post-container script to run that will download some additional software and setup the environment.
+There is a post-container script to run that will download some additional software and setup the environment. This should be done within the container.
+
 ```
 $ cd robot_ws/src
 $ls -lt additional_env_setup.sh 
@@ -111,4 +147,6 @@ This is essentially a simple visual simulation.
 ## TODO list
 - get amd64 containers tested on windows.
 - clean up some noise in the scripts 
+- add parameter to run.sh drop the need to have a gui interface 
+
 
