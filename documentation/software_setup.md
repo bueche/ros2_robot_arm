@@ -137,7 +137,7 @@ $ ros2 launch writing_robot_description display_launch.py
 
 ```
 This will launch rviz with a display only version of the robot that can be controlled with the joint_state_publisher gui. Again, the hardware does not have to be wired to have this working. 
-This is essentially a simple visual simulation.
+This is essentially a simple visual simulation, however, its not really appropriate on a raspberry pi or the arduino uno q as they are underpowered for rviz graphics.
 
 <p align="center">
   <img src="../images/display_only_example.jpg" alt="display onlyd" width="600">
