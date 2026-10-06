@@ -8,8 +8,8 @@ function show_help() {
   Options:
   \t-i --image_name\t\t Name of the image to be run (default robot-jazzy-arm64).
   \t-c --container_name\t Name of the container (default robot_container).
-  \t-w --workspace\t\t Host workspace directory name (default: robot_ws). 
-  \t--use_nvidia\t\t Use NVIDIA runtime.
+  \t-w --workspace\t\t Host workspace directory name (default: robot_ws).
+  \tNVIDIA runtime is auto-detected on Jetson (/etc/nv_tegra_release).
   Examples:
   \trun.sh
   \trun.sh --image_name custom_image_name --container_name custom_container_name\n"
@@ -46,6 +46,14 @@ CONTAINER_NAME=${CONTAINER_NAME:-robot_container}
 CONTAINER_USER=ubuntu
 HOST_USER=$USER
 
+# With --net=host the container shares the host's hostname and /etc/hosts.
+# If the hostname does not resolve, sudo in the container warns (and may stall
+# on a DNS lookup). The fix belongs on the host.
+if ! getent hosts "$(hostname)" > /dev/null; then
+    echo "Warning: hostname '$(hostname)' does not resolve; sudo in the container will warn."
+    echo "  Fix on the host: echo \"127.0.1.1 $(hostname)\" | sudo tee -a /etc/hosts"
+fi
+
 SSH_PATH=/home/$HOST_USER/.ssh
 if [ -z "$SSH_AUTH_SOCK" ]; then
     echo "Warning: SSH_AUTH_SOCK not set, starting ssh-agent..."
@@ -73,7 +81,8 @@ if docker container ls -a | grep "${CONTAINER_NAME}$" -c &> /dev/null; then
 fi
 
 # Start the container
-xhost +
+# Allow only this local user (same UID as the container user) to use the X server
+xhost +SI:localuser:$HOST_USER
 docker run --privileged --net=host -it $NVIDIA_FLAGS \
        -e DISPLAY=$DISPLAY \
        -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK_CONTAINER_USER \
@@ -86,7 +95,7 @@ docker run --privileged --net=host -it $NVIDIA_FLAGS \
        -v /dev:/dev \
        -u $HOST_UID:$HOST_GID \
        --name $CONTAINER_NAME $IMAGE_NAME
-xhost -
+xhost -SI:localuser:$HOST_USER
 
 # Cleanup function to commit changes if needed
 function onexit() {
@@ -105,4 +114,3 @@ function onexit() {
 }
 
 trap onexit EXIT
-

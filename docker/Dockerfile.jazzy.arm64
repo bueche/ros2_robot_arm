@@ -6,7 +6,8 @@
 # 2. docker installed on host
 # 3. git installed.
 # 4. (optional) vnc installed and running
-# 5. openssh-server running
+# 5. openssh-server running on the host (the container does not run sshd;
+#    ssh to the host, then docker exec or VS Code "Attach to Running Container")
 # 6. If running on arm64 then ros-jazzy-arm64 image has been created and locally stored,
 #    OR use osrf/ros:jazzy-desktop-full directly (will pull from Docker Hub).
 #
@@ -36,6 +37,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_WS=/home/${USERNAME}/robot_ws
 ENV TERM=linux
 ENV ROS_DISTRO=jazzy
+# UTF-8 locale (C.UTF-8 is built in, no locale-gen needed)
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
 # Make default shell in Dockerfile bash instead of sh
@@ -87,8 +91,6 @@ RUN sudo usermod -a -G video $USER
 
 RUN echo "export QT_X11_NO_MITSHM=1" >> /home/$USER/.bashrc
 
-USER $USER
-
 # Switch to user
 USER ${USERNAME}
 
@@ -118,23 +120,15 @@ RUN sudo apt-get update && \
     ros-jazzy-ros2-control \
     ros-jazzy-ros2-controllers \
     ros-jazzy-controller-manager \
+    ros-jazzy-joint-state-publisher-gui \
     && sudo apt-get clean && \
     sudo rm -rf /var/lib/apt/lists/*
 
 
-# Install SSH server without using systemctl
-RUN sudo apt update && sudo apt install -y openssh-server && \
-    sudo mkdir -p /var/run/sshd && \
-    test -f /etc/ssh/ssh_host_rsa_key || sudo ssh-keygen -A && \
-    sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-
 # Ensure .ssh directory exists with correct ownership for mount point
+# (run.sh mounts the host's ~/.ssh read-only here for git over ssh)
 RUN mkdir -p /home/${USERNAME}/.ssh && \
     chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.ssh
-
-# Expose SSH port
-EXPOSE 22
 
 # Install Arduino IDE (supports ARM64 and AMD64)
 RUN cd /tmp && \
@@ -179,16 +173,18 @@ RUN sudo apt update && \
 RUN mkdir -p /home/${USERNAME}/.vscode/extensions && \
     sudo chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.vscode
 
-# Add script to install VS Code extensions at runtime
+# Install VS Code extensions at build time so they are baked into the image
+# (the container is removed on exit, so a runtime install repeats every start)
 COPY docker/vscode_extensions.sh /usr/local/bin/vscode_extensions.sh
+RUN bash /usr/local/bin/vscode_extensions.sh
 
-# Source ROS workspace automatically when new terminal is opened
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USERNAME}/.bashrc && \
-    echo "source ${ROS_WS}/install/setup.bash 2>/dev/null || true" >> /home/${USERNAME}/.bashrc \
-    echo "export CYCLONEDDS_URI=file:///home/ubuntu/robot_ws/src/writing_robot_description/config/cyclonedds.xml" >> /home/${USERNAME}/.bashrc
+# Source ROS workspace and set DDS config when a new terminal is opened
+# (/opt/ros/jazzy/setup.bash is already sourced by an earlier step)
+RUN echo "source ${ROS_WS}/install/setup.bash 2>/dev/null || true" >> /home/${USERNAME}/.bashrc && \
+    echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/${USERNAME}/.bashrc && \
+    echo "export CYCLONEDDS_URI=file://${ROS_WS}/src/writing_robot_description/config/cyclonedds.xml" >> /home/${USERNAME}/.bashrc
 
 # Set working directory
 WORKDIR ${ROS_WS}
 
-CMD ["/bin/bash", "-c", "ssh-keygen -A & /usr/sbin/sshd -D & /usr/local/bin/vscode_extensions.sh ; exec bash"]
-# CMD ["/bin/bash", "-c", "exec bash"]
+CMD ["/bin/bash"]

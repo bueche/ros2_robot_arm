@@ -17,7 +17,9 @@ clone_or_update() {
     if [ -d "$WORKSPACE_SRC/$REPO_NAME" ]; then
         echo ">>> $REPO_NAME already exists, pulling latest..."
         cd $WORKSPACE_SRC/$REPO_NAME
-        git pull origin $BRANCH
+        # Local branch carries merged PRs, so it diverges from upstream.
+        # Merge explicitly; a plain pull fails on divergent branches.
+        git pull --no-rebase origin $BRANCH
     else
         echo ">>> Cloning $REPO_NAME..."
         cd $WORKSPACE_SRC
@@ -35,15 +37,17 @@ apply_pr() {
 
     cd $WORKSPACE_SRC/$REPO_NAME
 
-    # Check if PR branch already exists
-    if git branch | grep -q "pr-$PR_NUMBER"; then
+    # Skip only if the PR branch exists AND is already merged into HEAD
+    if git rev-parse -q --verify "pr-$PR_NUMBER" > /dev/null && \
+       git merge-base --is-ancestor "pr-$PR_NUMBER" HEAD; then
         echo ">>> PR #$PR_NUMBER already applied to $REPO_NAME, skipping..."
         return 0
     fi
 
+    # Failures are tested with "if !" so set -e does not exit before the
+    # error handling below runs. "+" lets the fetch follow a force-pushed PR.
     echo ">>> Fetching PR #$PR_NUMBER for $REPO_NAME..."
-    git fetch origin pull/$PR_NUMBER/head:pr-$PR_NUMBER
-    if [ $? -ne 0 ]; then
+    if ! git fetch origin +pull/$PR_NUMBER/head:pr-$PR_NUMBER; then
         echo ""
         echo "*** ERROR: Could not fetch PR #$PR_NUMBER for $REPO_NAME"
         echo "*** ACTION REQUIRED: Check if PR still exists at:"
@@ -52,8 +56,7 @@ apply_pr() {
     fi
 
     echo ">>> Merging PR #$PR_NUMBER into $ROS_DISTRO..."
-    git merge pr-$PR_NUMBER --no-edit
-    if [ $? -ne 0 ]; then
+    if ! git merge pr-$PR_NUMBER --no-edit; then
         echo ""
         echo "*** WARNING: PR #$PR_NUMBER failed to merge cleanly into $REPO_NAME"
         echo "*** The $ROS_DISTRO branch may have changed since the PR was opened."
