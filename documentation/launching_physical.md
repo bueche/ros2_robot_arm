@@ -58,12 +58,12 @@ rpi5:~/$ pwd
 /home/ubuntu/
 rpi5:~/$ cd robot_ws
 rpi5:~/robot_ws$ source ./install/setup.bash
-rpi5:~/robot_ws$ ros2 launch writing_robot_description koch_v11_real_robot.launch.py
+rpi5:~/robot_ws$ ros2 launch robot_arm_description koch_v11_real_robot.launch.py
 ```
 This will launch the ros2 robot software. The full example output is shown below. We comment on some of parts below.
 
 ```
-$ ros2 launch writing_robot_description koch_v11_real_robot.launch.py
+$ ros2 launch robot_arm_description koch_v11_real_robot.launch.py
 [INFO] [launch]: All log files can be found below /home/ubuntu/.ros/log/2026-03-01-23-27-25-361593-bueche-rpi5-6584
 [INFO] [launch]: Default logging verbosity is set to INFO
 [INFO] [robot_state_publisher-1]: process started with pid [6587]
@@ -311,10 +311,10 @@ $ ros2 launch writing_robot_description koch_v11_real_robot.launch.py
 [INFO] [spawner-3]: process has finished cleanly [pid 6624]
 [INFO] [spawner-4]: process started with pid [6641]
 [spawner-4] [INFO] [1772407650.225252761] [spawner_koch_v11_controller]: waiting for service /controller_manager/list_controllers to become available...
-[spawner-4] [INFO] [1772407650.492474802] [spawner_koch_v11_controller]: Setting controller param "params_file" to "['/home/ubuntu/robot_ws/install/writing_robot_description/share/writing_robot_description/config/koch_v11_controllers_real.yaml']" for koch_v11_controller
+[spawner-4] [INFO] [1772407650.492474802] [spawner_koch_v11_controller]: Setting controller param "params_file" to "['/home/ubuntu/robot_ws/install/robot_arm_description/share/robot_arm_description/config/koch_v11_controllers_real.yaml']" for koch_v11_controller
 [ros2_control_node-2] [INFO] [1772407650.502698982] [controller_manager]: Loading controller : 'koch_v11_controller' of type 'joint_trajectory_controller/JointTrajectoryController'
 [ros2_control_node-2] [INFO] [1772407650.502751779] [controller_manager]: Loading controller 'koch_v11_controller'
-[ros2_control_node-2] [INFO] [1772407650.513313313] [controller_manager]: Controller 'koch_v11_controller' node arguments: --ros-args --params-file /tmp/launch_params_yroe8zdt --params-file /home/ubuntu/robot_ws/install/writing_robot_description/share/writing_robot_description/config/koch_v11_controllers_real.yaml 
+[ros2_control_node-2] [INFO] [1772407650.513313313] [controller_manager]: Controller 'koch_v11_controller' node arguments: --ros-args --params-file /tmp/launch_params_yroe8zdt --params-file /home/ubuntu/robot_ws/install/robot_arm_description/share/robot_arm_description/config/koch_v11_controllers_real.yaml 
 [spawner-4] [INFO] [1772407650.547436799] [spawner_koch_v11_controller]: Loaded koch_v11_controller
 [ros2_control_node-2] [INFO] [1772407650.549255364] [controller_manager]: Configuring controller: 'koch_v11_controller'
 [ros2_control_node-2] [INFO] [1772407650.549608347] [koch_v11_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
@@ -373,7 +373,7 @@ ubuntu@bueche-nvidia-nano:~/robot_ws$ ros2 run balance ball_marker_node
 ### Step 4: Launch the robot
 Very similar to the non-balance one, but there is a special launch file (`koch_v11_real_robot_for_balance.launch.py`) to capture the URDF specific to this balance sub-project: this URDF adds a cup and ball.
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 launch writing_robot_description koch_v11_real_robot_for_balance.launch.py
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 launch robot_arm_description koch_v11_real_robot_for_balance.launch.py
 [INFO] [launch]: All log files can be found below /home/ubuntu/.ros/log/2026-07-08-21-38-31-032445-bueche-rpi5-608
 [INFO] [launch]: Default logging verbosity is set to INFO
 [INFO] [servo_config_node-1]: process started with pid [611]
@@ -414,7 +414,7 @@ These are also discussed in more detail in the [documentation for the balance no
 These take care of the external sensors (INA226 current sensors and IMU sensor).
 
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control power_monitor_node
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control power_monitor_node
 
 [INFO] [1783546835.463551482] [power_monitor_node]: Connected to ESP32 on /dev/ttyIna219 at 115200 baud
 [INFO] [1783546837.464657527] [power_monitor_node]: Power monitor node started
@@ -423,7 +423,7 @@ ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control power_monitor_node
 and 
 
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control imu_balance_node
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control imu_balance_node
 [INFO] [1783546819.931613581] [imu_balance_node]: Opening serial port /dev/ttyIMU...
 [INFO] [1783546819.932385679] [imu_balance_node]: IMU balance node started — /dev/ttyIMU @ 115200 baud, 50Hz publish rate
 [INFO] [1783546819.934893583] [imu_balance_node]: Topics: /imu/raw  /imu/balance_error  /imu/balance_cmd  /imu/is_stable
@@ -441,7 +441,7 @@ These nodes store detailed topic information on the movement of the joints and t
 
 
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control pid_logger
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control pid_logger
 [INFO] [1783547094.259052777] [pid_logger]: pid_logger started — writing to ./pid_log_20260708_214454.csv
 [INFO] [1783547094.260191044] [pid_logger]: Logging at /joint_states rate (100Hz) — ball/IMU held at their native rates
 [INFO] [1783547102.442729822] [pid_logger]: Pose started: pose 1 - initial (#1)
@@ -450,7 +450,7 @@ ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control pid_logger
 and
 
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control power_logger
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control power_logger
 [INFO] [1783546872.491511213] [power_logger_enhanced]: Logging to: power_log_20260708_214112.csv
 [INFO] [1783546872.492295236] [power_logger_enhanced]: Tracking: INA226 power (primary) + Servo currents
 [INFO] [1783547010.356605090] [power_logger_enhanced]: → Pose started: pose 1 - initial
@@ -467,7 +467,7 @@ ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control power_logger
 ### Step 7: turn on the system watch dog node
 This monitors the latency of topics and across hosts.
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control system_watchdog
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control system_watchdog
 [INFO] [1783546947.102875785] [system_watchdog]: System watchdog started — monitoring 8 topics, reporting at 0.2Hz
 [INFO] [1783546952.077402223] [system_watchdog]: === System Watchdog ===
   /ball/position: NO DATA
@@ -500,7 +500,7 @@ We use peek on the nvidia orin nano.
 We use the pose test utility for this purpose.
 
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/balance_v1.yaml -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real_for_balance.urdf -p power_monitoring:=true -p delay:=5.0 -p wait_for_stable:=true -p stable_timeout:=20.0
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control pose_test --ros-args -p poses_file:=src/robot_arm_description/config/balance_v1.yaml -p validate:=true -p telemetry:=true -p urdf_file:=src/robot_arm_description/urdf/koch_v11_arm_real_for_balance.urdf -p power_monitoring:=true -p delay:=5.0 -p wait_for_stable:=true -p stable_timeout:=20.0
 POWER_MONITORING_AVAILABLEF: True
 [INFO] [1783547100.375273498] [pose_test_node]: Loading URDF limits...
 [INFO] [1783547100.378236201] [pose_test_node]: ✓ Loaded limits for 6 joints
@@ -524,7 +524,7 @@ POWER_MONITORING_AVAILABLEF: True
 [INFO] [1783547100.410620438] [pose_test_node]: Wait for stable: YES (timeout: 20.0s)
 [INFO] [1783547100.412071632] [pose_test_node]: ============================================================
 [INFO] [1783547100.412887155] [pose_test_node]: Waiting for joint trajectory controller...
-[INFO] [1783547102.426382814] [pose_test_node]: ✓ Loaded 11 poses from src/writing_robot_description/config/balance_v1.yaml
+[INFO] [1783547102.426382814] [pose_test_node]: ✓ Loaded 11 poses from src/robot_arm_description/config/balance_v1.yaml
 [INFO] [1783547102.426991077] [pose_test_node]: 
 ============================================================
 [INFO] [1783547102.427521265] [pose_test_node]: POSE SEQUENCE TEST

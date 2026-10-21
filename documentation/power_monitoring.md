@@ -2,7 +2,7 @@
 
 This project also includes utilities to measure and correlate the power draw of servos with the sequence of poses as they enfold. Two [INA219 voltage and current sensors](https://www.amazon.com/dp/B0CRY7R4ZD) have been added to the setup (see hardware) and the utilities and software enhanced to report and analyze  this in a ros2 environment. The code also supports having [INA226 voltage and current sensors](https://www.amazon.com/dp/B0FC656459) in addition to the INA219 ones (both sensors at the same time). The results between the two sensors are close enough so in general this is not really needed. The code also pulls current, temperature, voltage, and load data from the [Dynamixel servo-internal sensors](https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface/pull/106) to compare with the external ones.
 
-The particular example illustrated is defined by [this pose sequence](../src/writing_robot_description/config/delivery_poses.yaml) and is illustrated in the story board below (which was an rviz2 reproduction of the actual physical robot movements). 
+The particular example illustrated is defined by [this pose sequence](../src/robot_arm_description/config/delivery_poses.yaml) and is illustrated in the story board below (which was an rviz2 reproduction of the actual physical robot movements). 
 
 <p align="center">
   <img src="../images/story_board_for_example_pose_test.jpg" alt="story board for example pose test" width="900">
@@ -18,8 +18,8 @@ This setup includes:
 - Two different arduino sketches to be run on the ESP32 dev boarding that is monitoring current:
    - [read_ina219.ino](../src/power_monitor/sketch/read_ina219.ino): ESP32dev sketch to collect data from the two INA219 sensors.
    - [read_ina219_ina226.ino](../src/power_monitor/sketch/read_ina219_ina226.ino): ESP32dev sketch to collect data from the two INA219 sensors and an optional ina226 sensor on the 5v rail.
-- [power_monitor_node.py](../src/writing_robot_control/writing_robot_control/power_monitor_node.py): A ros2 node that interfaces with the ESP32 board that is communicating with the INA219 sensors. An arduino sketch is running on the ESP32 board which samples the sensor data and passes the inforamtion back via USB. This node takes that infomration and publishes it in ROS2.
-- [power_logger.py](../src/writing_robot_control/writing_robot_control/power_logger.py): A ros2 client which pulls the power and temperature data (from the power_monitoring_node and from the dynamixel servos) and the pose data (from pose_test) and writes this to a CSV file for further analysis. Each timestamp is 100ms from the last by default.
+- [power_monitor_node.py](../src/robot_arm_control/robot_arm_control/power_monitor_node.py): A ros2 node that interfaces with the ESP32 board that is communicating with the INA219 sensors. An arduino sketch is running on the ESP32 board which samples the sensor data and passes the inforamtion back via USB. This node takes that infomration and publishes it in ROS2.
+- [power_logger.py](../src/robot_arm_control/robot_arm_control/power_logger.py): A ros2 client which pulls the power and temperature data (from the power_monitoring_node and from the dynamixel servos) and the pose data (from pose_test) and writes this to a CSV file for further analysis. Each timestamp is 100ms from the last by default.
 
  
 ## Observations and Investigations To Come

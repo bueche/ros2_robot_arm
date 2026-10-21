@@ -13,12 +13,12 @@ for i in {1..10}; do
     echo "Run $i of 10 - $(date)" | tee -a "$OUTPUT_FILE"
     echo "========================================" | tee -a "$OUTPUT_FILE"
     
-    ros2 run writing_robot_control pose_test \
+    ros2 run robot_arm_control pose_test \
         --ros-args \
-        -p poses_file:=src/writing_robot_description/config/delivery_poses.yaml \
+        -p poses_file:=src/robot_arm_description/config/delivery_poses.yaml \
         -p validate:=true \
         -p telemetry:=true \
-        -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf \
+        -p urdf_file:=src/robot_arm_description/urdf/koch_v11_arm_real.urdf \
         -p power_monitoring:=true \
         -p movement_time:=0.5 2>&1 | tee -a "$OUTPUT_FILE"
     

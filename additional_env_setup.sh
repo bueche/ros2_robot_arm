@@ -92,8 +92,8 @@ rosdep install --from-paths src --ignore-src -r -y --rosdistro $ROS_DISTRO
 echo ">>> setup Rviz2 environment..."
 
 mkdir -p ~/.rviz2
-cp ${WORKSPACE_SRC}/writing_robot_description/rviz/persistent_settings ~/.rviz2
-cp ${WORKSPACE_SRC}/writing_robot_description/rviz/default.rviz ~/.rviz2
+cp ${WORKSPACE_SRC}/robot_arm_description/rviz/persistent_settings ~/.rviz2
+cp ${WORKSPACE_SRC}/robot_arm_description/rviz/default.rviz ~/.rviz2
 
 echo ""
 echo "----------------------------------------------"

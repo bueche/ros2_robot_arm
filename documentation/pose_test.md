@@ -19,7 +19,7 @@ This ros2 utility does a number of tests that include:
 The parameters are:
 | parameter name | default | description |
 |----------------|---------|-------------|
-|`poses_file`| |The argument should be the file path to a yaml formatted set of poses. See [example pose sequence yaml file](https://github.com/bueche/ros2_robot_arm/blob/main/writing_robot_description/config/delivery_poses.yaml) for more detail.|
+|`poses_file`| |The argument should be the file path to a yaml formatted set of poses. See [example pose sequence yaml file](https://github.com/bueche/ros2_robot_arm/blob/main/robot_arm_description/config/delivery_poses.yaml) for more detail.|
 | `program`|| This can have an argument value of calibration, sweep, stress, or default. Each represents a sequence of poses.|
 | `servo_test`| False| if true then a servo range-of-motion test is run. Must be accompanied by the `servo_test_joint` parameter (see next).|
 | `servo_test_joint`|| Specific joint to test and can have a value of shoulder_pan, shoulder_lift, elbow_flex, elbow_flex, wrist_roll, and pen_holder.|
@@ -29,13 +29,13 @@ The parameters are:
 | `delay`|`2.0`| The time in seconds to delay between each pose.|
 | `movement_time`| `2.0`| how much time should the arm have to complete the transition from the current pose to the next pose.|
 | `urdf_file`| |Load URDF from file. (TODO: should have a default file to load)|
-| `power_monitoring`| |Determines whether or not the power monitoring will take place during poses. See [power_monitor_node](./writing_robot_control/writing_robot_comtrol/power_monitor.py).
+| `power_monitoring`| |Determines whether or not the power monitoring will take place during poses. See [power_monitor_node](./robot_arm_control/robot_arm_comtrol/power_monitor.py).
   
 
 ## Pose Sequence Example
 An example run through a sequence of poses is as follows. In this test the robot will go through a short simulated package handling scenario. Each pose transition is to occur within one second and there will be a one second pause between each pose. The software will also validate the that each pose is allowed by the URDF definition and stop if it does not. 
 
-The particular example illustrated is defined by [this pose sequence](../src/writing_robot_description/config/delivery_poses.yaml) and is illustrated in the story board below (which was an rviz2 reproduction of the actual physical robot movements). 
+The particular example illustrated is defined by [this pose sequence](../src/robot_arm_description/config/delivery_poses.yaml) and is illustrated in the story board below (which was an rviz2 reproduction of the actual physical robot movements). 
 
 <p align="center">
   <img src="../images/story_board_for_example_pose_test.jpg" alt="story board for example pose test" width="900">
@@ -44,7 +44,7 @@ The particular example illustrated is defined by [this pose sequence](../src/wri
 Ouptut from the Pose Test utility is given below.
 
 ```bash
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p poses_file:=src/writing_robot_description/config/delivery_poses.yaml -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf -p power_monitoring:=true -p delay:=2.0
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control pose_test --ros-args -p poses_file:=src/robot_arm_description/config/delivery_poses.yaml -p validate:=true -p telemetry:=true -p urdf_file:=src/robot_arm_description/urdf/koch_v11_arm_real.urdf -p power_monitoring:=true -p delay:=2.0
 POWER_MONITORING_AVAILABLEF: True
 [INFO] [1770595611.286299681] [pose_test_node]: Loading URDF limits...
 [INFO] [1770595611.288279858] [pose_test_node]: ✓ Loaded limits for 6 joints
@@ -67,7 +67,7 @@ POWER_MONITORING_AVAILABLEF: True
 [INFO] [1770595612.897053669] [pose_test_node]: Delay between poses: 2.0s
 [INFO] [1770595612.897580061] [pose_test_node]: ============================================================
 [INFO] [1770595612.898085119] [pose_test_node]: Waiting for joint trajectory controller...
-[INFO] [1770595614.918960495] [pose_test_node]: ✓ Loaded 11 poses from src/writing_robot_description/config/delivery_poses.yaml
+[INFO] [1770595614.918960495] [pose_test_node]: ✓ Loaded 11 poses from src/robot_arm_description/config/delivery_poses.yaml
 [INFO] [1770595614.919536684] [pose_test_node]: 
 ============================================================
 [INFO] [1770595614.920086372] [pose_test_node]: POSE SEQUENCE TEST
@@ -384,7 +384,7 @@ POWER_MONITORING_AVAILABLEF: True
 ## Servo Range of motion test example
 The following is a servo range of motion test example.
 ```bash
--rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf
+-rpi5:~/robot_ws$ ros2 run robot_arm_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/robot_arm_description/urdf/koch_v11_arm_real.urdf
 
 [INFO] [1766531325.081504237] [pose_test_node]: Loading URDF limits...
 [INFO] [1766531325.083479988] [pose_test_node]: ✓ Loaded limits for 6 joints
@@ -459,7 +459,7 @@ Testing max: 2.700 rad
 ## Example of a validation error
 The following is an example of a validation failure.
 ```bash
--rpi5:~/robot_ws$ ros2 run writing_robot_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/writing_robot_description/urdf/koch_v11_arm_real.urdf
+-rpi5:~/robot_ws$ ros2 run robot_arm_control pose_test --ros-args -p servo_test:=true -p servo_test_joint:=wrist_flex  -p validate:=true -p telemetry:=true -p urdf_file:=src/robot_arm_description/urdf/koch_v11_arm_real.urdf
 
 [INFO] [1766531037.347260479] [pose_test_node]: Loading URDF limits...
 [INFO] [1766531037.349198675] [pose_test_node]: ✓ Loaded limits for 6 joints

@@ -34,58 +34,58 @@ These are projections and the supporting analysis are a work in progress (that s
 - `--analyze-transition`: Analyze full pose transition (use with --pose-from and --pose-to)')
 - `--pose-from`: Starting pose as comma-separated angles in radians (e.g., "0.0,1.57,0.0,0.0,0.0,0.0")
 - `--pose-to`: Ending pose as comma-separated angles
-- `--analyze-sequence`: Analyze complete pose sequence from YAML file. See the following example yaml file: [delivery_poses.yaml](https://github.com/bueche/ros2_robot_arm/blob/main/writing_robot_description/config/delivery_poses.yaml). That yaml file can be used as input to the pose_test tool.
+- `--analyze-sequence`: Analyze complete pose sequence from YAML file. See the following example yaml file: [delivery_poses.yaml](https://github.com/bueche/ros2_robot_arm/blob/main/robot_arm_description/config/delivery_poses.yaml). That yaml file can be used as input to the pose_test tool.
 - `--csv-output`: Append analysis results to CSV file for Excel graphing')
     
 ## Some example invocations
 ```
 # Basic tests
-  ros2 run writing_robot_control load_tester --full_analysis
-  ros2 run writing_robot_control load_tester --joint shoulder_lift --static
-  ros2 run writing_robot_control load_tester --joint shoulder_lift --payload
+  ros2 run robot_arm_control load_tester --full_analysis
+  ros2 run robot_arm_control load_tester --joint shoulder_lift --static
+  ros2 run robot_arm_control load_tester --joint shoulder_lift --payload
   
   # Trajectory analysis (single joint)
-  ros2 run writing_robot_control load_tester --joint shoulder_lift --static \\
+  ros2 run robot_arm_control load_tester --joint shoulder_lift --static \\
     --previous-position 0.0 --movement-time 2.0
   
   # Full pose transition analysis
-  ros2 run writing_robot_control load_tester --analyze-transition \\
+  ros2 run robot_arm_control load_tester --analyze-transition \\
     --pose-from "0.0,1.57,0.0,0.0,0.0,0.0" \\
     --pose-to "0.0,1.57,1.57,0.0,0.0,0.0" \\
     --movement-time 2.0
   
   # YAML sequence analysis
-  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+  ros2 run robot_arm_control load_tester --analyze-sequence poses.yaml \\
     --movement-time 2.0
   
   # CSV output for Excel graphing. 
-  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+  ros2 run robot_arm_control load_tester --analyze-sequence poses.yaml \\
     --movement-time 2.0 --csv-output results.csv
   
   # Compare different movement times (appends to same CSV)
-  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+  ros2 run robot_arm_control load_tester --analyze-sequence poses.yaml \\
     --movement-time 2.0 --csv-output comparison.csv
-  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+  ros2 run robot_arm_control load_tester --analyze-sequence poses.yaml \\
     --movement-time 1.0 --csv-output comparison.csv
-  ros2 run writing_robot_control load_tester --analyze-sequence poses.yaml \\
+  ros2 run robot_arm_control load_tester --analyze-sequence poses.yaml \\
     --movement-time 0.5 --csv-output comparison.csv
   
   # What-if scenarios
-  ros2 run writing_robot_control load_tester --joint shoulder_lift --what-if XL330-M077
-  ros2 run writing_robot_control load_tester --joint shoulder_lift --what-if XL330-M288
-  ros2 run writing_robot_control load_tester --joint shoulder_lift --what-if XM430-W350
+  ros2 run robot_arm_control load_tester --joint shoulder_lift --what-if XL330-M077
+  ros2 run robot_arm_control load_tester --joint shoulder_lift --what-if XL330-M288
+  ros2 run robot_arm_control load_tester --joint shoulder_lift --what-if XM430-W350
   
   # Diagnostics with telemetry
-  ros2 run writing_robot_control load_tester --joint shoulder_lift --diagnostics
+  ros2 run robot_arm_control load_tester --joint shoulder_lift --diagnostics
   
   # Compare all options
-  ros2 run writing_robot_control load_tester --compare-servos
+  ros2 run robot_arm_control load_tester --compare-servos
         """
 ```
 ## Example run with shorter pose duration
 Example run in which the speed of movement is increased, and hence putting more potential strain on the servos. Again, any projection (at the moment) has not been verified with samples.
 ```bash
--rpi5:~/robot_ws$ ros2 run writing_robot_control load_tester --analyze-sequence src/writing_robot_description/config/default_poses.yaml    --movement-time 0.5 --csv-output movement.tst.csv
+-rpi5:~/robot_ws$ ros2 run robot_arm_control load_tester --analyze-sequence src/robot_arm_description/config/default_poses.yaml    --movement-time 0.5 --csv-output movement.tst.csv
 
 [INFO] [1766198123.975833871] [load_tester]: ✓ Dynamixel SDK connected (telemetry enabled)
 [INFO] [1766198123.976458355] [load_tester]: Load Tester initialized
@@ -93,7 +93,7 @@ Example run in which the speed of movement is increased, and hence putting more 
 ============================================================
 [INFO] [1766198123.977552861] [load_tester]: YAML POSE SEQUENCE ANALYSIS
 [INFO] [1766198123.978092271] [load_tester]: ============================================================
-[INFO] [1766198123.978611773] [load_tester]: File: src/writing_robot_description/config/default_poses.yaml
+[INFO] [1766198123.978611773] [load_tester]: File: src/robot_arm_description/config/default_poses.yaml
 [INFO] [1766198123.985224768] [load_tester]: Found 6 poses
 [INFO] [1766198123.985798715] [load_tester]: CSV output: movement.tst.csv
 [INFO] [1766198123.986313014] [load_tester]: 

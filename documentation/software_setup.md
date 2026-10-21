@@ -133,7 +133,7 @@ It is possible to test a good percentage of the software setup by successful exe
 ```
 $ cd ~/robot_ws
 $ colcon build --symlink-install
-$ ros2 launch writing_robot_description display_launch.py
+$ ros2 launch robot_arm_description display_launch.py
 
 ```
 This will launch rviz with a display only version of the robot that can be controlled with the joint_state_publisher gui. Again, the hardware does not have to be wired to have this working. 

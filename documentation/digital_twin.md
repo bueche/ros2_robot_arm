@@ -85,7 +85,7 @@ We will go into these steps in more detail below, but essentially the STL files 
 The servo STL files can be obtained from the Robotis website. The other pieces of the original Koch v1.1 follower arm STL files are available in ASCII format [here](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL). However, FreeCAD and most modern CAD tools prefer the more compact STL binary format.
 
 **📦 Binary STL files for the servos and other parts are available in this repository at:**  
-[github.com/bueche/ros2_robot_arm/.../meshes](https://github.com/bueche/ros2_robot_arm/tree/main/writing_robot_description/meshes)
+[github.com/bueche/ros2_robot_arm/.../meshes](https://github.com/bueche/ros2_robot_arm/tree/main/robot_arm_description/meshes)
 
 These files, however, need further processing in the CAD tool (orientation and placement) to support the correct kinematic behavior. 
 
@@ -95,7 +95,7 @@ Before diving into the algorithm, it's helpful to establish terminology mapping 
 
 | FreeCAD Concept | URDF Equivalent | Notes |
 |:----------------|:----------------|:------|
-| **Part** | **Link** | Except for the end effector (pen_link), each link consists of a 3D-printed bracket plus an attached servo motor |
+| **Part** | **Link** | Except for the end effector (gripper), each link consists of a 3D-printed bracket plus an attached servo motor |
 | **Assembly** | **Robot definition** | The complete set of links and joints defining the robot |
 
 > **💡 Important conceptual note:** A link rotates about the joint that *connects it to its parent*, not about its own attached servo. The servo attached to a link will be the rotation point for the *child* link. This is illustrated below. 
@@ -164,7 +164,7 @@ Before diving into the algorithm, it's helpful to establish terminology mapping 
 Two Python scripts are provided for extracting URDF data from a FreeCAD assembly:
 
 **📜 Scripts location:**  
-[github.com/bueche/ros2_robot_arm/.../scripts](https://github.com/bueche/ros2_robot_arm/tree/main/writing_robot_description/meshes/scripts)
+[github.com/bueche/ros2_robot_arm/.../scripts](https://github.com/bueche/ros2_robot_arm/tree/main/robot_arm_description/meshes/scripts)
 
 - **`extract_links.py`**: Exports `<link>` definitions with visual mesh references and their transforms
 - **`extract_joints.py`**: Exports `<joint>` definitions with parent-child relationships, origins, axes, and limits
@@ -216,7 +216,7 @@ Example output:
   <visual name="shoulder_bracket_visual">
     <origin xyz="0.025000 0.015000 0.010000" rpy="0.000000 0.000000 1.570796"/>
     <geometry>
-      <mesh filename="package://writing_robot_description/meshes/shoulder_bracket.stl"/>
+      <mesh filename="package://robot_arm_description/meshes/shoulder_bracket.stl"/>
     </geometry>
     <material name="grey">
       <color rgba="0.5 0.5 0.5 1.0"/>

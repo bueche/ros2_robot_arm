@@ -33,7 +33,7 @@ TODO: The defaults need to be updated to match the optimal values from the tests
 
 ## Example invocation
 ```
-ubuntu@bueche-rpi5:~/robot_ws$ ros2 run writing_robot_control wrist_balance_controller --ros-args   -p correction_hz:=1.0   -p move_duration:=0.4  -p max_step_rad:=0.08 -p max_total_rad:=0.5  -p max_total_flex_rad:=0.80  -p max_total_roll_rad:=0.55
+ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control wrist_balance_controller --ros-args   -p correction_hz:=1.0   -p move_duration:=0.4  -p max_step_rad:=0.08 -p max_total_rad:=0.5  -p max_total_flex_rad:=0.80  -p max_total_roll_rad:=0.55
 [INFO] [1781131294.416975799] [wrist_balance_controller]: Wrist balance controller started.
 [INFO] [1781131294.418435373] [wrist_balance_controller]: Joints: wrist_flex (pitch), wrist_roll (roll)
 [INFO] [1781131294.419544984] [wrist_balance_controller]: Rate=1.0Hz  step=4.6deg  total_limit=flex:45.8deg roll:31.5deg  move_dur=0.4s

@@ -7,7 +7,7 @@ There are two ways to run the digital twin. The first is the display-only versio
 ```
 $ cd ~/robot_ws
 $ colcon build --symlink-install
-$ ros2 launch writing_robot_description display_launch.py
+$ ros2 launch robot_arm_description display_launch.py
 
 ```
 This will launch rviz with a display only version of the robot that can be controlled with the joint_state_publisher gui. Again, the hardware does not have to be wired to have this working. 

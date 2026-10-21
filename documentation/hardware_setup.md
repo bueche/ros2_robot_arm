@@ -98,7 +98,7 @@ The following are the components added to support the cup balancing effort.
 
 
 ## 3D Print of Hardware
-There are a number of ways to print the various custom pieces of the robot arm. We have both printed pieces via a local 3D print and used the [Craftcloud](https://craftcloud3d.com/) service. The meshes used in this print are located [here](../writing_robot_description/meshes). These are derived as binary representations of the ones located in the original [koch v1.1](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL) version.
+There are a number of ways to print the various custom pieces of the robot arm. We have both printed pieces via a local 3D print and used the [Craftcloud](https://craftcloud3d.com/) service. The meshes used in this print are located [here](../robot_arm_description/meshes). These are derived as binary representations of the ones located in the original [koch v1.1](https://github.com/jess-moss/koch-v1-1/tree/main/hardware/follower/STL) version.
 
 The Balance PID controller exercise requires an additional 3D printed cup. This is shown below. This is the third version of the cup which improved upon the other two designs by being more smoothly concave. Indeed cup v1 had a flat bottom which made it impossible for a robot (or a human) to balance the ball bearing.
 
@@ -107,8 +107,8 @@ The Balance PID controller exercise requires an additional 3D printed cup. This 
 </p>
 
 The STL and Free cad files for this version of the cup found as:
-1. [cup.v3.FCStd](../writing_robot_description/meshes/cup.v3.FCStd),
-2. [cup.v3-Body.stl](../writing_robot_description/meshes/cup.v3-Body.stl)
+1. [cup.v3.FCStd](../robot_arm_description/meshes/cup.v3.FCStd),
+2. [cup.v3-Body.stl](../robot_arm_description/meshes/cup.v3-Body.stl)
 
 Note that the koch v1.1 hand is incapable of holding the cup without it rocking as the pitch changes. This is partly due to the design of the hand (or more accurately: the claw). Adding tape around the claw was unsuccessful in solving the issue. We respeted to tieing the base of the cup to the hand with a rubber band. 
 

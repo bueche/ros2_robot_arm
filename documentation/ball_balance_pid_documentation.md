@@ -85,9 +85,9 @@ As noted above, the Koch v1.1 wrist has two joints we focus on for balancing:
 - **wrist_flex**: used to tilt the cup forward/backward (toward/away from robot base)
 - **wrist_roll**: used to tilt the cup left/right
 
-This robot goes through a series of moves or poses which are defined ahead of time (in the pose sequence yaml, for example [here](../writing_robot_description/config/balance_v1.yaml))and deterministic. AFter each such step, it then transitions into a balancing phase controlled by the PID controller and whose goal is to get the ball to return the center. The pose step phase can impact all servos, but the PID phase only impacts the wrist flex and wrist roll.
+This robot goes through a series of moves or poses which are defined ahead of time (in the pose sequence yaml, for example [here](../robot_arm_description/config/balance_v1.yaml))and deterministic. AFter each such step, it then transitions into a balancing phase controlled by the PID controller and whose goal is to get the ball to return the center. The pose step phase can impact all servos, but the PID phase only impacts the wrist flex and wrist roll.
 
-Joint positions are in radians. The operating range for these two joints are defined in the [urdf file](../writing_robot_description/urdf/koch_v11_arm_real_for_balance.urdf) as:
+Joint positions are in radians. The operating range for these two joints are defined in the [urdf file](../robot_arm_description/urdf/koch_v11_arm_real_for_balance.urdf) as:
 - `wrist_flex`: 0.297 to 2.700 rad  
 - `wrist_roll`: -1.448 to 1.900 rad
 
@@ -96,7 +96,7 @@ But for this application we don't have these joints operate over that full range
 - if the wrist flex is too low, then the cup will hit the ground, and
 - In certain high positions it seemed as if the servos (like the elbow flex) were drawing too much current and having a hard time maintaining position while holding the cup.
 
-The positions from which the PID must operate to balance are defined in the [pose test balance seqeunce](../writing_robot_description/config/balance_v1.yaml). The limited movement for these two joints is illustrated below.
+The positions from which the PID must operate to balance are defined in the [pose test balance seqeunce](../robot_arm_description/config/balance_v1.yaml). The limited movement for these two joints is illustrated below.
 
 <p align="center">
   <img src="../images/illustration_of_wrist_flex_roll_orientation.jpg" alt="ball_orientation " width="700">
@@ -107,7 +107,7 @@ The positions from which the PID must operate to balance are defined in the [pos
 
 Currently, we are using the error in the servo's commanded vs. actual position to define the I-term error. That is, after each pose is set each servo's wheel has been moved to some position. When the PID algorithm kicks in it will start to set new incremental targets for the wrist_flex and wrist_roll in order to move the ball into the center. How well the servo does to reach that position defines the error. It can either do really well, fail misreably, or fall somewhere in between. In all cases we can get that information because the servo reports its new position. 
 
-Lets look at an actual case for one of the difficult scenarios in our test: pose 5. In this one, the arm tips the cup forward in a manner that puts significant strain on the wrist and elbow flex joints (essentially Servos 3 and 4). That is, it starts close to the *wrist-flex-low pose* shown in the figure above (position =  2.3 radians). Gravity makes it hard to do small moves. Note the current pull on the XL330's for pose 5 (output from [pose test utility)](../writing_robot_control/writing_robot_control/pose_test.py). The elbow flex is drawing 250 mA and the wrist_flex 50 mA. The current draw for the wrist flex is almost 5x that of the wrist roll.
+Lets look at an actual case for one of the difficult scenarios in our test: pose 5. In this one, the arm tips the cup forward in a manner that puts significant strain on the wrist and elbow flex joints (essentially Servos 3 and 4). That is, it starts close to the *wrist-flex-low pose* shown in the figure above (position =  2.3 radians). Gravity makes it hard to do small moves. Note the current pull on the XL330's for pose 5 (output from [pose test utility)](../robot_arm_control/robot_arm_control/pose_test.py). The elbow flex is drawing 250 mA and the wrist_flex 50 mA. The current draw for the wrist flex is almost 5x that of the wrist roll.
 
 ```
 [5/11] pose 5 - forward
@@ -141,7 +141,7 @@ Lets look at an actual case for one of the difficult scenarios in our test: pose
 ```
 
 
- It can move in a single pose from that low position to higher the *wrist-flex-high* (position = 2.7 radians), but doing small incremental adjustments turns out to be more difficult for the XL-330's as is illustrated in this sequence below. The table output comes from the [corr_analysis.py](../balance/scripts/corr_analysis.py) script which analyzes the raw correction log output from the [wrist_balance_controller.py](../writing_robot_control/writing_robot_control/wrist_balance_controller.py). In this output it evaluates how well the two joints did in the sequence while the PID was operating. For each step the wrist flex was being commanded to move 1.719 degrees but it is unable to make much headway. At step 1 it is being commanded to move from 2.2918 rad to 2.318 rad, but one can see that by the time step 2 fires it had only moved to 2.2933 (see the from in step 2). now the difference between the ending (2.2933 rad) and the start (2.2918 rad) is 0.0015 rad or 0.086 degrees. The flex servo was commanded to achieve 1.719 degrees, but only managed 0.086, that is 5% of goal. On the otherhand, the wrist_roll on the same steps did far better, achieving 92% of what it was targetted to do. This example also has no I-term influence.
+ It can move in a single pose from that low position to higher the *wrist-flex-high* (position = 2.7 radians), but doing small incremental adjustments turns out to be more difficult for the XL-330's as is illustrated in this sequence below. The table output comes from the [corr_analysis.py](../balance/scripts/corr_analysis.py) script which analyzes the raw correction log output from the [wrist_balance_controller.py](../robot_arm_control/robot_arm_control/wrist_balance_controller.py). In this output it evaluates how well the two joints did in the sequence while the PID was operating. For each step the wrist flex was being commanded to move 1.719 degrees but it is unable to make much headway. At step 1 it is being commanded to move from 2.2918 rad to 2.318 rad, but one can see that by the time step 2 fires it had only moved to 2.2933 (see the from in step 2). now the difference between the ending (2.2933 rad) and the start (2.2918 rad) is 0.0015 rad or 0.086 degrees. The flex servo was commanded to achieve 1.719 degrees, but only managed 0.086, that is 5% of goal. On the otherhand, the wrist_roll on the same steps did far better, achieving 92% of what it was targetted to do. This example also has no I-term influence.
 
  
 
@@ -495,7 +495,7 @@ direction and magnitude.
 
 ## 4. Test Poses
 
-The test script ([pose_test.py](../writing_robot_control/writing_robot_control/pose_test.py)) cycles through four directional tilt poses followed
+The test script ([pose_test.py](../robot_arm_control/robot_arm_control/pose_test.py)) cycles through four directional tilt poses followed
 by a center pose, designed to place the ball at a known offset in each cardinal
 direction. This exercises all four sign combinations of the control logic.
 

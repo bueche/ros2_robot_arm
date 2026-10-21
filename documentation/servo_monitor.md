@@ -28,7 +28,7 @@ TBD
 ## Example 
 
 ```bash
-ubuntu@bueche-rpi5:~/robot_ws$ python3 src/writing_robot_control/writing_robot_control/servo_monitor.py --interval 10 --duration 120
+ubuntu@bueche-rpi5:~/robot_ws$ python3 src/robot_arm_control/robot_arm_control/servo_monitor.py --interval 10 --duration 120
 
 ================================================================================
 DYNAMIXEL SERVO MONITOR - XL430/XL330 AWARE
