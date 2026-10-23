@@ -1,0 +1,48 @@
+# Arm profile: SO-ARM101 with Feetech STS3215 servos (feetech_ros2_driver).
+#
+# Single source of truth for the per-arm facts robot_arm_control nodes need.
+# Nodes select a profile with the 'arm_profile' parameter (a name here, or a path).
+
+name: so_arm101
+
+# JointTrajectoryController command topic.
+trajectory_topic: /arm_controller/joint_trajectory
+
+# Servo telemetry message. backend selects the message type:
+#   dynamixel -> dynamixel_interfaces/msg/DynamixelState
+#   feetech   -> feetech_interfaces/msg/FeetechState
+telemetry:
+  backend: feetech
+  topic: /feetech_state
+
+# Supply rails. min_voltage: warn when any servo on the rail reports less (V);
+# null disables the check.
+rails:
+  12v:
+    min_voltage: null   # TODO: set from the STS3215 (12 V version) operating range
+
+# Joints in command order. 'reports' lists the DynamixelState/FeetechState
+# telemetry fields this servo actually provides; the STS3215 provides all four.
+joints:
+  shoulder_pan:  {id: 1, model: STS3215, rail: 12v, reports: [present_temperature, present_input_voltage, present_current, present_load]}
+  shoulder_lift: {id: 2, model: STS3215, rail: 12v, reports: [present_temperature, present_input_voltage, present_current, present_load]}
+  elbow_flex:    {id: 3, model: STS3215, rail: 12v, reports: [present_temperature, present_input_voltage, present_current, present_load]}
+  wrist_flex:    {id: 4, model: STS3215, rail: 12v, reports: [present_temperature, present_input_voltage, present_current, present_load]}
+  wrist_roll:    {id: 5, model: STS3215, rail: 12v, reports: [present_temperature, present_input_voltage, present_current, present_load]}
+  gripper:       {id: 6, model: STS3215, rail: 12v, reports: [present_temperature, present_input_voltage, present_current, present_load]}
+
+# Starting pose for servo tests (rad, SO-ARM101 joint frame): pose 1
+# "poised to work" from sample.poses.yaml, after the drive_mode removal.
+safe_position:
+  shoulder_pan: -0.0537
+  shoulder_lift: -0.0107
+  elbow_flex: 0.5814
+  wrist_flex: 0.8621
+  wrist_roll: -0.1549
+  gripper: -0.0015
+
+thresholds:
+  temperature_warning_c: 55.0
+  temperature_critical_c: 65.0
+  load_warning_pct: 80.0
+  current_warning_ma: null     # TODO: set from measured holding/peak currents

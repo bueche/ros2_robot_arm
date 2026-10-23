@@ -12,6 +12,7 @@
   <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
   <depend>koch_v1_1_msgs</depend>
+  <exec_depend>rosidl_runtime_py</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
