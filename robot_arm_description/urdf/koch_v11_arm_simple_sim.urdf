@@ -150,7 +150,7 @@
   </link>
 
   <!-- Joint 6: Pen Holder (Gripper) - XL330 -->
-  <joint name="pen_holder" type="revolute">
+  <joint name="gripper" type="revolute">
     <parent link="hand_link"/>
     <child link="gripper"/>
     <origin xyz="0.10 0 0" rpy="0 0 0"/>
@@ -265,8 +265,8 @@
       <state_interface name="velocity"/>
     </joint>
     
-    <!-- Joint 6: pen_holder -->
-    <joint name="pen_holder">
+    <!-- Joint 6: gripper -->
+    <joint name="gripper">
       <command_interface name="position">
         <param name="min">-0.5</param>
         <param name="max">0.5</param>

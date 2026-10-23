@@ -36,7 +36,7 @@ class KochSquareDrawer(Node):
             'elbow_flex',
             'wrist_flex',
             'wrist_roll',
-            'pen_holder'
+            'gripper'
         ]
         
         # Initialize IK solver with Koch v1.1 dimensions
@@ -102,7 +102,7 @@ class KochSquareDrawer(Node):
             -1.57,  # elbow_flex: -90° (straight)
             0.0,    # wrist_flex: 0° (straight)
             0.0,    # wrist_roll: 0° (neutral)
-            0.0     # pen_holder: 0° (neutral)
+            0.0     # gripper: 0° (neutral)
         )
         
         if not validate_joint_angles(home_angles):

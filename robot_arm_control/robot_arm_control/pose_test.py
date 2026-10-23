@@ -705,7 +705,7 @@ class PoseTestNode(Node):
             'elbow_flex',
             'wrist_flex',
             'wrist_roll',
-            'pen_holder'
+            'gripper'
         ]
         
         # Servo ID mapping for telemetry
@@ -715,7 +715,7 @@ class PoseTestNode(Node):
             'elbow_flex': 3,     # XL330-M288
             'wrist_flex': 4,     # XL330-M288
             'wrist_roll': 5,     # XL330-M288
-            'pen_holder': 6      # XL330-M077
+            'gripper': 6      # XL330-M077
         }
         
         # Create publisher
@@ -747,7 +747,7 @@ class PoseTestNode(Node):
             'elbow_flex': 1.063,
             'wrist_flex': 2.499,
             'wrist_roll': -0.014,
-            'pen_holder': 0.895
+            'gripper': 0.895
         }
         self.safe_position = {
             'shoulder_pan': 1.55,
@@ -755,7 +755,7 @@ class PoseTestNode(Node):
             'elbow_flex': 1.2,       # Moderately bent
             'wrist_flex': 1.5,       # Neutral
             'wrist_roll': 0.0,       # Centered
-            'pen_holder': 0.9        # Slightly open
+            'gripper': 0.9        # Slightly open
         }
         
         # Load URDF limits
@@ -1108,12 +1108,12 @@ class PoseTestNode(Node):
             ]
         elif program_name == 'default':
             return [
-                {'name': 'pose 0', 'positions': {'shoulder_pan': 1.1679, 'shoulder_lift': 2.60, 'elbow_flex': 1.193, 'wrist_flex': 2.6873, 'wrist_roll': 1.01906, 'pen_holder':  1.10}},
-                {'name': 'pose 1', 'positions': {'shoulder_pan': 1.1679, 'shoulder_lift': 2.50, 'elbow_flex': 1.193, 'wrist_flex': 2.4556, 'wrist_roll': 0.92544, 'pen_holder':  1.58}},
-                {'name': 'pose 2', 'positions': {'shoulder_pan': 1.9874, 'shoulder_lift': 2.50, 'elbow_flex': 1.000, 'wrist_flex': 1.5908, 'wrist_roll': -1.4083, 'pen_holder':  0.21}},
-                {'name': 'pose 3', 'positions': {'shoulder_pan': 1.4533, 'shoulder_lift': 2.56, 'elbow_flex': 1.105, 'wrist_flex': 1.2992, 'wrist_roll': -0.3728, 'pen_holder':  1.59}},
-                {'name': 'pose 4', 'positions': {'shoulder_pan': 1.8125, 'shoulder_lift': 2.56, 'elbow_flex': 1.632, 'wrist_flex': 2.4402, 'wrist_roll': 1.1915, 'pen_holder':  0.5}},
-                {'name': 'pose 5', 'positions': {'shoulder_pan': 1.8125, 'shoulder_lift': 2.56, 'elbow_flex': 1.632, 'wrist_flex': 2.4402, 'wrist_roll': 1.1915, 'pen_holder':  1.5}},
+                {'name': 'pose 0', 'positions': {'shoulder_pan': 1.1679, 'shoulder_lift': 2.60, 'elbow_flex': 1.193, 'wrist_flex': 2.6873, 'wrist_roll': 1.01906, 'gripper':  1.10}},
+                {'name': 'pose 1', 'positions': {'shoulder_pan': 1.1679, 'shoulder_lift': 2.50, 'elbow_flex': 1.193, 'wrist_flex': 2.4556, 'wrist_roll': 0.92544, 'gripper':  1.58}},
+                {'name': 'pose 2', 'positions': {'shoulder_pan': 1.9874, 'shoulder_lift': 2.50, 'elbow_flex': 1.000, 'wrist_flex': 1.5908, 'wrist_roll': -1.4083, 'gripper':  0.21}},
+                {'name': 'pose 3', 'positions': {'shoulder_pan': 1.4533, 'shoulder_lift': 2.56, 'elbow_flex': 1.105, 'wrist_flex': 1.2992, 'wrist_roll': -0.3728, 'gripper':  1.59}},
+                {'name': 'pose 4', 'positions': {'shoulder_pan': 1.8125, 'shoulder_lift': 2.56, 'elbow_flex': 1.632, 'wrist_flex': 2.4402, 'wrist_roll': 1.1915, 'gripper':  0.5}},
+                {'name': 'pose 5', 'positions': {'shoulder_pan': 1.8125, 'shoulder_lift': 2.56, 'elbow_flex': 1.632, 'wrist_flex': 2.4402, 'wrist_roll': 1.1915, 'gripper':  1.5}},
             ]
         else:
             self.get_logger().error(f'Unknown program: {program_name}')

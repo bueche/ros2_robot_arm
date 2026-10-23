@@ -33,7 +33,7 @@ SERVOS = {
     3: {'name': 'elbow_flex', 'model': 'XL330-M288', 'type': 'XL330'},
     4: {'name': 'wrist_flex', 'model': 'XL330-M288', 'type': 'XL330'},
     5: {'name': 'wrist_roll', 'model': 'XL330-M288', 'type': 'XL330'},
-    6: {'name': 'pen_holder', 'model': 'XL330-M077', 'type': 'XL330'}
+    6: {'name': 'gripper', 'model': 'XL330-M077', 'type': 'XL330'}
 }
 
 # Protocol 2.0

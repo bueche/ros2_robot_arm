@@ -8,7 +8,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.5999
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 2 -tilt cup right
     positions:
@@ -17,7 +17,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.2
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 3 - tilt cup left
     positions:
@@ -26,7 +26,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.9
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 4 - center 
     positions:
@@ -35,7 +35,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.5999
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 5 - forward 
     positions:
@@ -44,7 +44,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.3
       wrist_roll: 1.5999
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 6 - back 
     positions:
@@ -53,7 +53,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.5999
-      pen_holder: 0.977
+      gripper: 0.977
 
 
   - name: pose 6 - center 
@@ -63,7 +63,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.5999
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 7 - tilt cup right
     positions:
@@ -72,7 +72,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.2
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 8 - tilt cup left
     positions:
@@ -81,7 +81,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.9
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 9 - back 
     positions:
@@ -90,7 +90,7 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.5999
-      pen_holder: 0.977
+      gripper: 0.977
 
   - name: pose 10 - center 
     positions:
@@ -99,5 +99,5 @@ poses:
       elbow_flex: 1.4705
       wrist_flex: 2.7
       wrist_roll: 1.5999
-      pen_holder: 0.977
+      gripper: 0.977
 

@@ -8,7 +8,7 @@ poses:
       elbow_flex: -0.581378718608658
       wrist_flex: -0.8620972027917303
       wrist_roll: -0.15493205957644976
-      pen_holder: -0.0015339807878856412
+      gripper: -0.0015339807878856412
 
   - name: pose 2 - reach to grab
     positions:
@@ -17,7 +17,7 @@ poses:
       elbow_flex: 0.2086213871524472
       wrist_flex: -0.25464081078901646
       wrist_roll: -0.7807962210337913
-      pen_holder: -0.0015339807878856412
+      gripper: -0.0015339807878856412
 
 
   - name: pose 3 - grab
@@ -27,7 +27,7 @@ poses:
       elbow_flex: 0.43104860139586515
       wrist_flex: 0.765456413154935
       wrist_roll: -0.782330201821677
-      pen_holder: -0.0015339807878856412
+      gripper: -0.0015339807878856412
 
   - name: pose 4 - lift and center
     positions:
@@ -36,7 +36,7 @@ poses:
       elbow_flex: 0.4356505437595221
       wrist_flex: 0.765456413154935
       wrist_roll: -0.7807962210337913
-      pen_holder: 0.9495341077012119
+      gripper: 0.9495341077012119
 
   - name: pose 5 - raise and get ready to place
     positions:
@@ -45,7 +45,7 @@ poses:
       elbow_flex: 0.007669903939428206
       wrist_flex: 1.0492428589137786
       wrist_roll: 0.01380582709097077
-      pen_holder: 0.5522330836388308
+      gripper: 0.5522330836388308
 
   - name: pose 6 - place high
     positions:
@@ -54,7 +54,7 @@ poses:
       elbow_flex: 0.006135923151542565
       wrist_flex: 1.0492428589137786
       wrist_roll: 0.01687378866674205
-      pen_holder: -0.01380582709097077
+      gripper: -0.01380582709097077
 
   - name: pose 7 - reach to grab again
     positions:
@@ -63,7 +63,7 @@ poses:
       elbow_flex: 0.15493205957644976
       wrist_flex: -0.4111068511533518
       wrist_roll: -1.7119225592803755
-      pen_holder: 0.49394181369917645
+      gripper: 0.49394181369917645
 
   - name: pose 8 - poised to work or shutdown
     positions:
@@ -72,7 +72,7 @@ poses:
       elbow_flex: -0.581378718608658
       wrist_flex: -0.8620972027917303
       wrist_roll: -0.15493205957644976
-      pen_holder: -0.0015339807878856412
+      gripper: -0.0015339807878856412
 
   # - name: pose 9 - place low
   #   positions:
@@ -81,7 +81,7 @@ poses:
   #     elbow_flex: 1.3520972763312165
   #     wrist_flex: 2.326650931802638
   #     wrist_roll: 1.7373145480214949
-  #     pen_holder: 1.520675055398144
+  #     gripper: 1.520675055398144
 
   # - name: pose 10 - release
   #   positions:
@@ -90,7 +90,7 @@ poses:
   #     elbow_flex: 1.2661523870297997
   #     wrist_flex: 2.326650931802638
   #     wrist_roll: 1.7373145480214949
-  #     pen_holder: 0.5816627329506595
+  #     gripper: 0.5816627329506595
 
   # - name: pose 11 - ending raise high
   #   positions:
@@ -99,7 +99,7 @@ poses:
   #     elbow_flex: 0.8057333372007817
   #     wrist_flex: 1.4727763861016122
   #     wrist_roll: 1.7618702306790426
-  #     pen_holder: 0.6553297809233024
+  #     gripper: 0.6553297809233024
 
 
   # - name: pose 12 - poised to work or shutdown
@@ -109,5 +109,5 @@ poses:
   #     elbow_flex: 1.4372234987336654
   #     wrist_flex: 0.7255729126697013
   #     wrist_roll: 1.7618702306790426
-  #     pen_holder: 1.520675055398144
+  #     gripper: 1.520675055398144
 

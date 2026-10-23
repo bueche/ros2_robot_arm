@@ -38,7 +38,7 @@ ros2 launch robot_arm_description koch_v11_real_robot.launch.py
 ros2 launch robot_arm_description koch_v11_real_robot_for_balance.launch.py
 
 ros2 topic pub --once /koch_v11_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "{
-  joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, pen_holder],
+  joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper],
   points: [
     {positions: [2.53, 1.04, -1.46, -1.57, -0.02, 2.22], time_from_start: {sec: 6}}
   ]
@@ -87,7 +87,7 @@ for _ in range(20):
 # holding a cup nearly level
 
 ros2 topic pub --once /koch_v11_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "{
-  joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, pen_holder],
+  joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper],
   points: [
     {positions: [1.50, 2.5635, 1.0705, 2.485, 1.5999,  1.463], time_from_start: {sec: 6}}
   ]

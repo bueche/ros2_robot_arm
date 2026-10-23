@@ -229,7 +229,7 @@ class LoadTester(Node):
             'elbow_flex',
             'wrist_flex',
             'wrist_roll',
-            'pen_holder'
+            'gripper'
         ]
         
         # Expanded servo specs database
@@ -293,7 +293,7 @@ class LoadTester(Node):
             'elbow_flex': 'XL330-M288',
             'wrist_flex': 'XL330-M288',
             'wrist_roll': 'XL330-M288',
-            'pen_holder': 'XL330-M288'
+            'gripper': 'XL330-M288'
         }
         
         # Servo ID mapping (for telemetry)
@@ -303,7 +303,7 @@ class LoadTester(Node):
             'elbow_flex': 3,
             'wrist_flex': 4,
             'wrist_roll': 5,
-            'pen_holder': 6
+            'gripper': 6
         }
         
         # Link masses (from URDF inertial data - koch_v11_arm_real.urdf)
@@ -356,7 +356,7 @@ class LoadTester(Node):
                 'hand_link': 0.036,       # From URDF: COM at 0.036m from link origin
                 'gripper': 0.053         # Approx
             },
-            'pen_holder': {
+            'gripper': {
                 'gripper': 0.017         # From URDF: Distance to pen COM
             }
         }
@@ -387,7 +387,7 @@ class LoadTester(Node):
                 'hand_link': 0.046 * (0.036**2),       # 46g at 36mm
                 'gripper': 0.016 * (0.053**2)         # 16g at ~53mm
             },
-            'pen_holder': {
+            'gripper': {
                 'gripper': 0.016 * (0.017**2)         # 16g at 17mm
             }
         }
@@ -509,15 +509,15 @@ class LoadTester(Node):
                 payload_distance = self.link_com_distances['wrist_roll']['gripper']
                 total_torque += payload_mass * g * payload_distance * 0.2
         
-        elif joint_name == 'pen_holder':
+        elif joint_name == 'gripper':
             # Pen holder joint - only gripper downstream
             mass = self.link_masses.get('gripper', 0.0)
-            distance = self.link_com_distances['pen_holder'].get('gripper', 0.0)
+            distance = self.link_com_distances['gripper'].get('gripper', 0.0)
             torque = mass * g * distance * 0.2  # Very small effect
             total_torque += torque
             
             if payload_mass > 0:
-                payload_distance = self.link_com_distances['pen_holder']['gripper']
+                payload_distance = self.link_com_distances['gripper']['gripper']
                 total_torque += payload_mass * g * payload_distance * 0.2
         
         return total_torque
@@ -589,7 +589,7 @@ class LoadTester(Node):
             'elbow_flex': {'viscous': 0.008, 'coulomb': 0.015},
             'wrist_flex': {'viscous': 0.005, 'coulomb': 0.01},
             'wrist_roll': {'viscous': 0.003, 'coulomb': 0.008},
-            'pen_holder': {'viscous': 0.002, 'coulomb': 0.005}
+            'gripper': {'viscous': 0.002, 'coulomb': 0.005}
         }
         
         params = friction_params.get(joint_name, {'viscous': 0.01, 'coulomb': 0.02})
@@ -1904,7 +1904,7 @@ Examples:
                     to_angles   = [float(x.strip()) for x in args.pose_to.split(',')]
                     
                     if len(from_angles) != 6 or len(to_angles) != 6:
-                        print("Error: Poses must have 6 angles (shoulder_pan,shoulder_lift,elbow_flex,wrist_flex,wrist_roll,pen_holder)")
+                        print("Error: Poses must have 6 angles (shoulder_pan,shoulder_lift,elbow_flex,wrist_flex,wrist_roll,gripper)")
                     else:
                         pose_from = dict(zip(tester.joint_names, from_angles))
                         pose_to   = dict(zip(tester.joint_names, to_angles))

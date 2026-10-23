@@ -19,7 +19,7 @@ HOME_POSITION = {
     'elbow_flex': 1.4095,      #  +80.76°
     'wrist_flex': 1.4695,      #  +84.20°
     'wrist_roll': 0.0000,      #   +0.00°
-    'pen_holder': 1.7055,      #  +97.72°
+    'gripper': 1.7055,      #  +97.72°
 }
 
 JOINT_NAMES = [
@@ -28,7 +28,7 @@ JOINT_NAMES = [
     'elbow_flex',
     'wrist_flex',
     'wrist_roll',
-    'pen_holder'
+    'gripper'
 ]
 
 
@@ -143,7 +143,7 @@ def main(args=None):
         node.get_logger().info('  3: elbow_flex')
         node.get_logger().info('  4: wrist_flex')
         node.get_logger().info('  5: wrist_roll')
-        node.get_logger().info('  6: pen_holder')
+        node.get_logger().info('  6: gripper')
         return
     
     try:

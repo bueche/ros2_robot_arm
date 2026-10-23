@@ -1,0 +1,50 @@
+# Arm profile: Koch v1.1 with Dynamixel servos.
+#
+# Single source of truth for the per-arm facts robot_arm_control nodes need.
+# Nodes select a profile with the 'arm_profile' parameter (a name here, or a path).
+
+name: koch_v1_1
+
+# JointTrajectoryController command topic.
+trajectory_topic: /koch_v11_controller/joint_trajectory
+
+# Servo telemetry message. backend selects the message type:
+#   dynamixel -> dynamixel_interfaces/msg/DynamixelState
+#   feetech   -> feetech_interfaces/msg/FeetechState
+telemetry:
+  backend: dynamixel
+  topic: /dynamixel_hardware_interface/dxl_state
+
+# Supply rails. min_voltage: warn when any servo on the rail reports less (V);
+# null disables the check.
+rails:
+  5v:
+    min_voltage: 4.5
+  12v:
+    min_voltage: null
+
+# Joints in command order. 'reports' lists the DynamixelState/FeetechState
+# telemetry fields this servo actually provides. XL430s have Present Load but no
+# Present Current; XL330s have Present Current but no Present Load.
+joints:
+  shoulder_pan:  {id: 1, model: XL430-W250, rail: 12v, reports: [present_temperature, present_input_voltage, present_load]}
+  shoulder_lift: {id: 2, model: XL430-W250, rail: 12v, reports: [present_temperature, present_input_voltage, present_load]}
+  elbow_flex:    {id: 3, model: XL330-M288, rail: 5v,  reports: [present_temperature, present_input_voltage, present_current]}
+  wrist_flex:    {id: 4, model: XL330-M288, rail: 5v,  reports: [present_temperature, present_input_voltage, present_current]}
+  wrist_roll:    {id: 5, model: XL330-M288, rail: 5v,  reports: [present_temperature, present_input_voltage, present_current]}
+  gripper:       {id: 6, model: XL330-M077, rail: 5v,  reports: [present_temperature, present_input_voltage, present_current]}
+
+# Starting pose for servo tests (rad, Koch joint frame).
+safe_position:
+  shoulder_pan: 1.55
+  shoulder_lift: 2.7
+  elbow_flex: 1.2
+  wrist_flex: 1.5
+  wrist_roll: 0.0
+  gripper: 0.9
+
+thresholds:
+  temperature_warning_c: 55.0
+  temperature_critical_c: 65.0
+  load_warning_pct: 80.0       # joints reporting present_load
+  current_warning_ma: 400.0    # joints reporting present_current

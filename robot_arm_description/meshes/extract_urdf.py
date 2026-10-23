@@ -29,7 +29,7 @@ JOINT_NAMES = [
     "elbow_flex",
     "wrist_flex",
     "wrist_roll",
-    "pen_holder",
+    "gripper",
 ]
 
 # Joint types (usually "revolute" for servos, "fixed" for rigid connections)
@@ -50,7 +50,7 @@ JOINT_LIMITS = [
     [-1.57, 1.57, 1.5, 2.0],         # elbow_flex
     [-1.57, 1.57, 1.5, 2.0],         # wrist_flex
     [-1.57, 1.57, 1.5, 2.0],         # wrist_roll
-    [0, 0, 0, 0]                     # pen_holder
+    [0, 0, 0, 0]                     # gripper
 ]
 
 # Shaft direction in Part's local frame (usually Z-axis for standard servo orientation)

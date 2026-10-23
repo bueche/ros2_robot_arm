@@ -1,0 +1,165 @@
+"""Arm profiles: the per-arm facts shared by robot_arm_control nodes.
+
+A profile is a YAML file in robot_arm_description/share/config/arm_profiles/.
+Nodes take an 'arm_profile' parameter that is either a profile name
+('koch_v1_1', 'so_arm101') or a path to a profile file.
+"""
+
+import os
+from dataclasses import dataclass
+from typing import Dict, FrozenSet, List, Optional
+
+import yaml
+
+PROFILE_PACKAGE = 'robot_arm_description'
+PROFILE_SUBDIR = os.path.join('config', 'arm_profiles')
+BACKENDS = ('dynamixel', 'feetech')
+# Per-servo telemetry fields of DynamixelState / FeetechState that a servo may or
+# may not provide. A joint's 'reports' list names the ones its servo provides.
+TELEMETRY_FIELDS = ('present_temperature', 'present_input_voltage', 'present_current', 'present_load')
+
+
+class ProfileError(ValueError):
+    """Raised when a profile file is missing or malformed."""
+
+
+@dataclass(frozen=True)
+class JointSpec:
+    name: str
+    id: int
+    model: str
+    rail: str
+    reports: FrozenSet[str]  # subset of TELEMETRY_FIELDS
+
+
+@dataclass(frozen=True)
+class Thresholds:
+    temperature_warning_c: Optional[float]
+    temperature_critical_c: Optional[float]
+    load_warning_pct: Optional[float]
+    current_warning_ma: Optional[float]
+
+
+@dataclass(frozen=True)
+class ArmProfile:
+    name: str
+    path: str
+    trajectory_topic: str
+    telemetry_backend: str
+    telemetry_topic: str
+    joints: List[JointSpec]               # command order
+    rail_min_voltage: Dict[str, Optional[float]]
+    safe_position: Dict[str, float]
+    thresholds: Thresholds
+
+    @property
+    def joint_names(self) -> List[str]:
+        return [j.name for j in self.joints]
+
+    @property
+    def joint_by_id(self) -> Dict[int, JointSpec]:
+        return {j.id: j for j in self.joints}
+
+    @property
+    def joint_by_name(self) -> Dict[str, JointSpec]:
+        return {j.name: j for j in self.joints}
+
+    def joints_reporting(self, field: str) -> List[JointSpec]:
+        """Joints whose servo provides telemetry field 'field', in command order."""
+        if field not in TELEMETRY_FIELDS:
+            raise ValueError(f"unknown telemetry field '{field}' (expected one of {TELEMETRY_FIELDS})")
+        return [j for j in self.joints if field in j.reports]
+
+
+def resolve_profile_path(name_or_path: str) -> str:
+    if not name_or_path:
+        raise ProfileError("arm_profile parameter is empty")
+    if os.path.isfile(name_or_path):
+        return name_or_path
+    if os.sep in name_or_path or name_or_path.endswith('.yaml'):
+        raise ProfileError(f"arm profile file not found: '{name_or_path}'")
+    from ament_index_python.packages import get_package_share_directory
+    path = os.path.join(get_package_share_directory(PROFILE_PACKAGE), PROFILE_SUBDIR, f'{name_or_path}.yaml')
+    if not os.path.isfile(path):
+        raise ProfileError(f"no arm profile named '{name_or_path}' (looked for {path})")
+    return path
+
+
+def _opt_float(value, what):
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise ProfileError(f"{what}: expected a number or null, got {value!r}")
+
+
+def load_arm_profile(name_or_path: str) -> ArmProfile:
+    path = resolve_profile_path(name_or_path)
+    try:
+        with open(path, 'r') as f:
+            data = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError) as e:
+        raise ProfileError(f"could not read arm profile {path}: {e}")
+
+    def need(d, key, where):
+        if key not in d:
+            raise ProfileError(f"{path}: missing '{key}' in {where}")
+        return d[key]
+
+    telemetry = need(data, 'telemetry', 'profile')
+    backend = need(telemetry, 'backend', 'telemetry')
+    if backend not in BACKENDS:
+        raise ProfileError(f"{path}: telemetry.backend '{backend}' not one of {BACKENDS}")
+
+    rails = need(data, 'rails', 'profile') or {}
+    rail_min_voltage = {str(name): _opt_float((cfg or {}).get('min_voltage'), f"rails.{name}.min_voltage")
+                        for name, cfg in rails.items()}
+
+    joints = []
+    seen_ids = set()
+    for name, cfg in (need(data, 'joints', 'profile') or {}).items():
+        where = f"joints.{name}"
+        sid = int(need(cfg, 'id', where))
+        if sid in seen_ids:
+            raise ProfileError(f"{path}: duplicate servo id {sid} ({where})")
+        seen_ids.add(sid)
+        rail = str(need(cfg, 'rail', where))
+        if rail not in rail_min_voltage:
+            raise ProfileError(f"{path}: {where}.rail '{rail}' is not defined under 'rails'")
+        reports = frozenset(cfg.get('reports', []))
+        unknown = reports - set(TELEMETRY_FIELDS)
+        if unknown:
+            raise ProfileError(f"{path}: {where}.reports has unknown fields {sorted(unknown)} "
+                               f"(expected any of {TELEMETRY_FIELDS})")
+        joints.append(JointSpec(name=name, id=sid, model=str(cfg.get('model', '')), rail=rail, reports=reports))
+    if not joints:
+        raise ProfileError(f"{path}: no joints defined")
+
+    names = {j.name for j in joints}
+    safe_position = {k: float(v) for k, v in (data.get('safe_position') or {}).items()}
+    missing = names - set(safe_position)
+    extra = set(safe_position) - names
+    if missing or extra:
+        raise ProfileError(f"{path}: safe_position must list exactly the profile joints "
+                           f"(missing {sorted(missing)}, unknown {sorted(extra)})")
+
+    t = data.get('thresholds') or {}
+    thresholds = Thresholds(
+        temperature_warning_c=_opt_float(t.get('temperature_warning_c'), 'thresholds.temperature_warning_c'),
+        temperature_critical_c=_opt_float(t.get('temperature_critical_c'), 'thresholds.temperature_critical_c'),
+        load_warning_pct=_opt_float(t.get('load_warning_pct'), 'thresholds.load_warning_pct'),
+        current_warning_ma=_opt_float(t.get('current_warning_ma'), 'thresholds.current_warning_ma'),
+    )
+
+    return ArmProfile(
+        name=str(data.get('name', os.path.splitext(os.path.basename(path))[0])),
+        path=path,
+        trajectory_topic=str(need(data, 'trajectory_topic', 'profile')),
+        telemetry_backend=backend,
+        telemetry_topic=str(need(telemetry, 'topic', 'telemetry')),
+        joints=joints,
+        rail_min_voltage=rail_min_voltage,
+        safe_position=safe_position,
+        thresholds=thresholds,
+    )

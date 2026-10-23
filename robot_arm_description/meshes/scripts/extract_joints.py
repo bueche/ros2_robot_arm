@@ -13,7 +13,7 @@ parts = [
     "Part003", # hand_link",
     "Part004", # "gripper"
 ]
-joint_names = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "pen_holder"]
+joint_names = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
 
 def euler_to_rpy(euler_deg):
     r = math.radians(euler_deg[2])

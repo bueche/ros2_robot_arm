@@ -285,7 +285,7 @@ $ ros2 launch robot_arm_description koch_v11_real_robot.launch.py
 [ros2_control_node-2] [INFO] [1772407646.094095541] [dynamixel_hardware_interface]: Sync joint state to command (joint: elbow_flex, position, 1.77482 <- position, 1.77482
 [ros2_control_node-2] [INFO] [1772407646.094112671] [dynamixel_hardware_interface]: Sync joint state to command (joint: wrist_flex, position, 0.895845 <- position, 0.895845
 [ros2_control_node-2] [INFO] [1772407646.094128745] [dynamixel_hardware_interface]: Sync joint state to command (joint: wrist_roll, position, 1.56159 <- position, 1.56159
-[ros2_control_node-2] [INFO] [1772407646.094144930] [dynamixel_hardware_interface]: Sync joint state to command (joint: pen_holder, position, 1.62142 <- position, 1.62142
+[ros2_control_node-2] [INFO] [1772407646.094144930] [dynamixel_hardware_interface]: Sync joint state to command (joint: gripper, position, 1.62142 <- position, 1.62142
 [ros2_control_node-2] [INFO] [1772407646.094361209] [dynamixel_hardware_interface]: Enabling torque for Dynamixels
 [ros2_control_node-2] [comm_id:001][ID:001] Torque ON
 [ros2_control_node-2] [comm_id:002][ID:002] Torque ON
@@ -396,7 +396,7 @@ ubuntu@bueche-rpi5:~/robot_ws$ ros2 launch robot_arm_description koch_v11_real_r
 [servo_config_node-1]   Configuring ID 5  wrist_roll     [XL330]
 [servo_config_node-1]   ok mode=position P=2000 I=0 D=0 FF1=0 FF2=0 vel=200 acc=50 goal_curr=0
 [servo_config_node-1] 
-[servo_config_node-1]   Configuring ID 6  pen_holder     [XL330]
+[servo_config_node-1]   Configuring ID 6  gripper     [XL330]
 [servo_config_node-1]   ok mode=position P=2000 I=0 D=0 FF1=0 FF2=0 vel=200 acc=50 goal_curr=200
 [servo_config_node-1] 
 [servo_config_node-1] === servo_config_node: done ===
@@ -460,7 +460,7 @@ ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control power_logger
 [INFO] [1783547116.925730365] [power_logger_enhanced]:      elbow_flex  :  339.0
 [INFO] [1783547116.927332245] [power_logger_enhanced]:      wrist_flex  :   71.0
 [INFO] [1783547116.928105527] [power_logger_enhanced]:      wrist_roll  :   18.0
-[INFO] [1783547116.929350294] [power_logger_enhanced]:      pen_holder  :   16.0
+[INFO] [1783547116.929350294] [power_logger_enhanced]:      gripper  :   16.0
 :
 :
 ```
@@ -540,7 +540,7 @@ POWER_MONITORING_AVAILABLEF: True
 [INFO] [1783547102.434860885] [pose_test_node]:   ✓ elbow_flex: 1.470 rad (within [0.726, 2.250])
 [INFO] [1783547102.435565371] [pose_test_node]:   ✓ wrist_flex: 2.700 rad (within [0.297, 2.700])
 [INFO] [1783547102.436182411] [pose_test_node]:   ✓ wrist_roll: 1.600 rad (within [-1.448, 1.900])
-[INFO] [1783547102.436800100] [pose_test_node]:   ✓ pen_holder: 0.977 rad (within [0.190, 1.600])
+[INFO] [1783547102.436800100] [pose_test_node]:   ✓ gripper: 0.977 rad (within [0.190, 1.600])
 [INFO] [1783547102.441800631] [pose_test_node]: → Sent: pose 1 - initial
 [INFO] [1783547109.444336614] [pose_test_node]:   ⏳ Waiting for ball to center (timeout: 20.0s)...
 [INFO] [1783547116.919794995] [pose_test_node]:   ✓ Cup stable after 7.47s
@@ -550,7 +550,7 @@ POWER_MONITORING_AVAILABLEF: True
 [INFO] [1783547116.930858359] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  1.534rad Curr: -330mA Volt: 4.8V Temp: 29.0°C
 [INFO] [1783547116.931532919] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.467rad Curr:   17mA Volt: 4.8V Temp: 23.0°C
 [INFO] [1783547116.932140700] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.420rad Curr:    0mA Volt: 4.8V Temp: 23.0°C
-[INFO] [1783547116.933323078] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  0.974rad Curr:   15mA Volt: 4.7V Temp: 24.0°C
+[INFO] [1783547116.933323078] [pose_test_node]:   📊 gripper      [XL330] Pos:  0.974rad Curr:   15mA Volt: 4.7V Temp: 24.0°C
 [INFO] [1783547116.934215695] [pose_test_node]:   ⚡ Power Analysis for "pose 1 - initial":
 [INFO] [1783547116.935191719] [pose_test_node]:      Peak 5V current (INA226):  0.409A
 [INFO] [1783547116.936076076] [pose_test_node]:      Peak motor sum (XL330s):     0.458A

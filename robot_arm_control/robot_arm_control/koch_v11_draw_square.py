@@ -38,7 +38,7 @@ class KochSquareDrawer(Node):
             'elbow_flex',
             'wrist_flex',
             'wrist_roll',
-            'pen_holder'
+            'gripper'
         ]
         
         # Initialize IK solver with Koch v1.1 dimensions
@@ -136,7 +136,7 @@ class KochSquareDrawer(Node):
             -1.57,   # elbow_flex: -90° (bends up)
             1.57,    # wrist_flex: +90° (compensates, keeps pen up)
             0.0,     # wrist_roll: 0° (neutral)
-            0.0      # pen_holder: 0° (pen up/neutral)
+            0.0      # gripper: 0° (pen up/neutral)
         )
         
         if not validate_joint_angles(home_angles):
@@ -262,7 +262,7 @@ class KochSquareDrawer(Node):
                 self.get_logger().error(f'Pen up position {i} unreachable!')
                 return False
             
-            # Move pen to surface AND set pen_holder to indicate "pen down"
+            # Move pen to surface AND set gripper to indicate "pen down"
             angles_pen_down = self.ik_solver.solve_for_vertical_surface(
                 self.pen_touch_x, y_from, z_from
             )
@@ -271,9 +271,9 @@ class KochSquareDrawer(Node):
                 self.get_logger().error(f'Pen down position {i} unreachable!')
                 return False
             
-            # Modify pen_holder to indicate pen is DOWN (small positive value)
+            # Modify gripper to indicate pen is DOWN (small positive value)
             angles_pen_down = list(angles_pen_down)
-            angles_pen_down[5] = 0.2  # pen_holder: positive = pen down
+            angles_pen_down[5] = 0.2  # gripper: positive = pen down
             angles_pen_down = tuple(angles_pen_down)
             
             # Validate safety
@@ -293,9 +293,9 @@ class KochSquareDrawer(Node):
                 self.get_logger().error(f'Corner {i+1} unreachable!')
                 return False
             
-            # Set pen_holder to indicate pen DOWN for next corner too
+            # Set gripper to indicate pen DOWN for next corner too
             angles_next = list(angles_next)
-            angles_next[5] = 0.2  # pen_holder: positive = pen down
+            angles_next[5] = 0.2  # gripper: positive = pen down
             angles_next = tuple(angles_next)
             
             # Interpolate between current and next position (pen stays down)

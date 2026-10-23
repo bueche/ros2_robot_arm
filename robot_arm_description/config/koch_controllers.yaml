@@ -18,7 +18,7 @@ joint_trajectory_controller:
       - elbow_flex
       - wrist_flex
       - wrist_roll
-      - pen_holder
+      - gripper
     
     command_interfaces:
       - position

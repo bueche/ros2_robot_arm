@@ -281,7 +281,7 @@
   </link>
 
   <!-- Joint 6: Pen Holder (Gripper) - XL330 -->
-  <joint name="pen_holder" type="revolute">
+  <joint name="gripper" type="revolute">
     <parent link="hand_link"/>
     <child link="gripper"/>
     <origin xyz="0.000000 -0.007000 0.016000" rpy="0.785398 0.000000 0.000000"/>
@@ -395,8 +395,8 @@
     <state_interface name="effort"/>
   </joint>
   
-  <!-- Joint 6: pen_holder (gripper)  -->
-  <joint name="pen_holder">
+  <!-- Joint 6: gripper (gripper)  -->
+  <joint name="gripper">
     <command_interface name="position">
       <param name="min">1.60</param>   <!-- completely closed  -->
       <param name="max">0.19</param>   <!-- completely open  -->
@@ -468,7 +468,7 @@
     <state_interface name="Present Input Voltage"/>
   </gpio>
   
-  <!-- Motor 6: XL330-M288 (pen_holder/gripper) -->
+  <!-- Motor 6: XL330-M288 (gripper/gripper) -->
   <gpio name="dxl6">
     <param name="type">dxl</param>
     <param name="ID">6</param>

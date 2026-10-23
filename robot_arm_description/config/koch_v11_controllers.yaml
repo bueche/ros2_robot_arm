@@ -18,7 +18,7 @@ koch_v11_controller:
       - elbow_flex
       - wrist_flex
       - wrist_roll
-      - pen_holder
+      - gripper
     
     command_interfaces:
       - position
@@ -58,7 +58,7 @@ koch_v11_controller:
         p: 50.0
         i: 0.0
         d: 5.0
-      pen_holder:
+      gripper:
         p: 50.0
         i: 0.0
         d: 5.0

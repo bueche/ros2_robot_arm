@@ -38,7 +38,7 @@ SERVO_MAP = {
     3: 'elbow_flex     [XL330]',
     4: 'wrist_flex     [XL330]',
     5: 'wrist_roll     [XL330]',
-    6: 'pen_holder     [XL330]',
+    6: 'gripper     [XL330]',
 }
 
 

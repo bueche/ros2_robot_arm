@@ -112,7 +112,7 @@ From pose:
 [INFO] [1766198123.991516243] [load_tester]:   elbow_flex     :  1.193 rad (  68.4°)
 [INFO] [1766198123.992038838] [load_tester]:   wrist_flex     :  2.687 rad ( 154.0°)
 [INFO] [1766198123.992561563] [load_tester]:   wrist_roll     :  1.019 rad (  58.4°)
-[INFO] [1766198123.993080676] [load_tester]:   pen_holder     :  1.100 rad (  63.0°)
+[INFO] [1766198123.993080676] [load_tester]:   gripper     :  1.100 rad (  63.0°)
 [INFO] [1766198123.993579493] [load_tester]: 
 To pose:
 [INFO] [1766198123.994105959] [load_tester]:   shoulder_pan   :  1.168 rad (  66.9°)
@@ -120,7 +120,7 @@ To pose:
 [INFO] [1766198123.995489743] [load_tester]:   elbow_flex     :  1.193 rad (  68.4°)
 [INFO] [1766198123.996104691] [load_tester]:   wrist_flex     :  2.456 rad ( 140.7°)
 [INFO] [1766198123.996645990] [load_tester]:   wrist_roll     :  0.925 rad (  53.0°)
-[INFO] [1766198123.997153492] [load_tester]:   pen_holder     :  1.580 rad (  90.5°)
+[INFO] [1766198123.997153492] [load_tester]:   gripper     :  1.580 rad (  90.5°)
 [INFO] [1766198123.998293127] [load_tester]: 
 ============================================================
 [INFO] [1766198123.998794185] [load_tester]: JOINT-BY-JOINT ANALYSIS
@@ -183,7 +183,7 @@ WRIST_ROLL
 [INFO] [1766198124.023816788] [load_tester]:     Utilization:      3.6%
 [INFO] [1766198124.024326012] [load_tester]:     ✓ SAFE
 [INFO] [1766198124.024833978] [load_tester]: 
-PEN_HOLDER
+gripper
 [INFO] [1766198124.025317925] [load_tester]:   Servo: XL330-M288
 [INFO] [1766198124.025822316] [load_tester]:   Movement: 27.5° in 0.96 rad/s avg
 [INFO] [1766198124.026304077] [load_tester]: 
@@ -227,7 +227,7 @@ From pose:
 [INFO] [1766198124.042929065] [load_tester]:   elbow_flex     :  1.193 rad (  68.4°)
 [INFO] [1766198124.043685328] [load_tester]:   wrist_flex     :  2.456 rad ( 140.7°)
 [INFO] [1766198124.044449869] [load_tester]:   wrist_roll     :  0.925 rad (  53.0°)
-[INFO] [1766198124.045076927] [load_tester]:   pen_holder     :  1.580 rad (  90.5°)
+[INFO] [1766198124.045076927] [load_tester]:   gripper     :  1.580 rad (  90.5°)
 [INFO] [1766198124.045590856] [load_tester]: 
 To pose:
 [INFO] [1766198124.046131525] [load_tester]:   shoulder_pan   :  1.987 rad ( 113.9°)
@@ -235,7 +235,7 @@ To pose:
 [INFO] [1766198124.047200734] [load_tester]:   elbow_flex     :  1.000 rad (  57.3°)
 [INFO] [1766198124.047741866] [load_tester]:   wrist_flex     :  1.591 rad (  91.1°)
 [INFO] [1766198124.048271554] [load_tester]:   wrist_roll     : -1.408 rad ( -80.7°)
-[INFO] [1766198124.048802686] [load_tester]:   pen_holder     :  0.210 rad (  12.0°)
+[INFO] [1766198124.048802686] [load_tester]:   gripper     :  0.210 rad (  12.0°)
 [INFO] [1766198124.049935340] [load_tester]: 
 ============================================================
 [INFO] [1766198124.050452676] [load_tester]: JOINT-BY-JOINT ANALYSIS
@@ -317,7 +317,7 @@ WRIST_ROLL
 [INFO] [1766198124.085913199] [load_tester]:     Utilization:      258.4%
 [ERROR] [1766198124.086578313] [load_tester]:     ❌ OVERLOADED
 [INFO] [1766198124.087130279] [load_tester]: 
-PEN_HOLDER
+gripper
 [INFO] [1766198124.087631651] [load_tester]:   Servo: XL330-M288
 [INFO] [1766198124.088210636] [load_tester]:   Movement: 78.5° in 2.74 rad/s avg
 [INFO] [1766198124.088716786] [load_tester]: 
@@ -361,7 +361,7 @@ From pose:
 [INFO] [1766198124.105780924] [load_tester]:   elbow_flex     :  1.000 rad (  57.3°)
 [INFO] [1766198124.106287464] [load_tester]:   wrist_flex     :  1.591 rad (  91.1°)
 [INFO] [1766198124.106851189] [load_tester]:   wrist_roll     : -1.408 rad ( -80.7°)
-[INFO] [1766198124.107375895] [load_tester]:   pen_holder     :  0.210 rad (  12.0°)
+[INFO] [1766198124.107375895] [load_tester]:   gripper     :  0.210 rad (  12.0°)
 [INFO] [1766198124.107880027] [load_tester]: 
 To pose:
 [INFO] [1766198124.108385548] [load_tester]:   shoulder_pan   :  1.453 rad (  83.3°)
@@ -369,7 +369,7 @@ To pose:
 [INFO] [1766198124.109405849] [load_tester]:   elbow_flex     :  1.105 rad (  63.3°)
 [INFO] [1766198124.109917629] [load_tester]:   wrist_flex     :  1.299 rad (  74.4°)
 [INFO] [1766198124.110422947] [load_tester]:   wrist_roll     : -0.373 rad ( -21.4°)
-[INFO] [1766198124.110936375] [load_tester]:   pen_holder     :  1.590 rad (  91.1°)
+[INFO] [1766198124.110936375] [load_tester]:   gripper     :  1.590 rad (  91.1°)
 [INFO] [1766198124.112021214] [load_tester]: 
 ============================================================
 [INFO] [1766198124.112508216] [load_tester]: JOINT-BY-JOINT ANALYSIS
@@ -470,7 +470,7 @@ WRIST_ROLL
 [INFO] [1766198124.154361233] [load_tester]:     Utilization:      9.5%
 [INFO] [1766198124.154870606] [load_tester]:     ✓ SAFE
 [INFO] [1766198124.155362108] [load_tester]: 
-PEN_HOLDER
+gripper
 [INFO] [1766198124.155866296] [load_tester]:   Servo: XL330-M288
 [INFO] [1766198124.156408169] [load_tester]:   Movement: 79.1° in 2.76 rad/s avg
 [INFO] [1766198124.156918375] [load_tester]: 
@@ -514,7 +514,7 @@ From pose:
 [INFO] [1766198124.173688845] [load_tester]:   elbow_flex     :  1.105 rad (  63.3°)
 [INFO] [1766198124.174201570] [load_tester]:   wrist_flex     :  1.299 rad (  74.4°)
 [INFO] [1766198124.174704035] [load_tester]:   wrist_roll     : -0.373 rad ( -21.4°)
-[INFO] [1766198124.175225278] [load_tester]:   pen_holder     :  1.590 rad (  91.1°)
+[INFO] [1766198124.175225278] [load_tester]:   gripper     :  1.590 rad (  91.1°)
 [INFO] [1766198124.175712595] [load_tester]: 
 To pose:
 [INFO] [1766198124.176234820] [load_tester]:   shoulder_pan   :  1.812 rad ( 103.8°)
@@ -522,7 +522,7 @@ To pose:
 [INFO] [1766198124.177242436] [load_tester]:   elbow_flex     :  1.632 rad (  93.5°)
 [INFO] [1766198124.177737920] [load_tester]:   wrist_flex     :  2.440 rad ( 139.8°)
 [INFO] [1766198124.178288552] [load_tester]:   wrist_roll     :  1.192 rad (  68.3°)
-[INFO] [1766198124.178806407] [load_tester]:   pen_holder     :  0.500 rad (  28.6°)
+[INFO] [1766198124.178806407] [load_tester]:   gripper     :  0.500 rad (  28.6°)
 [INFO] [1766198124.179918097] [load_tester]: 
 ============================================================
 [INFO] [1766198124.180410118] [load_tester]: JOINT-BY-JOINT ANALYSIS
@@ -604,7 +604,7 @@ WRIST_ROLL
 [INFO] [1766198124.213138869] [load_tester]:     Utilization:      18.5%
 [INFO] [1766198124.213628223] [load_tester]:     ✓ SAFE
 [INFO] [1766198124.214125096] [load_tester]: 
-PEN_HOLDER
+gripper
 [INFO] [1766198124.214626487] [load_tester]:   Servo: XL330-M288
 [INFO] [1766198124.215150693] [load_tester]:   Movement: 62.5° in 2.18 rad/s avg
 [INFO] [1766198124.215637029] [load_tester]: 
@@ -648,7 +648,7 @@ From pose:
 [INFO] [1766198124.232449758] [load_tester]:   elbow_flex     :  1.632 rad (  93.5°)
 [INFO] [1766198124.232968131] [load_tester]:   wrist_flex     :  2.440 rad ( 139.8°)
 [INFO] [1766198124.233517837] [load_tester]:   wrist_roll     :  1.192 rad (  68.3°)
-[INFO] [1766198124.234033914] [load_tester]:   pen_holder     :  0.500 rad (  28.6°)
+[INFO] [1766198124.234033914] [load_tester]:   gripper     :  0.500 rad (  28.6°)
 [INFO] [1766198124.234519657] [load_tester]: 
 To pose:
 [INFO] [1766198124.235047752] [load_tester]:   shoulder_pan   :  1.812 rad ( 103.8°)
@@ -656,13 +656,13 @@ To pose:
 [INFO] [1766198124.236078813] [load_tester]:   elbow_flex     :  1.632 rad (  93.5°)
 [INFO] [1766198124.236582593] [load_tester]:   wrist_flex     :  2.440 rad ( 139.8°)
 [INFO] [1766198124.237100651] [load_tester]:   wrist_roll     :  1.192 rad (  68.3°)
-[INFO] [1766198124.237604357] [load_tester]:   pen_holder     :  1.500 rad (  85.9°)
+[INFO] [1766198124.237604357] [load_tester]:   gripper     :  1.500 rad (  85.9°)
 [INFO] [1766198124.238700474] [load_tester]: 
 ============================================================
 [INFO] [1766198124.239196458] [load_tester]: JOINT-BY-JOINT ANALYSIS
 [INFO] [1766198124.239743553] [load_tester]: ============================================================
 [INFO] [1766198124.240323074] [load_tester]: 
-PEN_HOLDER
+gripper
 [INFO] [1766198124.240832169] [load_tester]:   Servo: XL330-M288
 [INFO] [1766198124.241461931] [load_tester]:   Movement: 57.3° in 2.00 rad/s avg
 [INFO] [1766198124.241984360] [load_tester]: 

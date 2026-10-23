@@ -44,7 +44,7 @@ Servo Configuration:
   ID 3: elbow_flex      [XL330] XL330-M288
   ID 4: wrist_flex      [XL330] XL330-M288
   ID 5: wrist_roll      [XL330] XL330-M288
-  ID 6: pen_holder      [XL330] XL330-M077
+  ID 6: gripper      [XL330] XL330-M077
 
 ⚠️  WARNING: Close ROS2 control before running!
    (This will conflict with ros2_control_node)
@@ -60,7 +60,7 @@ Enabling torque on all servos...
   ✓ Servo #3 (elbow_flex): Torque enabled
   ✓ Servo #4 (wrist_flex): Torque enabled
   ✓ Servo #5 (wrist_roll): Torque enabled
-  ✓ Servo #6 (pen_holder): Torque enabled
+  ✓ Servo #6 (gripper): Torque enabled
 
 Torque enabled on 6/6 servos
 
@@ -75,7 +75,7 @@ ITERATION 1 - 23:22:41
 ✓ Servo #3 (elbow_flex     ) [XL330]: Temp: 23°C         Volt:5.20V         Curr:    0mA Time:  7.0ms
 ✓ Servo #4 (wrist_flex     ) [XL330]: Temp: 20°C         Volt:5.20V         Curr:    0mA Time:  8.0ms
 ✓ Servo #5 (wrist_roll     ) [XL330]: Temp: 20°C         Volt:5.20V         Curr:    0mA Time:  8.0ms
-✓ Servo #6 (pen_holder     ) [XL330]: Temp: 22°C         Volt:5.20V         Curr:    0mA Time:  7.0ms
+✓ Servo #6 (gripper     ) [XL330]: Temp: 22°C         Volt:5.20V         Curr:    0mA Time:  7.0ms
 
 ================================================================================
 ITERATION 2 - 23:22:51
@@ -85,7 +85,7 @@ ITERATION 2 - 23:22:51
 ✓ Servo #3 (elbow_flex     ) [XL330]: Temp: 23°C         Volt:5.20V         Curr:  -54mA Time:  7.0ms
 ✓ Servo #4 (wrist_flex     ) [XL330]: Temp: 20°C         Volt:5.20V         Curr:    0mA Time:  7.0ms
 ✓ Servo #5 (wrist_roll     ) [XL330]: Temp: 20°C         Volt:5.20V         Curr:    0mA Time:  8.0ms
-✓ Servo #6 (pen_holder     ) [XL330]: Temp: 22°C         Volt:5.20V         Curr:    0mA Time:  8.0ms
+✓ Servo #6 (gripper     ) [XL330]: Temp: 22°C         Volt:5.20V         Curr:    0mA Time:  8.0ms
 
 ================================================================================
 ITERATION 3 - 23:23:01
@@ -95,7 +95,7 @@ ITERATION 3 - 23:23:01
 ✓ Servo #3 (elbow_flex     ) [XL330]: Temp: 23°C         Volt:5.20V         Curr:  -54mA Time:  8.9ms
 ✓ Servo #4 (wrist_flex     ) [XL330]: Temp: 20°C         Volt:5.20V         Curr:    0mA Time: 10.0ms
 ✓ Servo #5 (wrist_roll     ) [XL330]: Temp: 20°C         Volt:5.20V         Curr:    0mA Time: 10.0ms
-✓ Servo #6 (pen_holder     ) [XL330]: Temp: 22°C         Volt:5.20V         Curr:    0mA Time: 10.0ms
+✓ Servo #6 (gripper     ) [XL330]: Temp: 22°C         Volt:5.20V         Curr:    0mA Time: 10.0ms
 
 ================================================================================
 ITERATION 4 - 23:23:11
@@ -105,7 +105,7 @@ ITERATION 4 - 23:23:11
 ✓ Servo #3 (elbow_flex     ) [XL330]: Temp: 23°C         Volt:5.20V         Curr:  -54mA Time:  7.0ms
 ✓ Servo #4 (wrist_flex     ) [XL330]: Temp: 20°C         Volt:5.20V         Curr:    0mA Time:  6.0ms
 ✓ Servo #5 (wrist_roll     ) [XL330]: Temp: 20°C         Volt:5.20V         Curr:    0mA Time:  7.0ms
-✓ Servo #6 (pen_holder     ) [XL330]: Temp: 22°C         Volt:5.20V         Curr:    0mA Time:  9.0ms
+✓ Servo #6 (gripper     ) [XL330]: Temp: 22°C         Volt:5.20V         Curr:    0mA Time:  9.0ms
 ^C
 
 Shutdown requested...
@@ -116,7 +116,7 @@ Disabling torque on all servos...
   ✓ Servo #3 (elbow_flex): Torque disabled
   ✓ Servo #4 (wrist_flex): Torque disabled
   ✓ Servo #5 (wrist_roll): Torque disabled
-  ✓ Servo #6 (pen_holder): Torque disabled
+  ✓ Servo #6 (gripper): Torque disabled
 
 ================================================================================
 MONITORING SUMMARY
@@ -160,7 +160,7 @@ Servo #5 (wrist_roll) [XL330]:
   Resp time:     7.0ms →  10.0ms (avg 8.2ms)
   ✓ Failures:  0/4 (0%)
 
-Servo #6 (pen_holder) [XL330]:
+Servo #6 (gripper) [XL330]:
   Temperature:  22°C →  22°C (avg 22.0°C)
   Voltage:     5.20V → 5.20V (avg 5.20V)
   Current:        0mA →    0mA (avg 0mA)
