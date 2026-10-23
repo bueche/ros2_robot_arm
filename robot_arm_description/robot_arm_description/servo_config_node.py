@@ -12,7 +12,7 @@ Servo map:
   ID 3  XL330-M288  elbow_flex
   ID 4  XL330-M288  wrist_flex
   ID 5  XL330-M288  wrist_roll
-  ID 6  XL330-M077  pen_holder
+  ID 6  XL330-M077  gripper
 """
 
 import sys
@@ -91,7 +91,7 @@ SERVO_CONFIG = {
             prof_vel=200, prof_acc=50,
             goal_current=0),
 
-    6: dict(name='pen_holder     [XL330]',
+    6: dict(name='gripper     [XL330]',
             operating_mode=OP_MODE_POSITION,
             P=2000, I=0, D=0, FF1=0, FF2=0,
             prof_vel=200, prof_acc=50,

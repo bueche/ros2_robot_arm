@@ -70,7 +70,7 @@ class PowerLoggerEnhanced(Node):
             'elbow_flex': 3,
             'wrist_flex': 4,
             'wrist_roll': 5,
-            'pen_holder': 6
+            'gripper': 6
         }
         
         # Subscribe to power telemetry
@@ -113,7 +113,7 @@ class PowerLoggerEnhanced(Node):
             'elbow_flex': 0,
             'wrist_flex': 0,
             'wrist_roll': 0,
-            'pen_holder': 0
+            'gripper': 0
         }
         self.peak_servo_temperatures = {
             'shoulder_pan': 0,
@@ -121,7 +121,7 @@ class PowerLoggerEnhanced(Node):
             'elbow_flex': 0,
             'wrist_flex': 0,
             'wrist_roll': 0,
-            'pen_holder': 0
+            'gripper': 0
         }
         self.peak_servo_loads = {
             'shoulder_pan': 0,
@@ -158,7 +158,7 @@ class PowerLoggerEnhanced(Node):
             'elbow_flex': 0,
             'wrist_flex': 0,
             'wrist_roll': 0,
-            'pen_holder': 0
+            'gripper': 0
         }
         
         if not self.latest_dxl_state:
@@ -195,7 +195,7 @@ class PowerLoggerEnhanced(Node):
             'elbow_flex': 0,
             'wrist_flex': 0,
             'wrist_roll': 0,
-            'pen_holder': 0
+            'gripper': 0
         }
         
         if not self.latest_dxl_state:
@@ -263,7 +263,7 @@ class PowerLoggerEnhanced(Node):
             'elbow_flex':    0.0,
             'wrist_flex':    0.0,
             'wrist_roll':    0.0,
-            'pen_holder':    0.0,
+            'gripper':    0.0,
         }
 
         if not self.latest_dxl_state:
@@ -315,7 +315,7 @@ class PowerLoggerEnhanced(Node):
             servo_currents['elbow_flex'],
             servo_currents['wrist_flex'],
             servo_currents['wrist_roll'],
-            servo_currents['pen_holder'],
+            servo_currents['gripper'],
             servo_loads['shoulder_pan'],
             servo_loads['shoulder_lift'],
             servo_temperatures['shoulder_pan'],
@@ -323,13 +323,13 @@ class PowerLoggerEnhanced(Node):
             servo_temperatures['elbow_flex'],
             servo_temperatures['wrist_flex'],
             servo_temperatures['wrist_roll'],
-            servo_temperatures['pen_holder'],
+            servo_temperatures['gripper'],
             servo_voltages['shoulder_pan'],
             servo_voltages['shoulder_lift'],
             servo_voltages['elbow_flex'],
             servo_voltages['wrist_flex'],
             servo_voltages['wrist_roll'],
-            servo_voltages['pen_holder'],
+            servo_voltages['gripper'],
             total_xl330_current_ma,
         ])
         

@@ -42,7 +42,7 @@ Parameters:
                   default: /koch_v11_controller/joint_trajectory
 
 Joint names (Koch v1.1):
-  shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, pen_holder
+  shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper
 
 Examples:
   # Nudge wrist_flex up by 0.05 rad
@@ -80,7 +80,7 @@ JOINT_NAMES = [
     'elbow_flex',
     'wrist_flex',
     'wrist_roll',
-    'pen_holder',
+    'gripper',
 ]
 
 # Joint limits (rad) — derived from URDF <limit lower= upper= > tags.
@@ -93,7 +93,7 @@ JOINT_NAMES = [
 #   elbow_flex:    lower=0.726  upper=2.250   → range [0.726, 2.250]
 #   wrist_flex:    lower=2.70   upper=0.297   → range [0.297, 2.700]
 #   wrist_roll:    lower=1.900  upper=-1.448  → range [-1.448, 1.900]
-#   pen_holder:    lower=1.60   upper=0.19    → range [0.190, 1.600]
+#   gripper:    lower=1.60   upper=0.19    → range [0.190, 1.600]
 #
 # Physical notes (from URDF comments):
 #   shoulder_pan:  2.044=far left,   0.540=far right
@@ -101,14 +101,14 @@ JOINT_NAMES = [
 #   elbow_flex:    0.726=highest,    2.250=lowest   (INVERTED: higher rad = lower physical)
 #   wrist_flex:    2.70=highest,     0.297=lowest   (INVERTED: higher rad = lower physical)
 #   wrist_roll:    1.900=jacks same side, -1.448=jacks opposite (~180 deg)
-#   pen_holder:    1.60=closed,      0.19=open      (INVERTED: higher rad = more closed)
+#   gripper:    1.60=closed,      0.19=open      (INVERTED: higher rad = more closed)
 JOINT_LIMITS = {
     'shoulder_pan':  (0.540,  2.044),
     'shoulder_lift': (2.200,  2.886),
     'elbow_flex':    (0.726,  2.250),
     'wrist_flex':    (0.297,  2.700),
     'wrist_roll':    (-1.448, 1.900),
-    'pen_holder':    (0.190,  1.600),
+    'gripper':    (0.190,  1.600),
 }
 
 

@@ -29,7 +29,7 @@ class PoseSequenceNode(Node):
             'elbow_flex',
             'wrist_flex',
             'wrist_roll',
-            'pen_holder'
+            'gripper'
         ]
         
         # Define pose sequence 
@@ -92,7 +92,7 @@ class PoseSequenceNode(Node):
     def run_sequence(self):
         """Execute the pose sequence with pauses between poses."""
         self.get_logger().info('Starting pose sequence...')
-        self.get_logger().warn('NOTE: 6th joint (pen_holder) using placeholder value 2.4')
+        self.get_logger().warn('NOTE: 6th joint (gripper) using placeholder value 2.4')
         
         for i, pose in enumerate(self.poses):
             self.get_logger().info(f"\n{'='*50}")

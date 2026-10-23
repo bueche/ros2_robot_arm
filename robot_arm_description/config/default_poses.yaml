@@ -9,7 +9,7 @@ poses:
       elbow_flex: 1.193
       wrist_flex: 2.6873
       wrist_roll: 1.01906
-      pen_holder: 1.10
+      gripper: 1.10
 
   - name: pose 1
     positions:
@@ -18,7 +18,7 @@ poses:
       elbow_flex: 1.193
       wrist_flex: 2.4556
       wrist_roll: 0.92544
-      pen_holder: 1.58
+      gripper: 1.58
 
   - name: pose 2
     positions:
@@ -27,7 +27,7 @@ poses:
       elbow_flex: 1.000
       wrist_flex: 1.5908
       wrist_roll: -1.4083
-      pen_holder: 0.21
+      gripper: 0.21
 
   - name: pose 3
     positions:
@@ -36,7 +36,7 @@ poses:
       elbow_flex: 1.105
       wrist_flex: 1.2992
       wrist_roll: -0.3728
-      pen_holder: 1.59
+      gripper: 1.59
 
   - name: pose 4
     positions:
@@ -45,7 +45,7 @@ poses:
       elbow_flex: 1.632
       wrist_flex: 2.4402
       wrist_roll: 1.1915
-      pen_holder: 0.5
+      gripper: 0.5
 
   - name: pose 5
     positions:
@@ -54,4 +54,4 @@ poses:
       elbow_flex: 1.632
       wrist_flex: 2.4402
       wrist_roll: 1.1915
-      pen_holder: 1.5
+      gripper: 1.5

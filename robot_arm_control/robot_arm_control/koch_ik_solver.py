@@ -16,7 +16,7 @@ Koch v1.1 Kinematic Structure:
 3. elbow_flex: Elbow pitch (Y-axis)
 4. wrist_flex: Wrist pitch (Y-axis)
 5. wrist_roll: Wrist roll (Z-axis)
-6. pen_holder: Pen angle adjustment (Y-axis) - typically fixed
+6. gripper: Pen angle adjustment (Y-axis) - typically fixed
 """
 
 import numpy as np
@@ -72,7 +72,7 @@ class KochWritingIK:
             
         Returns:
             Tuple of 6 joint angles (shoulder_pan, shoulder_lift, elbow_flex, 
-                                    wrist_flex, wrist_roll, pen_holder) or None if unreachable
+                                    wrist_flex, wrist_roll, gripper) or None if unreachable
         """
         # 1. Calculate base rotation (shoulder_pan) to point towards target
         shoulder_pan = math.atan2(target_y, target_x)
@@ -123,10 +123,10 @@ class KochWritingIK:
         
         # 9. Set wrist roll and pen holder
         wrist_roll = pen_roll
-        pen_holder = 0.0  # Keep pen straight for writing
+        gripper = 0.0  # Keep pen straight for writing
         
         return (shoulder_pan, shoulder_lift, elbow_flex, 
-                wrist_flex, wrist_roll, pen_holder)
+                wrist_flex, wrist_roll, gripper)
     
     def solve_for_vertical_surface(self,
                                    surface_x: float,
@@ -189,7 +189,7 @@ def validate_joint_angles(angles: Tuple[float, ...],
             'elbow_flex': (-2.5, 2.5),
             'wrist_flex': (-2.0, 2.0),
             'wrist_roll': (-3.14, 3.14),
-            'pen_holder': (-0.5, 0.5)
+            'gripper': (-0.5, 0.5)
         }
     
     joint_names = list(limits.keys())
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     
     if result:
         joint_names = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 
-                      'wrist_flex', 'wrist_roll', 'pen_holder']
+                      'wrist_flex', 'wrist_roll', 'gripper']
         print("\nSolution found:")
         for name, angle in zip(joint_names, result):
             print(f"  {name:15s}: {angle:7.3f} rad ({math.degrees(angle):7.2f}°)")

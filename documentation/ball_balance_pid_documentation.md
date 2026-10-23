@@ -116,7 +116,7 @@ Lets look at an actual case for one of the difficult scenarios in our test: pose
 [pose_test_node]:   ✓ elbow_flex: 1.470 rad (within [0.726, 2.250])
 [pose_test_node]:   ✓ wrist_flex: 2.300 rad (within [0.297, 2.700])
 [pose_test_node]:   ✓ wrist_roll: 1.600 rad (within [-1.448, 1.900])
-[pose_test_node]:   ✓ pen_holder: 0.977 rad (within [0.190, 1.600])
+[pose_test_node]:   ✓ gripper: 0.977 rad (within [0.190, 1.600])
 [pose_test_node]: → Sent: pose 5 - forward
 [pose_test_node]:    Waiting for ball to center (timeout: 20.0s)...
 [pose_test_node]:   ✓ Cup stable after 11.53s
@@ -126,7 +126,7 @@ Lets look at an actual case for one of the difficult scenarios in our test: pose
 [pose_test_node]:    elbow_flex      [XL330] Pos:  1.519rad Curr: -250mA Volt: 4.6V Temp: 29.0°C <------
 [pose_test_node]:    wrist_flex      [XL330] Pos:  2.507rad Curr:   50mA Volt: 4.6V Temp: 25.0°C <------
 [pose_test_node]:    wrist_roll      [XL330] Pos:  1.548rad Curr:   11mA Volt: 4.6V Temp: 24.0°C
-[pose_test_node]:    pen_holder      [XL330] Pos:  0.974rad Curr:   15mA Volt: 4.6V Temp: 26.0°C
+[pose_test_node]:    gripper      [XL330] Pos:  0.974rad Curr:   15mA Volt: 4.6V Temp: 26.0°C
 [pose_test_node]:   ⚡ Power Analysis for "pose 5 - forward":
 [pose_test_node]:      Peak 5V current (INA219):    0.386A
 [pose_test_node]:      Peak motor sum (XL330s):     0.391A

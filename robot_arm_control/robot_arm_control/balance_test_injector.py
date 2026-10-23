@@ -256,7 +256,7 @@ class BalanceTestInjector(Node):
         js.header.stamp = now
         js.name = [
             'shoulder_pan', 'shoulder_lift', 'elbow_flex',
-            'wrist_flex', 'wrist_roll', 'pen_holder'
+            'wrist_flex', 'wrist_roll', 'gripper'
         ]
         js.position = [
             1.55,

@@ -88,7 +88,7 @@ INFO] [1770595614.927827338] [pose_test_node]: → Sent: pose 1 - poised to work
 [INFO] [1770595618.937008160] [pose_test_node]:   📊 elbow_flex      [XL330] Pos:  2.303rad Curr: -109mA Volt: 5.5V Temp: 21.0°C
 [INFO] [1770595618.937838905] [pose_test_node]:   📊 wrist_flex      [XL330] Pos:  2.276rad Curr:   13mA Volt: 5.4V Temp: 21.0°C
 [INFO] [1770595618.938645446] [pose_test_node]:   📊 wrist_roll      [XL330] Pos:  1.186rad Curr:  -12mA Volt: 5.5V Temp: 22.0°C
-[INFO] [1770595618.939474062] [pose_test_node]:   📊 pen_holder      [XL330] Pos:  1.621rad Curr:  -21mA Volt: 5.4V Temp: 22.0°C
+[INFO] [1770595618.939474062] [pose_test_node]:   📊 gripper      [XL330] Pos:  1.621rad Curr:  -21mA Volt: 5.4V Temp: 22.0°C
 [INFO] [1770595618.940354344] [pose_test_node]:   ⚡ Power Analysis for "pose 1 - poised to work":
 [INFO] [1770595618.941070959] [pose_test_node]:      Peak 5V current (INA219):    0.199A
 [INFO] [1770595618.941883204] [pose_test_node]:      Peak motor sum (XL330s):     0.162A
