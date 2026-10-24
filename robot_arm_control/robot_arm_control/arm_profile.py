@@ -3,6 +3,9 @@
 A profile is a YAML file in robot_arm_description/share/config/arm_profiles/.
 Nodes take an 'arm_profile' parameter that is either a profile name
 ('koch_v1_1', 'so_arm101') or a path to a profile file.
+
+The profile's 'launch' section is read by robot_arm_description's
+robot_arm.launch.py, not by this module.
 """
 
 import os
@@ -44,13 +47,18 @@ class Thresholds:
 class ArmProfile:
     name: str
     path: str
-    trajectory_topic: str
+    controller: str                       # JointTrajectoryController name
     telemetry_backend: str
     telemetry_topic: str
     joints: List[JointSpec]               # command order
     rail_min_voltage: Dict[str, Optional[float]]
     safe_position: Dict[str, float]
     thresholds: Thresholds
+    programs: Dict[str, List[dict]]       # name -> [{'name': str, 'positions': {joint: rad}}]
+
+    @property
+    def trajectory_topic(self) -> str:
+        return f'/{self.controller}/joint_trajectory'
 
     @property
     def joint_names(self) -> List[str]:
@@ -152,14 +160,29 @@ def load_arm_profile(name_or_path: str) -> ArmProfile:
         current_warning_ma=_opt_float(t.get('current_warning_ma'), 'thresholds.current_warning_ma'),
     )
 
+    programs = {}
+    for prog_name, poses in (data.get('programs') or {}).items():
+        if not isinstance(poses, list) or not poses:
+            raise ProfileError(f"{path}: programs.{prog_name} must be a non-empty list of poses")
+        for k, pose in enumerate(poses):
+            positions = (pose or {}).get('positions') or {}
+            unknown = set(positions) - names
+            if unknown:
+                raise ProfileError(f"{path}: programs.{prog_name}[{k}] has unknown joints {sorted(unknown)}")
+        programs[str(prog_name)] = [
+            {'name': str(pose.get('name', f'{prog_name}_{k}')),
+             'positions': {j: float(v) for j, v in pose['positions'].items()}}
+            for k, pose in enumerate(poses)]
+
     return ArmProfile(
         name=str(data.get('name', os.path.splitext(os.path.basename(path))[0])),
         path=path,
-        trajectory_topic=str(need(data, 'trajectory_topic', 'profile')),
+        controller=str(need(data, 'controller', 'profile')),
         telemetry_backend=backend,
         telemetry_topic=str(need(telemetry, 'topic', 'telemetry')),
         joints=joints,
         rail_min_voltage=rail_min_voltage,
         safe_position=safe_position,
         thresholds=thresholds,
+        programs=programs,
     )

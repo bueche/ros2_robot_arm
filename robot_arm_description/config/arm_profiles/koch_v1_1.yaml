@@ -5,8 +5,20 @@
 
 name: koch_v1_1
 
-# JointTrajectoryController command topic.
-trajectory_topic: /koch_v11_controller/joint_trajectory
+# JointTrajectoryController name (as in the controllers file). Nodes command it
+# on /<controller>/joint_trajectory; the launch file spawns it.
+controller: koch_v11_controller
+
+# Read by robot_arm_description's robot_arm.launch.py. Paths are relative to the
+# robot_arm_description share directory.
+launch:
+  urdf: urdf/koch_v11_arm_real_for_balance.urdf
+  controllers: config/koch_v11_controllers_real.yaml
+  # Run before the controller_manager starts; it opens the servo port itself,
+  # so the controller_manager waits startup_delay_s for it to finish.
+  pre_launch:
+    - {package: robot_arm_description, executable: servo_config_node}
+  startup_delay_s: 3.0
 
 # Servo telemetry message. backend selects the message type:
 #   dynamixel -> dynamixel_interfaces/msg/DynamixelState
@@ -48,3 +60,32 @@ thresholds:
   temperature_critical_c: 65.0
   load_warning_pct: 80.0       # joints reporting present_load
   current_warning_ma: 400.0    # joints reporting present_current
+
+# Built-in pose programs for pose_test (-p program:=<name>), Koch joint frame.
+# Joints left out of a pose are taken from safe_position.
+programs:
+  calibration:
+    - {name: home, positions: {shoulder_pan: 0.0, shoulder_lift: 0.0, elbow_flex: 0.0, wrist_flex: 0.0, wrist_roll: 0.0, gripper: 0.0}}
+    - {name: shoulder_up, positions: {shoulder_lift: 1.57}}
+    - {name: elbow_bent, positions: {shoulder_lift: 1.57, elbow_flex: -1.57}}
+    - {name: return_home, positions: {shoulder_pan: 0.0, shoulder_lift: 0.0, elbow_flex: 0.0, wrist_flex: 0.0, wrist_roll: 0.0, gripper: 0.0}}
+  sweep:   # shoulder_pan over linspace(-1.57, 1.57, 8)
+    - {name: pan_0, positions: {shoulder_pan: -1.57}}
+    - {name: pan_1, positions: {shoulder_pan: -1.1214}}
+    - {name: pan_2, positions: {shoulder_pan: -0.6729}}
+    - {name: pan_3, positions: {shoulder_pan: -0.2243}}
+    - {name: pan_4, positions: {shoulder_pan: 0.2243}}
+    - {name: pan_5, positions: {shoulder_pan: 0.6729}}
+    - {name: pan_6, positions: {shoulder_pan: 1.1214}}
+    - {name: pan_7, positions: {shoulder_pan: 1.57}}
+  stress:
+    - {name: horizontal, positions: {shoulder_lift: 1.57}}
+    - {name: extended, positions: {shoulder_lift: 1.57, elbow_flex: 1.57}}
+    - {name: overhead, positions: {shoulder_lift: 3.14}}
+  default:
+    - {name: pose 0, positions: {shoulder_pan: 1.1679, shoulder_lift: 2.60, elbow_flex: 1.193, wrist_flex: 2.6873, wrist_roll: 1.01906, gripper: 1.10}}
+    - {name: pose 1, positions: {shoulder_pan: 1.1679, shoulder_lift: 2.50, elbow_flex: 1.193, wrist_flex: 2.4556, wrist_roll: 0.92544, gripper: 1.58}}
+    - {name: pose 2, positions: {shoulder_pan: 1.9874, shoulder_lift: 2.50, elbow_flex: 1.000, wrist_flex: 1.5908, wrist_roll: -1.4083, gripper: 0.21}}
+    - {name: pose 3, positions: {shoulder_pan: 1.4533, shoulder_lift: 2.56, elbow_flex: 1.105, wrist_flex: 1.2992, wrist_roll: -0.3728, gripper: 1.59}}
+    - {name: pose 4, positions: {shoulder_pan: 1.8125, shoulder_lift: 2.56, elbow_flex: 1.632, wrist_flex: 2.4402, wrist_roll: 1.1915, gripper: 0.5}}
+    - {name: pose 5, positions: {shoulder_pan: 1.8125, shoulder_lift: 2.56, elbow_flex: 1.632, wrist_flex: 2.4402, wrist_roll: 1.1915, gripper: 1.5}}

@@ -1,0 +1,126 @@
+<?xml version="1.0"?>
+<robot name="so_101_arm">
+
+  <link name="base_link"/>
+  <link name="link1"/>
+  <link name="link2"/>
+  <link name="link3"/>
+  <link name="link4"/>
+  <link name="link5"/>
+  <link name="link6"/> <joint name="shoulder_pan" type="revolute">
+    <parent link="base_link"/>
+    <child link="link1"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="4.5" velocity="6.0"/>
+    <ros2_control name="FeetechServo">
+      <param name="servo_id">1</param>
+    </ros2_control>
+  </joint>
+
+  <joint name="shoulder_lift" type="revolute">
+    <parent link="link1"/>
+    <child link="link2"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-1.74" upper="1.74" effort="4.5" velocity="6.0"/>
+    <ros2_control name="FeetechServo">
+      <param name="servo_id">2</param>
+    </ros2_control>
+  </joint>
+
+  <joint name="elbow_flex" type="revolute">
+    <parent link="link2"/>
+    <child link="link3"/>
+    <origin xyz="0 0 0.10" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.69" upper="1.69" effort="4.5" velocity="6.0"/>
+    <ros2_control name="FeetechServo">
+      <param name="servo_id">3</param>
+    </ros2_control>
+  </joint>
+
+  <joint name="wrist_flex" type="revolute">
+    <parent link="link3"/>
+    <child link="link4"/>
+    <origin xyz="0 0 0.10" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.65" upper="1.65" effort="4.5" velocity="6.0"/>
+    <ros2_control name="FeetechServo">
+      <param name="servo_id">4</param>
+    </ros2_control>
+  </joint>
+
+  <joint name="wrist_roll" type="revolute">
+    <parent link="link4"/>
+    <child link="link5"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-3.14" upper="3.14" effort="4.5" velocity="6.0"/>
+    <ros2_control name="FeetechServo">
+      <param name="servo_id">5</param>
+    </ros2_control>
+  </joint>
+
+  <joint name="gripper" type="revolute">
+    <parent link="link5"/>
+    <child link="link6"/>
+    <origin xyz="0 0 0.03" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.0" upper="1.0" effort="4.5" velocity="6.0"/>
+    <ros2_control name="FeetechServo">
+      <param name="servo_id">6</param>
+    </ros2_control>
+  </joint>
+
+ <ros2_control name="FeetechSystem" type="system">
+  <hardware>
+    <plugin>feetech_ros2_driver/FeetechHardwareInterface</plugin>
+    <param name="usb_port">/dev/ttyWaveshare</param>
+    <param name="joint_config_file">$(find robot_arm_description)/config/so_arm101_calibration.yaml</param>
+  </hardware>
+
+  <joint name="shoulder_pan">
+    <param name="id">1</param>
+    <command_interface name="position"/>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+
+  <joint name="shoulder_lift">
+    <param name="id">2</param>
+    <command_interface name="position"/>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+
+  <joint name="elbow_flex">
+    <param name="id">3</param>
+    <command_interface name="position"/>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+
+  <joint name="wrist_flex">
+    <param name="id">4</param>
+    <command_interface name="position"/>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+
+  <joint name="wrist_roll">
+    <param name="id">5</param>
+    <command_interface name="position"/>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+
+  <joint name="gripper">
+    <param name="id">6</param>
+    <command_interface name="position"/>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+  </joint>
+ </ros2_control>
+</robot>
+

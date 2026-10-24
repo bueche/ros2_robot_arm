@@ -1,0 +1,73 @@
+# Single source of truth for servo calibration, read by both the waveshare bridge
+# (joint_config_file param) and feetech_ros2_driver (joint_config_file hardware param).
+# No drive_mode: the driver does not support it, so every joint uses
+# rad = (ticks - 2048) * pi/2048 and direction is expressed by the URDF <axis>.
+joints:
+  shoulder_pan:
+    id: 1
+    homing_offset: -1717
+    range_min: 948
+    range_max: 3026
+    p_coefficient: 16
+    i_coefficient: 0
+    d_coefficient: 32
+    return_delay_time: 0
+    acceleration: 254
+
+  shoulder_lift:
+    id: 2
+    homing_offset: 1663
+    range_min: 852
+    range_max: 3157
+    p_coefficient: 16
+    i_coefficient: 0
+    d_coefficient: 32
+    return_delay_time: 0
+    acceleration: 254
+
+  elbow_flex:
+    id: 3
+    homing_offset: 1787
+    range_min: 853
+    range_max: 2950
+    p_coefficient: 16
+    i_coefficient: 0
+    d_coefficient: 32
+    return_delay_time: 0
+    acceleration: 254
+
+  wrist_flex:
+    id: 4
+    homing_offset: 1566
+    range_min: 886
+    range_max: 3206
+    p_coefficient: 16
+    i_coefficient: 0
+    d_coefficient: 32
+    return_delay_time: 0
+    acceleration: 254
+
+  wrist_roll:
+    id: 5
+    homing_offset: -1829
+    range_min: 1125
+    range_max: 3737
+    p_coefficient: 16
+    i_coefficient: 0
+    d_coefficient: 32
+    return_delay_time: 0
+    acceleration: 254
+
+  gripper:
+    id: 6
+    homing_offset: 1530
+    range_min: 2047
+    range_max: 3359
+    p_coefficient: 16
+    i_coefficient: 0
+    d_coefficient: 32
+    return_delay_time: 0
+    acceleration: 254
+    max_torque_limit: 500
+    protection_current: 250
+    overload_torque: 25

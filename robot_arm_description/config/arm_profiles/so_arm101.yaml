@@ -5,8 +5,17 @@
 
 name: so_arm101
 
-# JointTrajectoryController command topic.
-trajectory_topic: /arm_controller/joint_trajectory
+# JointTrajectoryController name (as in the controllers file). Nodes command it
+# on /<controller>/joint_trajectory; the launch file spawns it.
+controller: arm_controller
+
+# Read by robot_arm_description's robot_arm.launch.py. Paths are relative to the
+# robot_arm_description share directory.
+launch:
+  urdf: urdf/so_arm101.urdf
+  controllers: config/so_arm101_controllers.yaml
+  pre_launch: []
+  startup_delay_s: 0.0
 
 # Servo telemetry message. backend selects the message type:
 #   dynamixel -> dynamixel_interfaces/msg/DynamixelState
@@ -46,3 +55,12 @@ thresholds:
   temperature_critical_c: 65.0
   load_warning_pct: 80.0
   current_warning_ma: null     # TODO: set from measured holding/peak currents
+
+# Built-in pose programs for pose_test (-p program:=<name>), SO-ARM101 joint frame.
+# Joints left out of a pose are taken from safe_position.
+programs:
+  sweep:   # shoulder_pan across its middle range
+    - {name: pan_left, positions: {shoulder_pan: -0.5}}
+    - {name: pan_center, positions: {shoulder_pan: 0.0}}
+    - {name: pan_right, positions: {shoulder_pan: 0.5}}
+    - {name: pan_center_again, positions: {shoulder_pan: 0.0}}
