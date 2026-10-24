@@ -723,7 +723,8 @@ class PoseTestNode(Node):
         self.get_logger().info('='*60)
     
     def get_urdf_content(self, urdf_file=''):
-        """Get URDF content from parameter server or file."""
+        """Get URDF content: urdf_file parameter, else robot_description
+        parameter, else the arm profile's URDF (launch.urdf)."""
         # Try from file first
         if urdf_file:
             try:
@@ -737,7 +738,7 @@ class PoseTestNode(Node):
             urdf_param = self.get_parameter('robot_description')
             return urdf_param.value
         except Exception:
-            self.get_logger().warn('robot_description parameter not found')
+            pass  # not set on this node; declared below
         
         # Try to declare and get it
         try:
@@ -747,7 +748,16 @@ class PoseTestNode(Node):
                 return urdf_param.value
         except Exception as e:
             self.get_logger().error(f'Could not get URDF: {e}')
-        
+
+        # Fall back to the URDF the launch file uses for this arm
+        if self.profile.urdf_path:
+            try:
+                with open(self.profile.urdf_path, 'r') as f:
+                    self.get_logger().info(f'Using arm profile URDF: {self.profile.urdf_path}')
+                    return f.read()
+            except Exception as e:
+                self.get_logger().error(f'Error reading profile URDF {self.profile.urdf_path}: {e}')
+
         return None
     
     def spin_for_duration(self, duration):

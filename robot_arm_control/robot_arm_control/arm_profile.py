@@ -5,7 +5,7 @@ Nodes take an 'arm_profile' parameter that is either a profile name
 ('koch_v1_1', 'so_arm101') or a path to a profile file.
 
 The profile's 'launch' section is read by robot_arm_description's
-robot_arm.launch.py, not by this module.
+robot_arm.launch.py; this module only takes launch.urdf from it (urdf_path).
 """
 
 import os
@@ -55,6 +55,7 @@ class ArmProfile:
     safe_position: Dict[str, float]
     thresholds: Thresholds
     programs: Dict[str, List[dict]]       # name -> [{'name': str, 'positions': {joint: rad}}]
+    urdf_path: Optional[str]              # launch.urdf, resolved in the robot_arm_description share dir
 
     @property
     def trajectory_topic(self) -> str:
@@ -174,6 +175,12 @@ def load_arm_profile(name_or_path: str) -> ArmProfile:
              'positions': {j: float(v) for j, v in pose['positions'].items()}}
             for k, pose in enumerate(poses)]
 
+    urdf_path = None
+    urdf_rel = (data.get('launch') or {}).get('urdf')
+    if urdf_rel:
+        from ament_index_python.packages import get_package_share_directory
+        urdf_path = os.path.join(get_package_share_directory(PROFILE_PACKAGE), urdf_rel)
+
     return ArmProfile(
         name=str(data.get('name', os.path.splitext(os.path.basename(path))[0])),
         path=path,
@@ -185,4 +192,5 @@ def load_arm_profile(name_or_path: str) -> ArmProfile:
         safe_position=safe_position,
         thresholds=thresholds,
         programs=programs,
+        urdf_path=urdf_path,
     )
