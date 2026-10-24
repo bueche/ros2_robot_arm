@@ -1,21 +1,23 @@
 # Pose sequence generated from sampled joint_states
+# shoulder_lift, elbow_flex, wrist_flex negated when drive_mode was removed from
+# so-arm101.yaml (positions are now (ticks - 2048) * pi/2048 for every joint).
 
 poses:
   - name: pose 1 - poised to work
     positions:
       shoulder_pan: -0.05368932757599744
-      shoulder_lift: -0.047553404424454875
-      elbow_flex: -0.581378718608658
-      wrist_flex: -0.8620972027917303
+      shoulder_lift: -0.010737865515199488
+      elbow_flex: 0.581378718608658
+      wrist_flex: 0.8620972027917303
       wrist_roll: -0.15493205957644976
       gripper: -0.0015339807878856412
 
   - name: pose 2 - reach to grab
     positions:
       shoulder_pan: -0.0046019423636569235
-      shoulder_lift: -0.006135923151542565
-      elbow_flex: 0.2086213871524472
-      wrist_flex: -0.25464081078901646
+      shoulder_lift: 0.006135923151542565
+      elbow_flex: -0.2086213871524472
+      wrist_flex: 0.25464081078901646
       wrist_roll: -0.7807962210337913
       gripper: -0.0015339807878856412
 
@@ -23,91 +25,53 @@ poses:
   - name: pose 3 - grab
     positions:
       shoulder_pan: -0.2807184841830723
-      shoulder_lift: -1.0538448012774355
-      elbow_flex: 0.43104860139586515
-      wrist_flex: 0.765456413154935
+      shoulder_lift: 1.0538448012774355
+      elbow_flex: -0.43104860139586515
+      wrist_flex: -0.765456413154935
       wrist_roll: -0.782330201821677
       gripper: -0.0015339807878856412
 
   - name: pose 4 - lift and center
     positions:
       shoulder_pan: -0.28225246497095796
-      shoulder_lift: -1.0707185899441776
-      elbow_flex: 0.4356505437595221
-      wrist_flex: 0.765456413154935
+      shoulder_lift: 1.0707185899441776
+      elbow_flex: -0.4356505437595221
+      wrist_flex: -0.765456413154935
       wrist_roll: -0.7807962210337913
       gripper: 0.9495341077012119
 
   - name: pose 5 - raise and get ready to place
     positions:
       shoulder_pan: 0.14266021327336462
-      shoulder_lift: -1.0400389741864646
-      elbow_flex: 0.007669903939428206
-      wrist_flex: 1.0492428589137786
+      shoulder_lift: 1.0400389741864646
+      elbow_flex: -0.007669903939428206
+      wrist_flex: -1.0492428589137786
       wrist_roll: 0.01380582709097077
       gripper: 0.5522330836388308
 
   - name: pose 6 - place high
     positions:
       shoulder_pan: 0.14266021327336462
-      shoulder_lift: -1.047708878125893
-      elbow_flex: 0.006135923151542565
-      wrist_flex: 1.0492428589137786
+      shoulder_lift: 1.047708878125893
+      elbow_flex: -0.006135923151542565
+      wrist_flex: -1.0492428589137786
       wrist_roll: 0.01687378866674205
       gripper: -0.01380582709097077
 
   - name: pose 7 - reach to grab again
     positions:
       shoulder_pan: 0.3574175235773544
-      shoulder_lift: 0.2162912910918754
-      elbow_flex: 0.15493205957644976
-      wrist_flex: -0.4111068511533518
+      shoulder_lift: -0.2162912910918754
+      elbow_flex: -0.15493205957644976
+      wrist_flex: 0.4111068511533518
       wrist_roll: -1.7119225592803755
       gripper: 0.49394181369917645
 
   - name: pose 8 - poised to work or shutdown
     positions:
       shoulder_pan: -0.05368932757599744
-      shoulder_lift: -0.047553404424454875
-      elbow_flex: -0.581378718608658
-      wrist_flex: -0.8620972027917303
+      shoulder_lift: -0.010737865515199488
+      elbow_flex: 0.581378718608658
+      wrist_flex: 0.8620972027917303
       wrist_roll: -0.15493205957644976
       gripper: -0.0015339807878856412
-
-  # - name: pose 9 - place low
-  #   positions:
-  #     shoulder_pan: 1.9245516282852957
-  #     shoulder_lift: 2.4033874401074744
-  #     elbow_flex: 1.3520972763312165
-  #     wrist_flex: 2.326650931802638
-  #     wrist_roll: 1.7373145480214949
-  #     gripper: 1.520675055398144
-
-  # - name: pose 10 - release
-  #   positions:
-  #     shoulder_pan: 1.872370802638007
-  #     shoulder_lift: 2.4033874401074744
-  #     elbow_flex: 1.2661523870297997
-  #     wrist_flex: 2.326650931802638
-  #     wrist_roll: 1.7373145480214949
-  #     gripper: 0.5816627329506595
-
-  # - name: pose 11 - ending raise high
-  #   positions:
-  #     shoulder_pan: 1.5976541029066929
-  #     shoulder_lift: 2.655083187347338
-  #     elbow_flex: 0.8057333372007817
-  #     wrist_flex: 1.4727763861016122
-  #     wrist_roll: 1.7618702306790426
-  #     gripper: 0.6553297809233024
-
-
-  # - name: pose 12 - poised to work or shutdown
-  #   positions:
-  #     shoulder_pan: 1.5961193727405962
-  #     shoulder_lift: 2.61
-  #     elbow_flex: 1.4372234987336654
-  #     wrist_flex: 0.7255729126697013
-  #     wrist_roll: 1.7618702306790426
-  #     gripper: 1.520675055398144
-
