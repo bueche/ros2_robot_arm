@@ -16,6 +16,7 @@ setup(
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.urdf')),
         (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        (os.path.join('share', package_name, 'config', 'arm_profiles'), glob('config/arm_profiles/*.yaml')),
         (os.path.join('share', package_name, 'meshes'), glob('meshes/*.stl') + glob('meshes/*.STL')),
 
     ],
