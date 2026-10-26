@@ -1,0 +1,103 @@
+# Pose sequence generated from sampled joint_states
+
+poses:
+  - name: pose 1 - initial 
+    positions:
+      shoulder_pan: 0.03681553890925539
+      shoulder_lift: 0.9802137234589247
+      elbow_flex: 0.5353592949720888
+      wrist_flex: -1.0737865515199487
+      wrist_roll: 1.6935147898257479
+      gripper: 0.28532042654672923
+
+  - name: pose 2 -tilt cup right
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 2.1981944690401236
+      gripper: 0.28532042654672923
+
+  - name: pose 3 - tilt cup left
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.2333205534600555
+      gripper: 0.28532042654672923
+
+  - name: pose 4 - center 
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.6198837120072371
+      gripper: 0.28532042654672923
+
+  - name: pose 5 - forward 
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.7102331047910518
+      elbow_flex: 0.4693981210930062
+      wrist_flex: -0.8053399136399616
+      wrist_roll: 1.6198837120072371
+      gripper: 0.2837864457588436
+
+  - name: pose 6 - back 
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.44638840927472156
+      elbow_flex: 0.5031456984264903
+      wrist_flex: -1.217980745581199
+      wrist_roll: 1.6214176927951227
+      gripper: 0.2837864457588436
+
+
+  - name: pose 6 - center 
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.6198837120072371
+      gripper: 0.28532042654672923
+
+  - name: pose 7 - tilt cup right
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.6198837120072371
+      gripper: 0.28532042654672923
+
+  - name: pose 8 - tilt cup left
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.2333205534600555
+      gripper: 0.28532042654672923
+
+  - name: pose 9 - back 
+    positions:
+      houlder_pan: -0.0046019423636569235
+      shoulder_lift: 0.44638840927472156
+      elbow_flex: 0.5031456984264903
+      wrist_flex: -1.217980745581199
+      wrist_roll: 1.6214176927951227
+      gripper: 0.2837864457588436
+
+  - name: pose 10 - center 
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.6198837120072371
+      gripper: 0.28532042654672923
+
