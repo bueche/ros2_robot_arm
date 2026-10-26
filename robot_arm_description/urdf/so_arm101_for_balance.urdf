@@ -425,7 +425,7 @@
   <joint name="cup_handle_joint" type="fixed">
     <parent link="gripper_frame_link"/>
     <child link="cup_handle_link"/>
-    <origin xyz="0 0 0.0175" rpy="0 0 0"/>
+    <origin xyz="-0.01 -0.0175 -0.02" rpy="1.5708 0 0"/>
   </joint>
 
   <link name="cup_handle_link">
