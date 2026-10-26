@@ -40,9 +40,9 @@ poses:
   - name: pose 5 - forward 
     positions:
       shoulder_pan: -0.0046019423636569235
-      shoulder_lift: 0.7102331047910518
-      elbow_flex: 0.4693981210930062
-      wrist_flex: -0.8053399136399616
+      shoulder_lift: 0.543029198911517
+      elbow_flex: 0.5307573526084318
+      wrist_flex:  -0.5982525072754
       wrist_roll: 1.6198837120072371
       gripper: 0.2837864457588436
 
@@ -71,7 +71,7 @@ poses:
       shoulder_lift: 0.5338253141842031
       elbow_flex: 0.5875146417602005
       wrist_flex: -1.0722525707320631
-      wrist_roll: 1.6198837120072371
+      wrist_roll: 2.1981944690401236 
       gripper: 0.28532042654672923
 
   - name: pose 9 - tilt cup left
