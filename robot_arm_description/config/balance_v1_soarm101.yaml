@@ -49,9 +49,9 @@ poses:
   - name: pose 6 - back 
     positions:
       shoulder_pan: -0.0046019423636569235
-      shoulder_lift: 0.44638840927472156
-      elbow_flex: 0.5031456984264903
-      wrist_flex: -1.217980745581199
+      shoulder_lift: 0.6043884304269426
+      elbow_flex: 0.5123495831538042
+      wrist_flex: -1.3606409588545638
       wrist_roll: 1.6214176927951227
       gripper: 0.2837864457588436
 
