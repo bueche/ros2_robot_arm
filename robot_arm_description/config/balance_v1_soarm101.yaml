@@ -56,7 +56,7 @@ poses:
       gripper: 0.2837864457588436
 
 
-  - name: pose 6 - center 
+  - name: pose 7 - center 
     positions:
       shoulder_pan: -0.0046019423636569235
       shoulder_lift: 0.5338253141842031
@@ -65,7 +65,7 @@ poses:
       wrist_roll: 1.6198837120072371
       gripper: 0.28532042654672923
 
-  - name: pose 7 - tilt cup right
+  - name: pose 8 - tilt cup right
     positions:
       shoulder_pan: -0.0046019423636569235
       shoulder_lift: 0.5338253141842031
@@ -74,7 +74,7 @@ poses:
       wrist_roll: 1.6198837120072371
       gripper: 0.28532042654672923
 
-  - name: pose 8 - tilt cup left
+  - name: pose 9 - tilt cup left
     positions:
       shoulder_pan: -0.0046019423636569235
       shoulder_lift: 0.5338253141842031
@@ -83,16 +83,16 @@ poses:
       wrist_roll: 1.2333205534600555
       gripper: 0.28532042654672923
 
-  - name: pose 9 - back 
+  - name: pose 10 - back
     positions:
-      houlder_pan: -0.0046019423636569235
+      shoulder_pan: -0.0046019423636569235
       shoulder_lift: 0.44638840927472156
       elbow_flex: 0.5031456984264903
       wrist_flex: -1.217980745581199
       wrist_roll: 1.6214176927951227
       gripper: 0.2837864457588436
 
-  - name: pose 10 - center 
+  - name: pose 11 - center 
     positions:
       shoulder_pan: -0.0046019423636569235
       shoulder_lift: 0.5338253141842031

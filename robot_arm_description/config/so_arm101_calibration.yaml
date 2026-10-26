@@ -20,7 +20,7 @@ joints:
     range_min: 852
     range_max: 3157
     p_coefficient: 16
-    i_coefficient: 0
+    i_coefficient: 2
     d_coefficient: 32
     return_delay_time: 0
     acceleration: 254
@@ -31,7 +31,7 @@ joints:
     range_min: 853
     range_max: 2950
     p_coefficient: 16
-    i_coefficient: 0
+    i_coefficient: 2
     d_coefficient: 32
     return_delay_time: 0
     acceleration: 254
