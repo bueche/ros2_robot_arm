@@ -453,7 +453,7 @@
   <joint name="cup_plate_joint" type="fixed">
     <parent link="cup_handle_link"/>
     <child link="cup_plate_link"/>
-    <origin xyz="0 0 0.02" rpy="0 0 1.5708"/>
+    <origin xyz="0 0 0.02" rpy="0 0 -1.5708"/>
   </joint>
 
   <link name="cup_plate_link">
