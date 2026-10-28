@@ -704,12 +704,16 @@ class BallBalanceNode(Node):
             self.get_logger().warn(
                 f'CAM LAG: {cam_age_ms:.0f}ms since last ball position',
                 throttle_duration_sec=1.0)
-        if imu_age_ms > 60:    # >3 frames at 50Hz
+        # The IMU only feeds the control law when d_term_source='imu' (and use_imu);
+        # with 'joints' an absent IMU is expected, so don't warn about it.
+        imu_in_use = (self.get_parameter('d_term_source').value == 'imu' and
+                      self.get_parameter('use_imu').value)
+        if imu_in_use and imu_age_ms > 60:    # >3 frames at 50Hz
             self.get_logger().warn(
                 f'IMU LAG: {imu_age_ms:.0f}ms since last IMU reading',
                 throttle_duration_sec=1.0)
         imu_raw_age_ms = (now - imu_raw_time) * 1000 if imu_raw_time else 9999.0
-        if imu_raw_age_ms > 60:
+        if imu_in_use and imu_raw_age_ms > 60:
             self.get_logger().warn(
                 f'IMU RAW LAG: {imu_raw_age_ms:.0f}ms since last /imu/raw',
                 throttle_duration_sec=1.0)
@@ -847,7 +851,7 @@ class BallBalanceNode(Node):
                             now - wrist_vel_time < imu_timeout)
             d_flex = wrist_flex_vel if joints_fresh else 0.0
             d_roll = wrist_roll_vel if joints_fresh else 0.0
-            if not joints_fresh and use_imu:
+            if not joints_fresh:
                 self.get_logger().warn(
                     'wrist_velocity stale — D-term zeroed. '
                     'Is wrist_balance_controller_v25+ running?',

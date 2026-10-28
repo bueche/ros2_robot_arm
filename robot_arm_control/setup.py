@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+from glob import glob
+import os
 
 package_name = 'robot_arm_control'
 
@@ -9,6 +11,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
+        (os.path.join('share', package_name, 'config', 'balance'), glob('config/balance/*.yaml')),
         ('share/' + package_name, ['package.xml']),
     ],
     install_requires=['setuptools'],

@@ -194,3 +194,26 @@ def load_arm_profile(name_or_path: str) -> ArmProfile:
         programs=programs,
         urdf_path=urdf_path,
     )
+
+
+def load_urdf_joint_limits(urdf_path: str) -> Dict[str, tuple]:
+    """Revolute/prismatic joint limits from a URDF as {joint: (min, max)} in rad.
+
+    URDF lower/upper are taken as an unordered pair (some URDFs in this
+    workspace list them in physical-direction order, e.g. lower > upper).
+    """
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.parse(urdf_path).getroot()
+    except (OSError, ET.ParseError) as e:
+        raise ProfileError(f"could not read URDF {urdf_path}: {e}")
+    limits = {}
+    for joint in root.findall('joint'):
+        if joint.get('type') not in ('revolute', 'prismatic'):
+            continue
+        lim = joint.find('limit')
+        if lim is None or lim.get('lower') is None or lim.get('upper') is None:
+            continue
+        lo, hi = float(lim.get('lower')), float(lim.get('upper'))
+        limits[joint.get('name')] = (min(lo, hi), max(lo, hi))
+    return limits

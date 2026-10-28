@@ -1,0 +1,38 @@
+# Balance tuning for the Koch v1.1 (Dynamixel). Hardware facts (controller,
+# URDF, joint limits) come from the arm profile; this file is tuning only.
+#
+#   ros2 run robot_arm_control ball_balance_node --ros-args \
+#     --params-file <share>/config/balance/koch_v1_1.yaml
+#   ros2 run robot_arm_control wrist_balance_controller --ros-args \
+#     --params-file <share>/config/balance/koch_v1_1.yaml
+#
+# Add -p name:=value after --params-file to try a value for one run.
+
+ball_balance_node:
+  ros__parameters:
+    kp_flex: 0.15
+    kp_roll: 0.15
+    ki_flex: 0.20
+    ki_roll: 0.05
+    kd_flex: 0.05
+    kd_roll: 0.05
+    ki_mode: servo
+    d_term_source: joints
+    use_imu: true             # IMU present; with d_term_source=joints it only feeds diagnostics
+    max_cmd: 0.3
+    antiwindup_decay: 0.2
+    attempt_timeout: 40.0
+    jiggle_start_delay: 1.0
+    jiggle_amplitude: 0.05
+    dry_run: false
+
+wrist_balance_controller:
+  ros__parameters:
+    arm_profile: koch_v1_1
+    correction_hz: 1.0
+    move_duration: 0.4
+    max_step_rad: 0.08
+    max_total_flex_rad: 0.80
+    max_total_roll_rad: 0.55
+    flex_scale: 1.0
+    roll_scale: 1.0

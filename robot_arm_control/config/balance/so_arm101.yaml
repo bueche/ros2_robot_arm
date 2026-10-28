@@ -1,0 +1,41 @@
+# Balance tuning for the SO-ARM101 (Feetech STS3215). Hardware facts (controller,
+# URDF, joint limits) come from the arm profile; this file is tuning only.
+#
+#   ros2 run robot_arm_control ball_balance_node --ros-args \
+#     --params-file <share>/config/balance/so_arm101.yaml
+#   ros2 run robot_arm_control wrist_balance_controller --ros-args \
+#     --params-file <share>/config/balance/so_arm101.yaml
+#
+# Add -p name:=value after --params-file to try a value for one run.
+#
+# Gains and step settings are the Koch values as a starting point; retune on
+# this arm (different servo position loop, wrist geometry and axis directions).
+
+ball_balance_node:
+  ros__parameters:
+    kp_flex: 0.15
+    kp_roll: 0.15
+    ki_flex: 0.20
+    ki_roll: 0.05
+    kd_flex: 0.05
+    kd_roll: 0.05
+    ki_mode: servo
+    d_term_source: joints
+    use_imu: false            # no IMU on this arm
+    max_cmd: 0.3
+    antiwindup_decay: 0.2
+    attempt_timeout: 40.0
+    jiggle_start_delay: 1.0
+    jiggle_amplitude: 0.05
+    dry_run: false
+
+wrist_balance_controller:
+  ros__parameters:
+    arm_profile: so_arm101
+    correction_hz: 1.0
+    move_duration: 0.4
+    max_step_rad: 0.08
+    max_total_flex_rad: 0.80
+    max_total_roll_rad: 0.55
+    flex_scale: 1.0           # set to -1.0 if the sign check shows this axis is reversed
+    roll_scale: 1.0           # likewise

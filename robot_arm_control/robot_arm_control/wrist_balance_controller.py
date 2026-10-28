@@ -11,6 +11,9 @@ Key safety design:
   - move_duration=0.3s: 300ms to reach each target
 
 Parameters:
+  arm_profile        Arm profile (koch_v1_1, so_arm101, or path) default: koch_v1_1
+                     Supplies the trajectory topic and, unless overridden
+                     below, the wrist joint limits (from the profile's URDF).
   enabled            Master enable                           default: True
   dry_run            Log only, don't publish                 default: False
   correction_hz      Correction rate (Hz)                    default: 2.0
@@ -22,10 +25,14 @@ Parameters:
   wrist_roll_joint   Roll joint name                         default: wrist_roll
   flex_scale         Flex correction scale                   default: 1.0
   roll_scale         Roll correction scale                   default: 1.0
-  flex_min_rad       Flex hard minimum                       default: 0.297
-  flex_max_rad       Flex hard maximum                       default: 2.700
-  roll_min_rad       Roll hard minimum                       default: -1.448
-  roll_max_rad       Roll hard maximum                       default: 1.900
+  flex_min_rad       Flex hard minimum      default: NaN = URDF limit (Koch: 0.297)
+  flex_max_rad       Flex hard maximum      default: NaN = URDF limit (Koch: 2.700)
+  roll_min_rad       Roll hard minimum      default: NaN = URDF limit (Koch: -1.448)
+  roll_max_rad       Roll hard maximum      default: NaN = URDF limit (Koch: 1.900)
+
+Limits are enforced without jumps: a target is never more than max_step_rad from
+the current position, never farther than max_total_*_rad from the start pose, and
+never pushed further outside the hard limits if the joint already starts outside.
 
 Publishes:
   /balance/wrist_velocity (Vector3) — x=d(wrist_flex)/dt, y=d(wrist_roll)/dt (rad/s)
@@ -48,6 +55,8 @@ from std_msgs.msg import Bool, String
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
+from robot_arm_control.arm_profile import load_arm_profile, load_urdf_joint_limits
+
 
 class WristBalanceController(Node):
 
@@ -55,6 +64,7 @@ class WristBalanceController(Node):
         super().__init__('wrist_balance_controller')
 
         # Parameters
+        self.declare_parameter('arm_profile',      'koch_v1_1')
         self.declare_parameter('enabled',          True)
         self.declare_parameter('dry_run',          False)
         self.declare_parameter('correction_hz',    2.0)
@@ -68,10 +78,13 @@ class WristBalanceController(Node):
         self.declare_parameter('wrist_roll_joint', 'wrist_roll')
         self.declare_parameter('flex_scale',       1.0)
         self.declare_parameter('roll_scale',       1.0)
-        self.declare_parameter('flex_min_rad',     0.297)
-        self.declare_parameter('flex_max_rad',     2.700)
-        self.declare_parameter('roll_min_rad',    -1.448)
-        self.declare_parameter('roll_max_rad',     1.900)
+        # NaN = take the limit from the arm profile's URDF
+        self.declare_parameter('flex_min_rad',     float('nan'))
+        self.declare_parameter('flex_max_rad',     float('nan'))
+        self.declare_parameter('roll_min_rad',     float('nan'))
+        self.declare_parameter('roll_max_rad',     float('nan'))
+
+        self._profile = load_arm_profile(self.get_parameter('arm_profile').value)
 
         # Cache hot-loop parameters
         self._p_enabled     = self.get_parameter('enabled').value
@@ -89,10 +102,23 @@ class WristBalanceController(Node):
         self._p_roll_joint  = self.get_parameter('wrist_roll_joint').value
         self._p_flex_scale  = self.get_parameter('flex_scale').value
         self._p_roll_scale  = self.get_parameter('roll_scale').value
-        self._p_flex_min    = self.get_parameter('flex_min_rad').value
-        self._p_flex_max    = self.get_parameter('flex_max_rad').value
-        self._p_roll_min    = self.get_parameter('roll_min_rad').value
-        self._p_roll_max    = self.get_parameter('roll_max_rad').value
+        urdf_limits = (load_urdf_joint_limits(self._profile.urdf_path)
+                       if self._profile.urdf_path else {})
+
+        def limit(param, joint, idx):
+            v = self.get_parameter(param).value
+            if not math.isnan(v):
+                return v
+            if joint not in urdf_limits:
+                raise RuntimeError(
+                    f"{param} not set and joint '{joint}' has no <limit> in "
+                    f"{self._profile.urdf_path}")
+            return urdf_limits[joint][idx]
+
+        self._p_flex_min    = limit('flex_min_rad', self._p_flex_joint, 0)
+        self._p_flex_max    = limit('flex_max_rad', self._p_flex_joint, 1)
+        self._p_roll_min    = limit('roll_min_rad', self._p_roll_joint, 0)
+        self._p_roll_max    = limit('roll_max_rad', self._p_roll_joint, 1)
 
         # State
         self._lock            = threading.Lock()
@@ -126,7 +152,7 @@ class WristBalanceController(Node):
         # Publishers
         self._traj_pub = self.create_publisher(
             JointTrajectory,
-            '/koch_v11_controller/joint_trajectory',
+            self._profile.trajectory_topic,
             10)
         self._pub_intended = self.create_publisher(
             String, '/balance/intended_action', 10)
@@ -161,6 +187,12 @@ class WristBalanceController(Node):
             1.0 / self._p_corr_hz, self._control_loop)
 
         self.get_logger().info('Wrist balance controller started.')
+        self.get_logger().info(
+            f'Arm profile: {self._profile.name}  '
+            f'trajectory topic: {self._profile.trajectory_topic}')
+        self.get_logger().info(
+            f'Hard limits: flex [{self._p_flex_min:+.3f}, {self._p_flex_max:+.3f}]  '
+            f'roll [{self._p_roll_min:+.3f}, {self._p_roll_max:+.3f}] rad')
         self.get_logger().info(
             f'Joints: {self._p_flex_joint} (pitch), {self._p_roll_joint} (roll)')
         self.get_logger().info(
@@ -291,46 +323,45 @@ class WristBalanceController(Node):
         if abs(flex_delta) < 1e-4 and abs(roll_delta) < 1e-4:
             return
 
-        # Total displacement limit
-        projected_flex = self._total_flex + flex_delta
-        projected_roll = self._total_roll + roll_delta
+        # Target = current position + step, then limited by position, not by a
+        # running sum: within max_total of the start pose (so moving back toward
+        # the start is always allowed), and within the hard limits without ever
+        # jumping -- if the joint is already outside a hard limit, the target may
+        # move back toward the range but never further out, and never by more
+        # than the step already computed above.
+        def no_jump_clamp(cur, target, lo, hi):
+            # Clamp to [lo, hi] but never move further outside it than cur already is.
+            target = min(target, max(cur, hi))
+            return max(target, min(cur, lo))
 
-        if abs(projected_flex) > self._p_max_total_flex:
-            remaining = self._p_max_total_flex - abs(self._total_flex)
-            flex_delta = math.copysign(max(0.0, remaining), flex_delta)
-            self.get_logger().warn(
-                f'Flex total limit reached '
-                f'({math.degrees(self._total_flex):+.1f}deg '
-                f'limit={math.degrees(self._p_max_total_flex):.1f}deg) — clamping',
-                throttle_duration_sec=2.0)
+        def limited(cur, delta, start, max_total, lo, hi, name):
+            target = cur + delta
+            t_lo, t_hi = start - max_total, start + max_total
+            if not t_lo <= target <= t_hi:
+                self.get_logger().warn(
+                    f'{name} total limit reached '
+                    f'({math.degrees(target - start):+.1f}deg '
+                    f'limit={math.degrees(max_total):.1f}deg) — clamping',
+                    throttle_duration_sec=2.0)
+            target = no_jump_clamp(cur, target, t_lo, t_hi)
+            return no_jump_clamp(cur, target, lo, hi)
 
-        if abs(projected_roll) > self._p_max_total_roll:
-            remaining = self._p_max_total_roll - abs(self._total_roll)
-            roll_delta = math.copysign(max(0.0, remaining), roll_delta)
-            self.get_logger().warn(
-                f'Roll total limit reached '
-                f'({math.degrees(self._total_roll):+.1f}deg '
-                f'limit={math.degrees(self._p_max_total_roll):.1f}deg) — clamping',
-                throttle_duration_sec=2.0)
-
-        if abs(flex_delta) < 1e-4 and abs(roll_delta) < 1e-4:
-            self.get_logger().warn(
-                'Both axes at total limit', throttle_duration_sec=2.0)
-            return
-
-        # Target positions
-        new_flex = max(self._p_flex_min,
-                       min(self._p_flex_max,
-                           joint_pos[fj] + flex_delta))
-        new_roll = max(self._p_roll_min,
-                       min(self._p_roll_max,
-                           joint_pos[rj] + roll_delta))
+        new_flex = limited(joint_pos[fj], flex_delta, self._start_flex,
+                           self._p_max_total_flex, self._p_flex_min, self._p_flex_max, 'Flex')
+        new_roll = limited(joint_pos[rj], roll_delta, self._start_roll,
+                           self._p_max_total_roll, self._p_roll_min, self._p_roll_max, 'Roll')
 
         actual_flex_delta = new_flex - joint_pos[fj]
         actual_roll_delta = new_roll - joint_pos[rj]
 
-        self._total_flex += actual_flex_delta
-        self._total_roll += actual_roll_delta
+        if abs(actual_flex_delta) < 1e-4 and abs(actual_roll_delta) < 1e-4:
+            self.get_logger().warn(
+                'Both axes at a limit', throttle_duration_sec=2.0)
+            return
+
+        # Displacement from the start pose (reported on DISABLE and in CORR logs)
+        self._total_flex = new_flex - self._start_flex
+        self._total_roll = new_roll - self._start_roll
 
         # Store current targets for next step's true achievement calculation.
         # Also publish /balance/cmd_delta so ball_balance_node knows what was
