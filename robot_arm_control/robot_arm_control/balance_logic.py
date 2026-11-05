@@ -13,6 +13,10 @@ class WristAxis:
     'start' is the joint position when balancing was enabled. 'prev_target' and
     'prev_delta' describe the previous CORR step (joint units, rad): its target
     and how far that target was from the joint when it was sent.
+
+    achieved() and commanded() report in command units (joint delta / scale),
+    the units of ball_balance_node's commands, so that its servo integral of
+    commanded - achieved has the sign of the command whatever the scale.
     """
 
     def __init__(self, scale: float = 1.0):
@@ -37,15 +41,18 @@ class WristAxis:
         """True once a CORR step has been recorded."""
         return self.prev_delta is not None
 
+    def _to_command(self, joint_delta: float) -> float:
+        return joint_delta / self.scale if self.scale != 0.0 else 0.0
+
     def achieved(self, position: float) -> float:
-        """How far the joint has moved since the previous step was sent (rad)."""
+        """How far the joint has moved since the previous step was sent (command units)."""
         if self.prev_target is None or abs(self.prev_delta) <= 1e-4:
             return 0.0
-        return position - (self.prev_target - self.prev_delta)
+        return self._to_command(position - (self.prev_target - self.prev_delta))
 
     def commanded(self) -> float:
-        """The previous step's commanded delta (rad); 0.0 before the first step."""
-        return self.prev_delta if self.prev_delta is not None else 0.0
+        """The previous step's delta (command units); 0.0 before the first step."""
+        return self._to_command(self.prev_delta) if self.prev_delta is not None else 0.0
 
     def record(self, target: float, position: float) -> float:
         """Record a step sent from 'position' to 'target'; returns the joint delta."""

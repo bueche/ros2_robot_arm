@@ -35,6 +35,10 @@ the current position, never farther than max_total_*_rad from the start pose, an
 never pushed further outside the hard limits if the joint already starts outside.
 
 Publishes:
+  /balance/cmd_delta      (Vector3) — x=flex, y=roll: previous step's delta
+  /balance/achieved_delta (Vector3) — x=flex, y=roll: how far the joint moved since
+    Both in command units (joint delta / flex_scale or roll_scale), the units of
+    /imu/balance_cmd, so commanded - achieved has the sign of the command.
   /balance/wrist_velocity (Vector3) — x=d(wrist_flex)/dt, y=d(wrist_roll)/dt (rad/s)
     Finite difference at joint_states rate (~100Hz).
     Use as D-term source in ball_balance_node (d_term_source:=joints) instead
