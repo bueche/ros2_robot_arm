@@ -22,8 +22,15 @@ class WristAxis:
         self.prev_delta: Optional[float] = None
 
     def begin(self, position: Optional[float]):
-        """Start a balance session at joint position 'position'."""
+        """Start a balance session at joint position 'position'.
+
+        Forgets the previous session's last step: the arm has usually moved
+        to a new pose since, so measuring against that step would report the
+        whole pose change as 'achieved'.
+        """
         self.start = position
+        self.prev_target = None
+        self.prev_delta = None
 
     @property
     def has_step(self) -> bool:
