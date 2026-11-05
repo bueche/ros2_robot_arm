@@ -101,6 +101,8 @@ from geometry_msgs.msg import Point, Vector3
 from sensor_msgs.msg import Imu, JointState
 from std_msgs.msg import Bool, String
 
+from robot_arm_control.balance_logic import ball_lost_duration
+
 
 class BallBalanceNode(Node):
 
@@ -498,6 +500,9 @@ class BallBalanceNode(Node):
                 self._settled_at           = None
                 self._pid_started_at       = None
                 self._last_valid_ball_time = None
+                # Forget the previous pose's ball position: until the detector
+                # finds the ball again, there is no position to control on.
+                self._ball_pos             = None
                 self._integral_flex        = 0.0
                 self._integral_roll        = 0.0
                 self._integral_flex_servo  = 0.0
@@ -599,7 +604,7 @@ class BallBalanceNode(Node):
 
         # Camera freshness check
         cam_timeout = self.get_parameter('camera_timeout').value
-        if ball_pos is None or ball_time is None:
+        if ball_time is None:
             self.get_logger().warn(
                 'No camera data yet — waiting.',
                 throttle_duration_sec=5.0)
@@ -621,9 +626,8 @@ class BallBalanceNode(Node):
         ball_lost_timeout  = self.get_parameter('ball_lost_timeout').value
         jiggle_amplitude   = self.get_parameter('jiggle_amplitude').value
         jiggle_start_delay = self.get_parameter('jiggle_start_delay').value
-        if (self._last_valid_ball_time is not None and
-                now - self._last_valid_ball_time > ball_lost_timeout):
-            lost_duration = now - self._last_valid_ball_time
+        lost_duration = ball_lost_duration(now, self._last_valid_ball_time, self._pid_started_at)
+        if lost_duration is not None and lost_duration > ball_lost_timeout:
             self.get_logger().warn(
                 f'Ball lost for {lost_duration:.1f}s '
                 f'(>{ball_lost_timeout:.1f}s) — suspending PID.',
@@ -695,6 +699,11 @@ class BallBalanceNode(Node):
             self.get_logger().warn(
                 f'Attempt timeout ({attempt_timeout:.0f}s) — '
                 f'PID suspended. Waiting for next SETTLED transition.')
+            return
+
+        # No detection yet in this attempt (ball_pos is cleared on MOVING);
+        # the ball-lost check above takes over after ball_lost_timeout.
+        if ball_pos is None:
             return
 
         # Latency monitoring — time since each message arrived
