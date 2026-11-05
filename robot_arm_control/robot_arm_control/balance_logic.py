@@ -27,8 +27,12 @@ class WristAxis:
 
     def begin(self, position: Optional[float]):
         """Start a balance session at joint position 'position'.
+        The pose_test  executes a step pose sequence. Between each pose the 
+        pid controller kicks in to balance the ball. Each step is assumed to be 
+        independent of the last step and balance attempt. It starts fresh at every
+        new step. 
 
-        Forgets the previous session's last step: the arm has usually moved
+        The begin method forgets the previous session's last step: the arm has usually moved
         to a new pose since, so measuring against that step would report the
         whole pose change as 'achieved'.
         """
@@ -65,9 +69,15 @@ def ball_lost_duration(now: float, last_valid_ball_time: Optional[float],
                        pid_started_at: Optional[float]) -> Optional[float]:
     """Seconds the ball has been missing in the current attempt, or None if unknown.
 
-    Measured from the last valid detection, or from the start of the attempt
-    if the ball has not been detected since (last_valid_ball_time is cleared
-    on every arm move, so a ball never found after a move still times out).
+    The PID controller depends on the vision model. Sometimes the ball might not
+    be detected (due to lighting, occlusion, etc.). There is logic to try to jiggle
+    the ball so that it reappears but it could be that the ball is lost all the way 
+    to the end of the attempt period. 
+    
+    This function returns the duration of time since 
+    the ball was last detected. Measured from the last valid detection, or from 
+    the start of the attempt if the ball has not been detected since (last_valid_ball_time 
+    is cleared on every arm move, so a ball never found after a move still times out).
     """
     ref = last_valid_ball_time if last_valid_ball_time is not None else pid_started_at
     if ref is None:
