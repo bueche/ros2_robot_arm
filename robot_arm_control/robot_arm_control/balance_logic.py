@@ -63,7 +63,13 @@ class WristAxis:
 
 def ball_lost_duration(now: float, last_valid_ball_time: Optional[float],
                        pid_started_at: Optional[float]) -> Optional[float]:
-    """Seconds the ball has been missing in the current attempt, or None if unknown."""
-    if last_valid_ball_time is None:
+    """Seconds the ball has been missing in the current attempt, or None if unknown.
+
+    Measured from the last valid detection, or from the start of the attempt
+    if the ball has not been detected since (last_valid_ball_time is cleared
+    on every arm move, so a ball never found after a move still times out).
+    """
+    ref = last_valid_ball_time if last_valid_ball_time is not None else pid_started_at
+    if ref is None:
         return None
-    return now - last_valid_ball_time
+    return now - ref
