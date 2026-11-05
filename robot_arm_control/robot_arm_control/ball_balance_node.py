@@ -101,6 +101,8 @@ from geometry_msgs.msg import Point, Vector3
 from sensor_msgs.msg import Imu, JointState
 from std_msgs.msg import Bool, String
 
+from robot_arm_control.balance_logic import ball_lost_duration
+
 
 class BallBalanceNode(Node):
 
@@ -621,9 +623,8 @@ class BallBalanceNode(Node):
         ball_lost_timeout  = self.get_parameter('ball_lost_timeout').value
         jiggle_amplitude   = self.get_parameter('jiggle_amplitude').value
         jiggle_start_delay = self.get_parameter('jiggle_start_delay').value
-        if (self._last_valid_ball_time is not None and
-                now - self._last_valid_ball_time > ball_lost_timeout):
-            lost_duration = now - self._last_valid_ball_time
+        lost_duration = ball_lost_duration(now, self._last_valid_ball_time, self._pid_started_at)
+        if lost_duration is not None and lost_duration > ball_lost_timeout:
             self.get_logger().warn(
                 f'Ball lost for {lost_duration:.1f}s '
                 f'(>{ball_lost_timeout:.1f}s) — suspending PID.',

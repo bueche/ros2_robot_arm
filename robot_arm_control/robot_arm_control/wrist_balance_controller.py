@@ -56,6 +56,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
 from robot_arm_control.arm_profile import load_arm_profile, load_urdf_joint_limits
+from robot_arm_control.balance_logic import WristAxis
 
 
 class WristBalanceController(Node):
@@ -128,15 +129,12 @@ class WristBalanceController(Node):
         self._balance_active  = False
 
         # Displacement tracking — reset each time balance activates
-        self._start_flex  = None
-        self._start_roll  = None
         self._total_flex  = 0.0
         self._total_roll  = 0.0
 
-        self._prev_target_flex = None  # target set by previous CORR step
-        self._prev_target_roll = None
-        self._prev_cmd_flex    = None  # commanded delta for previous step
-        self._prev_cmd_roll    = None
+        # Per-axis start pose and previous CORR step (see balance_logic.WristAxis)
+        self._flex = WristAxis(self._p_flex_scale)
+        self._roll = WristAxis(self._p_roll_scale)
 
         # Finite difference state for /balance/wrist_velocity
         # Provides d(wrist_flex_pos)/dt and d(wrist_roll_pos)/dt at joint_states rate.
@@ -250,15 +248,13 @@ class WristBalanceController(Node):
         if msg.data:
             # Record starting pose
             with self._lock:
-                self._start_flex = self._joint_positions.get(
-                    self._p_flex_joint)
-                self._start_roll = self._joint_positions.get(
-                    self._p_roll_joint)
+                self._flex.begin(self._joint_positions.get(self._p_flex_joint))
+                self._roll.begin(self._joint_positions.get(self._p_roll_joint))
             self._total_flex = 0.0
             self._total_roll = 0.0
             self.get_logger().info(
-                f'Start pose: flex={self._start_flex:.4f}  '
-                f'roll={self._start_roll:.4f}')
+                f'Start pose: flex={self._flex.start:.4f}  '
+                f'roll={self._roll.start:.4f}')
         else:
             self.get_logger().info(
                 f'Total displacement: '
@@ -298,17 +294,11 @@ class WristBalanceController(Node):
         # Compute true achievement for /balance/achieved_delta so ball_balance_node
         # can update its ki_mode=servo integral and achievement EMA.
         # True achievement = how far servo actually moved since previous target was set.
-        if self._prev_target_flex is not None and abs(self._prev_cmd_flex) > 1e-4:
-            true_achieved_f = joint_pos[fj] - (self._prev_target_flex - self._prev_cmd_flex)
-        else:
-            true_achieved_f = 0.0
-        if self._prev_target_roll is not None and abs(self._prev_cmd_roll) > 1e-4:
-            true_achieved_r = joint_pos[rj] - (self._prev_target_roll - self._prev_cmd_roll)
-        else:
-            true_achieved_r = 0.0
+        true_achieved_f = self._flex.achieved(joint_pos[fj])
+        true_achieved_r = self._roll.achieved(joint_pos[rj])
 
         # Publish achieved_delta so ball_balance_node can track servo delivery.
-        if self._prev_cmd_flex is not None or self._prev_cmd_roll is not None:
+        if self._flex.has_step or self._roll.has_step:
             ach_msg = Vector3()
             ach_msg.x = float(true_achieved_f)
             ach_msg.y = float(true_achieved_r)
@@ -346,9 +336,9 @@ class WristBalanceController(Node):
             target = no_jump_clamp(cur, target, t_lo, t_hi)
             return no_jump_clamp(cur, target, lo, hi)
 
-        new_flex = limited(joint_pos[fj], flex_delta, self._start_flex,
+        new_flex = limited(joint_pos[fj], flex_delta, self._flex.start,
                            self._p_max_total_flex, self._p_flex_min, self._p_flex_max, 'Flex')
-        new_roll = limited(joint_pos[rj], roll_delta, self._start_roll,
+        new_roll = limited(joint_pos[rj], roll_delta, self._roll.start,
                            self._p_max_total_roll, self._p_roll_min, self._p_roll_max, 'Roll')
 
         actual_flex_delta = new_flex - joint_pos[fj]
@@ -360,20 +350,18 @@ class WristBalanceController(Node):
             return
 
         # Displacement from the start pose (reported on DISABLE and in CORR logs)
-        self._total_flex = new_flex - self._start_flex
-        self._total_roll = new_roll - self._start_roll
+        self._total_flex = new_flex - self._flex.start
+        self._total_roll = new_roll - self._roll.start
 
         # Store current targets for next step's true achievement calculation.
         # Also publish /balance/cmd_delta so ball_balance_node knows what was
         # commanded this step (needed to compute undelivered delta next step).
-        self._prev_target_flex = new_flex
-        self._prev_target_roll = new_roll
-        self._prev_cmd_flex    = actual_flex_delta
-        self._prev_cmd_roll    = actual_roll_delta
+        self._flex.record(new_flex, joint_pos[fj])
+        self._roll.record(new_roll, joint_pos[rj])
 
         cmd_msg = Vector3()
-        cmd_msg.x = float(actual_flex_delta)
-        cmd_msg.y = float(actual_roll_delta)
+        cmd_msg.x = float(self._flex.commanded())
+        cmd_msg.y = float(self._roll.commanded())
         self._pub_cmd_delta.publish(cmd_msg)
 
         self.get_logger().info(
