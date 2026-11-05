@@ -137,3 +137,13 @@ ros2 run balance ball_detector_nvidia   --ros-args   -p engine_path:=/home/ubunt
 ros2 run robot_arm_control ball_balance_node --ros-args \
   -p dry_run:=true \
   -p attempt_timeout:=7.0 
+
+
+ffmpeg -i test.video.060426.t3.cv3.gif -vf "select='between(n\,768\,1030)',setpts=N/FRAME_RATE/TB,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" pose5.and.pid.gif
+
+P=$(ros2 pkg prefix robot_arm_control)/share/robot_arm_control/config/balance/so_arm101.yaml
+ros2 run robot_arm_control wrist_balance_controller --ros-args --params-file $P
+
+ros2 run robot_arm_control ball_balance_node --ros-args --params-file $P
+
+

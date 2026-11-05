@@ -10,6 +10,11 @@ import re, sys, math, argparse
 from dataclasses import dataclass, field
 from typing import Optional, List, Tuple
 
+# Joint positions are signed (the SO-ARM101 wrist runs at negative flex).
+NUM      = r'[+-]?\d+\.\d+'
+# Any ball detector node (ball_detector_nvidia, ball_detector_oak, ...).
+DETECTOR = r'ball_detector_\w+'
+
 RE_CMD          = re.compile(r'\[(\d+\.\d+)\] \[ball_balance_node\]: CMD \| ball=\(([+-]?\d+\.\d+),([+-]?\d+\.\d+)\).*?stable=(True|False)')
 RE_PID_ACTIVE   = re.compile(r'\[(\d+\.\d+)\] \[ball_balance_node\]: PID active')
 RE_BALL_LOST    = re.compile(r'\[(\d+\.\d+)\] \[ball_balance_node\]: Ball lost for [\d.]+s')
@@ -17,12 +22,12 @@ RE_BALL_CENTERED= re.compile(r'\[(\d+\.\d+)\] \[ball_balance_node\]: Ball center
 RE_POSE_SENT    = re.compile(r'\[(\d+\.\d+)\] \[pose_test_node\]: → Sent: (.+)')
 RE_SETTLED      = re.compile(r'\[(\d+\.\d+)\] \[ball_balance_node\]: Arm state → SETTLED')
 RE_MOVING       = re.compile(r'\[(\d+\.\d+)\] \[ball_balance_node\]: Arm state → MOVING')
-RE_CORR         = re.compile(r'\[(\d+\.\d+)\] \[wrist_balance_controller\]: CORR \| flex ([\d.]+)→([\d.]+) \(Δ([+-][\d.]+)deg\)  roll ([\d.]+)→([\d.]+) \(Δ([+-][\d.]+)deg\)')
+RE_CORR         = re.compile(r'\[(\d+\.\d+)\] \[wrist_balance_controller\]: CORR \| flex (' + NUM + r')→(' + NUM + r') \(Δ([+-][\d.]+)deg\)  roll (' + NUM + r')→(' + NUM + r') \(Δ([+-][\d.]+)deg\)')
 RE_DISABLED     = re.compile(r'\[(\d+\.\d+)\] \[wrist_balance_controller\]: Balance DISABLED')
-RE_SUB_THRESH   = re.compile(r'\[(\d+\.\d+)\] \[ball_detector_nvidia\]: Ball detected sub-threshold: conf=([\d.]+)')
-RE_CONTAINMENT  = re.compile(r'\[(\d+\.\d+)\] \[ball_detector_nvidia\]: Ball outside cup')
+RE_SUB_THRESH   = re.compile(r'\[(\d+\.\d+)\] \[' + DETECTOR + r'\]: Ball detected sub-threshold: conf=([\d.]+)')
+RE_CONTAINMENT  = re.compile(r'\[(\d+\.\d+)\] \[' + DETECTOR + r'\]: Ball outside cup')
 RE_ATTEMPT_TO   = re.compile(r'\[(\d+\.\d+)\] \[ball_balance_node\]: Attempt timeout')
-RE_NO_BALL      = re.compile(r'\[(\d+\.\d+)\] \[ball_detector_nvidia\]: Cup.*?found but NO BALL')
+RE_NO_BALL      = re.compile(r'\[(\d+\.\d+)\] \[' + DETECTOR + r'\]: Cup.*?found but NO BALL')
 RE_SUMMARY      = re.compile(
     r'\[(\d+\.\d+)\] \[ball_balance_node\]: PID_SUMMARY \| '
     r'frames=(\d+)/(\d+).*?'

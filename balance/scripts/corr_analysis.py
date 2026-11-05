@@ -26,15 +26,18 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 
+# Joint positions are signed (the SO-ARM101 wrist runs at negative flex).
+NUM = r'[+-]?\d+\.\d+'
+
 RE_ENABLED = re.compile(
     r'\[(\d+\.\d+)\] \[wrist_balance_controller\]: Balance ENABLED')
 RE_START   = re.compile(
     r'\[(\d+\.\d+)\] \[wrist_balance_controller\]: Start pose: '
-    r'flex=([\d.]+)\s+roll=([\d.]+)')
+    r'flex=(' + NUM + r')\s+roll=(' + NUM + r')')
 RE_CORR    = re.compile(
     r'\[(\d+\.\d+)\] \[wrist_balance_controller\]: CORR \| '
-    r'flex ([\d.]+)→([\d.]+) \(Δ([+-][\d.]+)deg\)  '
-    r'roll ([\d.]+)→([\d.]+) \(Δ([+-][\d.]+)deg\)  '
+    r'flex (' + NUM + r')→(' + NUM + r') \(Δ([+-][\d.]+)deg\)  '
+    r'roll (' + NUM + r')→(' + NUM + r') \(Δ([+-][\d.]+)deg\)  '
     r'cumul: flex=([+-][\d.]+)deg roll=([+-][\d.]+)deg')
 RE_DISABLED= re.compile(
     r'\[(\d+\.\d+)\] \[wrist_balance_controller\]: Balance DISABLED')
@@ -136,7 +139,10 @@ def analyse_session(sess, max_steps):
 
     print(f'\n{"="*80}')
     print(f'  POSE : {sess.pose_name}')
-    print(f'  Start: flex={sess.start_flex:.4f} rad  roll={sess.start_roll:.4f} rad')
+    if sess.start_flex is not None and sess.start_roll is not None:
+        print(f'  Start: flex={sess.start_flex:.4f} rad  roll={sess.start_roll:.4f} rad')
+    else:
+        print('  Start: (no Start pose line found)')
     dur = (sess.disabled_t - sess.enabled_t) if sess.disabled_t else None
     print(f'  Duration: {f"{dur:.1f}s" if dur else "?"}  '
           f'  CORR steps: {n}')
