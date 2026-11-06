@@ -121,3 +121,17 @@ def pid_axis(error: float, integral: float, rate: float,
     d = -kd * rate
     cmd = max(-max_cmd, min(max_cmd, p + i + d))
     return AxisTerms(p, i, d, cmd)
+
+
+def servo_integral_step(integral: float, commanded: float, achieved: float,
+                        ki: float, windup_limit: float) -> float:
+    """Add one CORR step's undelivered wrist delta (commanded - achieved, command units).
+
+    Clamped so that ki * integral stays within windup_limit. ki <= 0 leaves
+    the integral unchanged.
+    """
+    if ki <= 0:
+        return integral
+    integral += commanded - achieved
+    limit = windup_limit / max(ki, 1e-6)
+    return max(-limit, min(limit, integral))

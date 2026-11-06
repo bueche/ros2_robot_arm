@@ -102,7 +102,8 @@ from sensor_msgs.msg import Imu, JointState
 from std_msgs.msg import Bool, String
 
 from robot_arm_control.balance_logic import (
-    apply_deadband, ball_lost_duration, crossed_center, error_sign, pid_axis)
+    apply_deadband, ball_lost_duration, crossed_center, error_sign, pid_axis,
+    servo_integral_step)
 
 
 class BallBalanceNode(Node):
@@ -397,13 +398,9 @@ class BallBalanceNode(Node):
                                               alpha * ratio_f)
                     self._flex_achievement = max(0.05, self._flex_achievement)
                     # servo ki — accumulate undelivered flex displacement
-                    if ki_flex > 0:
-                        undelivered_f = self._last_cmd_flex - msg.x  # signed gap
-                        self._integral_flex_servo += undelivered_f
-                        self._integral_flex_servo = max(
-                            -windup_lim / max(ki_flex, 1e-6),
-                            min(windup_lim / max(ki_flex, 1e-6),
-                                self._integral_flex_servo))
+                    self._integral_flex_servo = servo_integral_step(
+                        self._integral_flex_servo, self._last_cmd_flex, msg.x,
+                        ki_flex, windup_lim)
 
             if self._last_cmd_roll is not None:
                 cmd_r = abs(self._last_cmd_roll)
@@ -414,13 +411,9 @@ class BallBalanceNode(Node):
                                               alpha * ratio_r)
                     self._roll_achievement = max(0.05, self._roll_achievement)
                     # servo ki — accumulate undelivered roll displacement
-                    if ki_roll > 0:
-                        undelivered_r = self._last_cmd_roll - msg.y
-                        self._integral_roll_servo += undelivered_r
-                        self._integral_roll_servo = max(
-                            -windup_lim / max(ki_roll, 1e-6),
-                            min(windup_lim / max(ki_roll, 1e-6),
-                                self._integral_roll_servo))
+                    self._integral_roll_servo = servo_integral_step(
+                        self._integral_roll_servo, self._last_cmd_roll, msg.y,
+                        ki_roll, windup_lim)
 
     def _imu_raw_cb(self, msg: Imu):
         """Receive angular velocity from /imu/raw for true D-term.
