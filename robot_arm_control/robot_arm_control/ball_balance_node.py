@@ -101,7 +101,9 @@ from geometry_msgs.msg import Point, Vector3
 from sensor_msgs.msg import Imu, JointState
 from std_msgs.msg import Bool, String
 
-from robot_arm_control.balance_logic import ball_lost_duration
+from robot_arm_control.balance_logic import (
+    apply_deadband, ball_integral_step, ball_lost_duration, crossed_center, error_sign,
+    pid_axis, select_integrals)
 
 
 class BallBalanceNode(Node):
@@ -733,10 +735,8 @@ class BallBalanceNode(Node):
 
         # Apply deadband
         deadband = self.get_parameter('deadband').value
-        if abs(error_x) < deadband:
-            error_x = 0.0
-        if abs(error_y) < deadband:
-            error_y = 0.0
+        error_x = apply_deadband(error_x, deadband)
+        error_y = apply_deadband(error_y, deadband)
 
         # Magnitude for stability check
         magnitude = math.sqrt(error_x**2 + error_y**2)
@@ -778,57 +778,33 @@ class BallBalanceNode(Node):
             # Ball left stable zone — reset hold timer
             self._centered_since = None
 
-        if error_x == 0.0 and error_y == 0.0:
-            # Within deadband — reset integrals slowly
-            self._integral_flex *= 0.9
-            self._integral_roll *= 0.9
-            return
-
-        # dt for integral
-        if self._last_control_time is None:
-            dt = 0.0
-        else:
-            dt = now - self._last_control_time
-            dt = max(dt, 1e-3)
-        self._last_control_time = now
-
-        # Integral
+        # ki_mode='ball' integrals: decay inside the deadband, otherwise
+        # integrate the error and clamp (anti-windup hard limit)
         ki_flex = self.get_parameter('ki_flex').value
         ki_roll = self.get_parameter('ki_roll').value
         max_cmd = self.get_parameter('max_cmd').value
-
-        self._integral_flex += error_y * dt
-        self._integral_roll += error_x * dt
-
-        # Anti-windup clamp — hard magnitude limit
-        max_integral = max_cmd / max(ki_flex, 1e-6)
-        self._integral_flex = max(-max_integral,
-                                   min(max_integral, self._integral_flex))
-        self._integral_roll = max(-max_integral,
-                                   min(max_integral, self._integral_roll))
+        self._integral_flex, self._integral_roll, self._last_control_time = ball_integral_step(
+            self._integral_flex, self._integral_roll, self._last_control_time, now,
+            error_x, error_y, ki_flex, ki_roll, max_cmd)
+        if error_x == 0.0 and error_y == 0.0:
+            return  # within deadband
 
         # Anti-windup sign-change decay — when the ball crosses center on
         # either axis the accumulated I-term is now pushing the wrong way.
         # Decay it toward zero so the P-term can respond cleanly.
         # Applied to both ball-mode and servo-mode integrals independently.
         antiwindup_decay = self.get_parameter('antiwindup_decay').value
-        curr_y_sign = 1 if error_y > 0 else (-1 if error_y < 0 else 0)
-        curr_x_sign = 1 if error_x > 0 else (-1 if error_x < 0 else 0)
+        curr_y_sign = error_sign(error_y)
+        curr_x_sign = error_sign(error_x)
 
-        if (antiwindup_decay < 1.0 and
-                self._prev_error_y_sign is not None and
-                curr_y_sign != 0 and self._prev_error_y_sign != 0 and
-                curr_y_sign != self._prev_error_y_sign):
+        if antiwindup_decay < 1.0 and crossed_center(self._prev_error_y_sign, curr_y_sign):
             old_i = self._integral_flex_servo
             self._integral_flex       *= antiwindup_decay
             self._integral_flex_servo *= antiwindup_decay
             self.get_logger().info(
                 f'ANTI-WINDUP flex: error_y {self._prev_error_y_sign:+d}→{curr_y_sign:+d} '                f'i_flex {old_i:+.4f}→{self._integral_flex_servo:+.4f} '                f'(decay={antiwindup_decay})')
 
-        if (antiwindup_decay < 1.0 and
-                self._prev_error_x_sign is not None and
-                curr_x_sign != 0 and self._prev_error_x_sign != 0 and
-                curr_x_sign != self._prev_error_x_sign):
+        if antiwindup_decay < 1.0 and crossed_center(self._prev_error_x_sign, curr_x_sign):
             old_i = self._integral_roll_servo
             self._integral_roll       *= antiwindup_decay
             self._integral_roll_servo *= antiwindup_decay
@@ -877,23 +853,16 @@ class BallBalanceNode(Node):
         #   ball near  (+y) → flex back → +wrist_flex → flex_cmd positive
         # Select integral source based on ki_mode
         ki_mode = self.get_parameter('ki_mode').value
-        if ki_mode == 'servo':
-            i_flex = self._integral_flex_servo
-            i_roll = self._integral_roll_servo
-        else:  # 'ball', 'combined', 'none'
-            i_flex = self._integral_flex
-            i_roll = self._integral_roll
+        i_flex, i_roll = select_integrals(
+            ki_mode,
+            ball=(self._integral_flex, self._integral_roll),
+            servo=(self._integral_flex_servo, self._integral_roll_servo))
 
-        flex_cmd = (+kp_flex * error_y
-                    + ki_flex * i_flex
-                    - kd_flex * d_flex)   # MINUS: D-term opposes motion (damping)
-        roll_cmd = (+kp_roll * error_x
-                    + ki_roll * i_roll
-                    - kd_roll * d_roll)   # MINUS: D-term opposes motion (damping)
-
-        # Clamp
-        flex_cmd = max(-max_cmd, min(max_cmd, flex_cmd))
-        roll_cmd = max(-max_cmd, min(max_cmd, roll_cmd))
+        # P follows the error, D opposes motion (damping); clamped to max_cmd
+        flex = pid_axis(error_y, i_flex, d_flex, kp_flex, ki_flex, kd_flex, max_cmd)
+        roll = pid_axis(error_x, i_roll, d_roll, kp_roll, ki_roll, kd_roll, max_cmd)
+        flex_cmd = flex.cmd
+        roll_cmd = roll.cmd
 
         # Publish or log
         if self.get_parameter('dry_run').value:
@@ -914,20 +883,20 @@ class BallBalanceNode(Node):
         # Publish individual PID terms for pid_logger.
         # x=P_term, y=I_term, z=D_term — sum equals pre-clamp flex/roll cmd.
         pid_flex = Vector3()
-        pid_flex.x = +kp_flex * error_y          # P
-        pid_flex.y = +ki_flex * i_flex            # I
-        pid_flex.z = -kd_flex * d_flex            # D (negative = damping)
+        pid_flex.x = flex.p   # P
+        pid_flex.y = flex.i   # I
+        pid_flex.z = flex.d   # D (negative = damping)
         self._pub_pid_flex.publish(pid_flex)
 
         pid_roll = Vector3()
-        pid_roll.x = +kp_roll * error_x          # P
-        pid_roll.y = +ki_roll * i_roll            # I
-        pid_roll.z = -kd_roll * d_roll            # D
+        pid_roll.x = roll.p   # P
+        pid_roll.y = roll.i   # I
+        pid_roll.z = roll.d   # D
         self._pub_pid_roll.publish(pid_roll)
         self.get_logger().info(
             f'CMD | ball=({error_x:+.3f},{error_y:+.3f}) '
-            f'Pflex={+kp_flex*error_y:+.4f} Proll={+kp_roll*error_x:+.4f} '
-            f'Dflex={-kd_flex*d_flex:+.4f} Droll={-kd_roll*d_roll:+.4f} '
+            f'Pflex={flex.p:+.4f} Proll={roll.p:+.4f} '
+            f'Dflex={flex.d:+.4f} Droll={roll.d:+.4f} '
             f'→ flex={flex_cmd:+.4f} roll={roll_cmd:+.4f} '
             f'd_src={d_term_source} flex_rate={d_flex:+.4f}rad/s roll_rate={d_roll:+.4f}rad/s '
             f'ach_flex={self._flex_achievement:.2f} ach_roll={self._roll_achievement:.2f} '

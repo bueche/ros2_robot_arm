@@ -83,3 +83,69 @@ def ball_lost_duration(now: float, last_valid_ball_time: Optional[float],
     if ref is None:
         return None
     return now - ref
+
+
+# ball_balance_node control law
+#
+# Axis convention: flex is driven by the ball's y error, roll by its x error.
+
+def apply_deadband(error: float, deadband: float) -> float:
+    """Zero an error whose magnitude is below the deadband."""
+    return 0.0 if abs(error) < deadband else error
+
+
+def error_sign(error: float) -> int:
+    return 1 if error > 0 else (-1 if error < 0 else 0)
+
+
+def crossed_center(prev_sign: Optional[int], curr_sign: int) -> bool:
+    """True when the error changed sign since the previous control step."""
+    return (prev_sign is not None and prev_sign != 0 and curr_sign != 0
+            and curr_sign != prev_sign)
+
+
+def ball_integral_step(flex: float, roll: float, last_time: Optional[float], now: float,
+                       error_x: float, error_y: float,
+                       ki_flex: float, ki_roll: float, max_cmd: float):
+    """One control step of the ki_mode='ball' integrals.
+
+    Returns (flex, roll, last_time). Inside the deadband (both errors zero)
+    the integrals decay by 0.9; otherwise each integrates its error over the
+    time since the previous step and is clamped so that ki * integral stays
+    within max_cmd.
+    """
+    if error_x == 0.0 and error_y == 0.0:
+        return flex * 0.9, roll * 0.9, last_time
+    dt = 0.0 if last_time is None else max(now - last_time, 1e-3)
+    flex += error_y * dt
+    roll += error_x * dt
+    max_integral = max_cmd / max(ki_flex, 1e-6)
+    flex = max(-max_integral, min(max_integral, flex))
+    roll = max(-max_integral, min(max_integral, roll))
+    return flex, roll, now
+
+
+def select_integrals(ki_mode: str, ball: tuple, servo: tuple) -> tuple:
+    """(i_flex, i_roll) used by the control law for ki_mode."""
+    if ki_mode == 'servo':
+        return servo
+    return ball  # 'ball', 'combined', 'none'
+
+
+class AxisTerms:
+    """P, I and D contributions for one axis, and the clamped command."""
+
+    __slots__ = ('p', 'i', 'd', 'cmd')
+
+    def __init__(self, p: float, i: float, d: float, cmd: float):
+        self.p, self.i, self.d, self.cmd = p, i, d, cmd
+
+
+def pid_axis(error: float, integral: float, rate: float,
+             kp: float, ki: float, kd: float, max_cmd: float) -> AxisTerms:
+    """Control law for one axis: P follows the error, D opposes the measured rate."""
+    p = kp * error
+    i = ki * integral
+    d = -kd * rate
+    cmd = max(-max_cmd, min(max_cmd, p + i + d))
+    return AxisTerms(p, i, d, cmd)
