@@ -296,7 +296,7 @@ class WristBalanceController(Node):
         roll_delta = float(cmd.y) * self._p_roll_scale * dt
 
         # Compute true achievement for /balance/achieved_delta so ball_balance_node
-        # can update its ki_mode=servo integral and achievement EMA.
+        # can update its servo integral and achievement EMA.
         # True achievement = how far servo actually moved since previous target was set.
         true_achieved_f = self._flex.achieved(joint_pos[fj])
         true_achieved_r = self._roll.achieved(joint_pos[rj])

@@ -61,8 +61,8 @@ Parameters:
   kp_roll         Camera P gain, roll axis         default: 0.3
   kd_flex         IMU D gain, flex axis            default: 0.1
   kd_roll         IMU D gain, roll axis            default: 0.1
-  ki_flex         Integral gain, flex axis         default: 0.01
-  ki_roll         Integral gain, roll axis         default: 0.01
+  ki_flex         Integral gain, flex axis (undelivered servo delta)  default: 0.01
+  ki_roll         Integral gain, roll axis (undelivered servo delta)  default: 0.01
   max_cmd         Max correction command (rad/s)   default: 0.3
   deadband        Ball position deadband (0..1)    default: 0.05
   stable_thresh   Ball within this = stable        default: 0.15
@@ -102,8 +102,7 @@ from sensor_msgs.msg import Imu, JointState
 from std_msgs.msg import Bool, String
 
 from robot_arm_control.balance_logic import (
-    apply_deadband, ball_integral_step, ball_lost_duration, crossed_center, error_sign,
-    pid_axis, select_integrals)
+    apply_deadband, ball_lost_duration, crossed_center, error_sign, pid_axis)
 
 
 class BallBalanceNode(Node):
@@ -157,14 +156,11 @@ class BallBalanceNode(Node):
         self.declare_parameter('achievement_max_scale',3.0)   # max multiplier to prevent runaway
         self.declare_parameter('achievement_min_cmd',  0.003) # min |cmd| to avoid updating on HOLD steps
 
-        # ki mode — three options, select via 'ki_mode' parameter:
-        #   'ball'     — classic: accumulate ball_error × dt (standard PID integral)
-        #   'servo'    — accumulate (commanded - achieved) servo delta per CORR step
-        #                grows when servo underperforms, not just when ball is off-center
-        #   'combined' — accumulate ball_error × (1 - achievement) × dt
-        #                grows only when ball is wrong AND servo is underperforming
-        #   'none'     — integral disabled (ki_flex=0 and ki_roll=0 still work as before)
-        self.declare_parameter('ki_mode',  'ball')  # 'ball' | 'servo' | 'combined' | 'none'
+        # I term: accumulates (commanded - achieved) wrist delta per CORR step,
+        # i.e. the motion the servo was asked for but did not deliver. It grows
+        # only when the servo underperforms. (The ball error itself is already
+        # integrated: each command is a step added to the wrist position.)
+        # ki_flex = ki_roll = 0 disables it.
         self.declare_parameter('ki_windup_limit', 0.5)  # clamp integral contribution to ±this
         self.declare_parameter('summary_hz',           1.0)   # rate of PID_SUMMARY log lines
         self.declare_parameter('dry_run',           False)
@@ -210,17 +206,14 @@ class BallBalanceNode(Node):
         self._settled_at        = None
         self._pid_active        = False
 
-        # Integrals
-        self._integral_flex     = 0.0
-        self._integral_roll     = 0.0
-        self._integral_flex_servo  = 0.0   # ki_mode='servo'/'combined': undelivered flex
-        self._integral_roll_servo  = 0.0   # ki_mode='servo'/'combined': undelivered roll
+        # Integrals: undelivered wrist delta (see ki_flex / ki_roll)
+        self._integral_flex_servo  = 0.0   # undelivered flex
+        self._integral_roll_servo  = 0.0   # undelivered roll
 
         # Previous error signs — used for anti-windup sign-change detection.
         # None until first valid ball reading.
         self._prev_error_x_sign = None   # sign of error_x on previous tick
         self._prev_error_y_sign = None   # sign of error_y on previous tick
-        self._last_control_time = None
 
         # Servo achievement ratio — exponential moving average of (achieved/commanded).
         # When the servo only achieves 50% of commanded, next command is scaled up 2×.
@@ -391,7 +384,6 @@ class BallBalanceNode(Node):
             alpha   = self.get_parameter('achievement_alpha').value
             min_cmd = self.get_parameter('achievement_min_cmd').value
 
-            ki_mode     = self.get_parameter('ki_mode').value
             windup_lim  = self.get_parameter('ki_windup_limit').value
             ki_flex     = self.get_parameter('ki_flex').value
             ki_roll     = self.get_parameter('ki_roll').value
@@ -405,7 +397,7 @@ class BallBalanceNode(Node):
                                               alpha * ratio_f)
                     self._flex_achievement = max(0.05, self._flex_achievement)
                     # servo ki — accumulate undelivered flex displacement
-                    if ki_mode in ('servo', 'combined') and ki_flex > 0:
+                    if ki_flex > 0:
                         undelivered_f = self._last_cmd_flex - msg.x  # signed gap
                         self._integral_flex_servo += undelivered_f
                         self._integral_flex_servo = max(
@@ -422,7 +414,7 @@ class BallBalanceNode(Node):
                                               alpha * ratio_r)
                     self._roll_achievement = max(0.05, self._roll_achievement)
                     # servo ki — accumulate undelivered roll displacement
-                    if ki_mode in ('servo', 'combined') and ki_roll > 0:
+                    if ki_roll > 0:
                         undelivered_r = self._last_cmd_roll - msg.y
                         self._integral_roll_servo += undelivered_r
                         self._integral_roll_servo = max(
@@ -505,8 +497,6 @@ class BallBalanceNode(Node):
                 # Forget the previous pose's ball position: until the detector
                 # finds the ball again, there is no position to control on.
                 self._ball_pos             = None
-                self._integral_flex        = 0.0
-                self._integral_roll        = 0.0
                 self._integral_flex_servo  = 0.0
                 self._integral_roll_servo  = 0.0
                 self._prev_error_x_sign    = None
@@ -695,8 +685,6 @@ class BallBalanceNode(Node):
             self._pid_active     = False
             self._pid_started_at = None
             self._settled_at     = None   # prevents immediate PID restart
-            self._integral_flex  = 0.0
-            self._integral_roll  = 0.0
             self._pub_enabled.publish(Bool(data=False))
             self.get_logger().warn(
                 f'Attempt timeout ({attempt_timeout:.0f}s) — '
@@ -778,35 +766,28 @@ class BallBalanceNode(Node):
             # Ball left stable zone — reset hold timer
             self._centered_since = None
 
-        # ki_mode='ball' integrals: decay inside the deadband, otherwise
-        # integrate the error and clamp (anti-windup hard limit)
+        if error_x == 0.0 and error_y == 0.0:
+            return  # within deadband
+
         ki_flex = self.get_parameter('ki_flex').value
         ki_roll = self.get_parameter('ki_roll').value
         max_cmd = self.get_parameter('max_cmd').value
-        self._integral_flex, self._integral_roll, self._last_control_time = ball_integral_step(
-            self._integral_flex, self._integral_roll, self._last_control_time, now,
-            error_x, error_y, ki_flex, ki_roll, max_cmd)
-        if error_x == 0.0 and error_y == 0.0:
-            return  # within deadband
 
         # Anti-windup sign-change decay — when the ball crosses center on
         # either axis the accumulated I-term is now pushing the wrong way.
         # Decay it toward zero so the P-term can respond cleanly.
-        # Applied to both ball-mode and servo-mode integrals independently.
         antiwindup_decay = self.get_parameter('antiwindup_decay').value
         curr_y_sign = error_sign(error_y)
         curr_x_sign = error_sign(error_x)
 
         if antiwindup_decay < 1.0 and crossed_center(self._prev_error_y_sign, curr_y_sign):
             old_i = self._integral_flex_servo
-            self._integral_flex       *= antiwindup_decay
             self._integral_flex_servo *= antiwindup_decay
             self.get_logger().info(
                 f'ANTI-WINDUP flex: error_y {self._prev_error_y_sign:+d}→{curr_y_sign:+d} '                f'i_flex {old_i:+.4f}→{self._integral_flex_servo:+.4f} '                f'(decay={antiwindup_decay})')
 
         if antiwindup_decay < 1.0 and crossed_center(self._prev_error_x_sign, curr_x_sign):
             old_i = self._integral_roll_servo
-            self._integral_roll       *= antiwindup_decay
             self._integral_roll_servo *= antiwindup_decay
             self.get_logger().info(
                 f'ANTI-WINDUP roll: error_x {self._prev_error_x_sign:+d}→{curr_x_sign:+d} '                f'i_roll {old_i:+.4f}→{self._integral_roll_servo:+.4f} '                f'(decay={antiwindup_decay})')
@@ -851,12 +832,8 @@ class BallBalanceNode(Node):
         # Control law (validated signs from balance_v1.yaml):
         #   ball right (+x) → roll left  → +wrist_roll → roll_cmd positive
         #   ball near  (+y) → flex back → +wrist_flex → flex_cmd positive
-        # Select integral source based on ki_mode
-        ki_mode = self.get_parameter('ki_mode').value
-        i_flex, i_roll = select_integrals(
-            ki_mode,
-            ball=(self._integral_flex, self._integral_roll),
-            servo=(self._integral_flex_servo, self._integral_roll_servo))
+        i_flex = self._integral_flex_servo
+        i_roll = self._integral_roll_servo
 
         # P follows the error, D opposes motion (damping); clamped to max_cmd
         flex = pid_axis(error_y, i_flex, d_flex, kp_flex, ki_flex, kd_flex, max_cmd)
@@ -900,7 +877,7 @@ class BallBalanceNode(Node):
             f'→ flex={flex_cmd:+.4f} roll={roll_cmd:+.4f} '
             f'd_src={d_term_source} flex_rate={d_flex:+.4f}rad/s roll_rate={d_roll:+.4f}rad/s '
             f'ach_flex={self._flex_achievement:.2f} ach_roll={self._roll_achievement:.2f} '
-            f'i_flex={i_flex:+.4f} i_roll={i_roll:+.4f} ki_mode={self.get_parameter("ki_mode").value} '
+            f'i_flex={i_flex:+.4f} i_roll={i_roll:+.4f} '
             f'stable={is_stable} '
             f'hold={f"{now-self._centered_since:.1f}s" if self._centered_since else "--"}',
             throttle_duration_sec=1.0)

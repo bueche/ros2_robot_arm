@@ -104,34 +104,6 @@ def crossed_center(prev_sign: Optional[int], curr_sign: int) -> bool:
             and curr_sign != prev_sign)
 
 
-def ball_integral_step(flex: float, roll: float, last_time: Optional[float], now: float,
-                       error_x: float, error_y: float,
-                       ki_flex: float, ki_roll: float, max_cmd: float):
-    """One control step of the ki_mode='ball' integrals.
-
-    Returns (flex, roll, last_time). Inside the deadband (both errors zero)
-    the integrals decay by 0.9; otherwise each integrates its error over the
-    time since the previous step and is clamped so that ki * integral stays
-    within max_cmd.
-    """
-    if error_x == 0.0 and error_y == 0.0:
-        return flex * 0.9, roll * 0.9, last_time
-    dt = 0.0 if last_time is None else max(now - last_time, 1e-3)
-    flex += error_y * dt
-    roll += error_x * dt
-    max_integral = max_cmd / max(ki_flex, 1e-6)
-    flex = max(-max_integral, min(max_integral, flex))
-    roll = max(-max_integral, min(max_integral, roll))
-    return flex, roll, now
-
-
-def select_integrals(ki_mode: str, ball: tuple, servo: tuple) -> tuple:
-    """(i_flex, i_roll) used by the control law for ki_mode."""
-    if ki_mode == 'servo':
-        return servo
-    return ball  # 'ball', 'combined', 'none'
-
-
 class AxisTerms:
     """P, I and D contributions for one axis, and the clamped command."""
 

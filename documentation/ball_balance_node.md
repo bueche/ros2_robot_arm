@@ -17,7 +17,7 @@ The `ball_balance_node` implements the core of the PID logic in this system. It 
 | `kd_roll` | 0.02 | Derivative gain for the roll axis. Same damping role as `kd_flex` but for the roll/left-right axis. |
 | `d_term_source` | `'joints'` | Selects where the D-term's angular velocity comes from. `'imu'` reads `/imu/raw` gyroscope data (50Hz MPU-6050) but quantizes at 0.000133 rad/s/LSB, which effectively freezes the signal at the slow angular velocities typical of 1Hz corrections. `'joints'` reads `/balance/wrist_velocity`, a finite-difference of joint_states published by wrist_balance_controller (~100Hz), giving finer resolution (~0.0015 rad/s) and directly measuring servo motion rather than cup vibration. |
 | `antiwindup_decay` | 0.2 | Decay factor applied to the accumulated I-term when the ball's position error changes sign on an axis (i.e. the ball crosses center). `0.0` fully resets the integral on a sign change; `1.0` disables this decay entirely. Applied independently per axis — flex decays when `error_y` changes sign, roll decays when `error_x` changes sign. Prevents the integral term from continuing to push in a now-wrong direction after overshoot. |
-| `ki_flex` | 0.01 | Integral gain, flex axis. Multiplies the accumulated integral term selected by `ki_mode`. |
+| `ki_flex` | 0.01 | Integral gain, flex axis. Multiplies the accumulated undelivered wrist delta (commanded − achieved per correction step), which grows when the servo underperforms. 0 disables the I term. |
 | `ki_roll` | 0.01 | Integral gain, roll axis. Same role as `ki_flex` for roll. |
 | `max_cmd` | 0.3 | Maximum magnitude (rad/s) for the final flex or roll command after PID summation. Commands are clamped symmetrically to `±max_cmd`. |
 | `deadband` | 0.05 | Ball position error magnitude (in normalised 0–1 units) below which no correction is issued, preventing the controller from chasing detection noise when the ball is already very close to center. |
@@ -37,7 +37,6 @@ The `ball_balance_node` implements the core of the PID logic in this system. It 
 | `achievement_alpha` | 0.3 | Exponential Moving Average (EMA) weight used when updating the achievement ratio after each correction. `0` freezes the ratio at its current value; `1` makes it track the latest single sample instantly. This is a way of smoothing a sequence of values over time so a single noisy sample doesn't yank the tracked value around. The update rule is: `new_average = alpha × new_sample + (1 - alpha) × old_average`|
 | `achievement_max_scale` | 3.0 | Maximum multiplier the achievement-ratio scaling can apply to a command, preventing runaway amplification if a servo persistently achieves a very small fraction of what's commanded. |
 | `achievement_min_cmd` | 0.003 | Minimum absolute commanded delta required before a correction step is used to update the achievement ratio — avoids corrupting the ratio with near-zero HOLD-step commands where achievement percentage would be noisy or meaningless. |
-| `ki_mode` | `'ball'` | Selects what the integral term accumulates. `'ball'` is the classic PID integral of ball position error × dt. `'servo'` accumulates the gap between commanded and achieved servo delta per correction step, growing when the servo underperforms rather than when the ball is off-center. `'combined'` accumulates ball error × (1 − achievement) × dt, growing only when the ball is off AND the servo is underperforming. `'none'` disables the integral entirely (independent of the `ki_flex`/`ki_roll` gain values). |
 | `ki_windup_limit` | 0.5 | Clamp applied to the integral term's contribution to the command, limiting how much influence accumulated integral can have regardless of how large the raw integral value grows (separate from the absolute integral clamp derived from `max_cmd / ki_*`). |
 | `summary_hz` | 1.0 | Rate at which `PID_SUMMARY` log lines are emitted, summarizing proximity statistics accumulated from every `/ball/position` reading during active PID (sampled at the full camera rate, not just at `publish_hz`). |
 | `dry_run` | False | When True, computed PID commands are logged but never published to `/imu/balance_cmd` — used for verifying gain behavior without moving the arm. |
@@ -48,7 +47,7 @@ The `ball_balance_node` implements the core of the PID logic in this system. It 
 ```
 ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control ball_balance_node --ros-args   -p kp_flex:=0.15 \
 -p kp_roll:=0.15   -p ki_flex:=0.20 -p ki_roll:=0.05   -p kd_flex:=0.05 -p kd_roll:=0.05 -p d_term_source:=joints  \
--p max_cmd:=0.3   -p dry_run:=false -p attempt_timeout:=40.0 -p ki_mode:=servo -p use_imu:=true \
+-p max_cmd:=0.3   -p dry_run:=false -p attempt_timeout:=40.0 -p use_imu:=true \
 -p  antiwindup_decay:=0.2  -p jiggle_start_delay:=1.0 -p jiggle_amplitude:=0.05
 
 
