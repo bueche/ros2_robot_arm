@@ -16,7 +16,6 @@ ball_balance_node:
     ki_roll: 0.05
     kd_flex: 0.05
     kd_roll: 0.05
-    ki_mode: servo
     d_term_source: joints
     use_imu: true             # IMU present; with d_term_source=joints it only feeds diagnostics
     max_cmd: 0.3

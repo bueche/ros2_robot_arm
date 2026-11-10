@@ -83,3 +83,55 @@ def ball_lost_duration(now: float, last_valid_ball_time: Optional[float],
     if ref is None:
         return None
     return now - ref
+
+
+# ball_balance_node control law
+#
+# Axis convention: flex is driven by the ball's y error, roll by its x error.
+
+def apply_deadband(error: float, deadband: float) -> float:
+    """Zero an error whose magnitude is below the deadband."""
+    return 0.0 if abs(error) < deadband else error
+
+
+def error_sign(error: float) -> int:
+    return 1 if error > 0 else (-1 if error < 0 else 0)
+
+
+def crossed_center(prev_sign: Optional[int], curr_sign: int) -> bool:
+    """True when the error changed sign since the previous control step."""
+    return (prev_sign is not None and prev_sign != 0 and curr_sign != 0
+            and curr_sign != prev_sign)
+
+
+class AxisTerms:
+    """P, I and D contributions for one axis, and the clamped command."""
+
+    __slots__ = ('p', 'i', 'd', 'cmd')
+
+    def __init__(self, p: float, i: float, d: float, cmd: float):
+        self.p, self.i, self.d, self.cmd = p, i, d, cmd
+
+
+def pid_axis(error: float, integral: float, rate: float,
+             kp: float, ki: float, kd: float, max_cmd: float) -> AxisTerms:
+    """Control law for one axis: P follows the error, D opposes the measured rate."""
+    p = kp * error
+    i = ki * integral
+    d = -kd * rate
+    cmd = max(-max_cmd, min(max_cmd, p + i + d))
+    return AxisTerms(p, i, d, cmd)
+
+
+def servo_integral_step(integral: float, commanded: float, achieved: float,
+                        ki: float, windup_limit: float) -> float:
+    """Add one CORR step's undelivered wrist delta (commanded - achieved, command units).
+
+    Clamped so that ki * integral stays within windup_limit. ki <= 0 leaves
+    the integral unchanged.
+    """
+    if ki <= 0:
+        return integral
+    integral += commanded - achieved
+    limit = windup_limit / max(ki, 1e-6)
+    return max(-limit, min(limit, integral))
