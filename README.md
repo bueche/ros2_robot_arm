@@ -1,9 +1,9 @@
 # Ros2 Robot Arm and Balance PID Controller Using Koch v1.1 Follower
 
 ## Summary
-The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. The arm is based on a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/)) and its powered by The Robot Operating System v2 [ROS2](https://github.com/ros2).  
+The following repository has the source, resources, and instructions for building a robotic arm and its digital twin. We support two different robot arms:  a modified Koch V1.1 "follower arm" physical design (see [Robotis Koch v1.1 follower arm](https://robotis.us/koch-v1-1-low-cost-robot-arm-follower/)) and the [LeRobot SO-ARM101](https://huggingface.co/docs/lerobot/en/so101) and both are powered by The Robot Operating System v2 [ROS2](https://github.com/ros2).  
 
-(**NEW**) The current effort is focused on enabling this robotic arm to balance a cup containing a metal ball bearing. Balancing is a perennial challenge with robotics (as humanoid robots often fall at embarrassing times ;-)). The koch v1.1 hardware is a bit limited to explore all aspects of balance, but useful as a starter task. This is being 
+(**NEW**) The current effort is focused on enabling this robotic arm to balance a cup containing a metal ball bearing. Balancing is a perennial challenge with robotics (as humanoid robots often fall at embarrassing times ;-)). Both the koch v1.1 hardware and the SO-ARM101 are a bit limited to explore all aspects of balance, but useful as a starter task. This is being 
 accomplished by enhancing the robot with additinoal hardware (IMU sensor and inferencing camera) and software, including a Balance [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) (PID = Proportional–integral–derivative) and a vision ML model among other modules. [Learn more ..](./documentation/balance.md)
 
 This branch supports Ros2 Jazzy (4.2+) and a combination with Humble for the ball bearing detection inferencing.
@@ -18,6 +18,7 @@ The details in this project include:
 <p align="center">
   <img src="./images/real_robot.jpg" alt="Real Robot Arm" width="400">
   <img src="./images/digital_twin.jpg" alt="The digital twin" width="400">
+   <img src="./images/so-arm101.image.jpg" alt="ao-arm101" width="400">
 </p>
 
 The documentation for this repository covers the following:
@@ -33,6 +34,7 @@ The documentation for this repository covers the following:
 <p align="center">
   <img src="./images/robot_arm_in_motion.gif" alt="Real Robot Arm" width="500">
 <img src="./images/balance_video_camera_inference.gif" alt="balance video" width="700">
+<img src="./images/soarm101.sample.gif" alt="balance video for soamr101" width="700">
 </p>
 
 Animations above:
