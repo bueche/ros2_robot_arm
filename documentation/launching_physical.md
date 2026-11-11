@@ -5,7 +5,7 @@ Once the software and hardware envionment has been setup with the one-time setup
 ## Table of Contents
 - [Ensure that the USB port can be accessed](#ensure-that-the-usb-port-can-be-accessed)
 - [Launching the basic robot](#launch-the-robot-via-ros2)
-- [Launching the robot for balancing activity](#launcing-the-robot-for-balancing-activity)
+- [Launching the robot for balancing activity](#launcing-the-robot-for-balancing-activity). This includes the invocations for the koch_v11 and the soarm101 robots.
 
   
 ## Ensure that the USB port can be accessed
@@ -51,7 +51,7 @@ crw------- 1 root   root      3, 167 Nov 10 14:27 /dev/ttyz7
 
 ```
 
-## Launch the robot via ros2
+## Launch the koch_v11 robot arm via ros2
 ```bash
 rpi5:~/$ 
 rpi5:~/$ pwd
@@ -60,7 +60,7 @@ rpi5:~/$ cd robot_ws
 rpi5:~/robot_ws$ source ./install/setup.bash
 rpi5:~/robot_ws$ ros2 launch robot_arm_description koch_v11_real_robot.launch.py
 ```
-This will launch the ros2 robot software. The full example output is shown below. We comment on some of parts below.
+This will launch the ros2 robot software for the koch_v11 arm. The full example output is shown below. We comment on some of parts below.
 
 ```
 $ ros2 launch robot_arm_description koch_v11_real_robot.launch.py
@@ -358,20 +358,23 @@ Loading /home/ubuntu/robot_ws/src/balance/models/ball_detector_v4.engine for Ten
 ### Step 2: Start rviz2 on the Nvidia Nano
 Even if the initial camera works well upon boot (high confidence recognition) its no guarantee that the one of the tipping poses will cause the ball bearing to fall out of the camera view. Rviz2 and the debug picture topic sent by the ball detector node are useful to tune camera placement and optimal lighting. Rviz2 really can't be run on the RPI5 due to capacity limitations.
 
+In practice rviz2 can be kept running and doesn't need to be restarted for each balance run.
+
 ```
 ubuntu@bueche-nvidia-nano:~/robot_ws/src$ ros2 run rviz2 rviz2
 
 ```
 
 ### Step 3: Start ball marker node on Nvidia Nano
+Also in practice the ball marker node doesn't have to be restarted for every balance run.
 
 ```
 ubuntu@bueche-nvidia-nano:~/robot_ws$ ros2 run balance ball_marker_node
 [INFO] [1783545409.262960482] [ball_marker_node]: ball_marker_node ready
 ```
 
-### Step 4: Launch the robot
-Very similar to the non-balance one, but there is a special launch file (`koch_v11_real_robot_for_balance.launch.py`) to capture the URDF specific to this balance sub-project: this URDF adds a cup and ball.
+### Step 4: Launch the robot for balance (koch_v11)
+Very similar to the non-balance one, but there is a special launch file (`koch_v11_real_robot_for_balance.launch.py`) to capture the URDF specific to this balance sub-project: this URDF adds a cup and ball. Its also possible to launch using `robot_arm.launch.py` and by default it will start the koch_v11 for balance.
 ```
 ubuntu@bueche-rpi5:~/robot_ws$ ros2 launch robot_arm_description koch_v11_real_robot_for_balance.launch.py
 [INFO] [launch]: All log files can be found below /home/ubuntu/.ros/log/2026-07-08-21-38-31-032445-bueche-rpi5-608
@@ -405,6 +408,68 @@ ubuntu@bueche-rpi5:~/robot_ws$ ros2 launch robot_arm_description koch_v11_real_r
 [ros2_control_node-3] [INFO] [1783546
 :
 :
+```
+
+### Step 4: Launch the robot for balance (soarm101)
+To launch the so-arm101 just use the `robot_arm.launch.py` program and set the urdf parameter to reference the balance urdf associdated the with the SO-ARM101 robot arm.
+
+```
+rpi5:~/$ 
+rpi5:~/$ pwd
+/home/ubuntu/
+rpi5:~/$ cd robot_ws
+rpi5:~/robot_ws$ source ./install/setup.bash
+rpi5:~/robot_ws$
+rpi5:~/robot_ws$ ros2 launch robot_arm_description robot_arm.launch.py arm:=so_arm101 urdf:=urdf/so_arm101_for_balance.urdf
+[INFO] [launch]: All log files can be found below /home/ubuntu/.ros/log/2026-10-12-14-26-23-474494-bueche-rpi5-204
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [207]
+[INFO] [ros2_control_node-2]: process started with pid [208]
+[INFO] [spawner-3]: process started with pid [209]
+[robot_state_publisher-1] [WARN] [1791815183.701405965] [kdl_parser]: The root link base_link has an inertia specified in the URDF, but KDL does not support a root link with an inertia.  As a workaround, you can add an extra dummy link to your URDF.
+[robot_state_publisher-1] [INFO] [1791815183.701723928] [robot_state_publisher]: Robot initialized
+[ros2_control_node-2] [INFO] [1791815183.722153335] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[ros2_control_node-2] [INFO] [1791815183.728309465] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-2] [INFO] [1791815183.731963668] [controller_manager]: update rate is 50 Hz
+[ros2_control_node-2] [INFO] [1791815183.732035743] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-2] [INFO] [1791815183.732051224] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-2] [WARN] [1791815183.732170835] [controller_manager]: Could not enable FIFO RT scheduling policy: with error number <1>(Operation not permitted). See [https://control.ros.org/master/doc/ros2_control/controller_manager/doc/userdoc.html] for details on how to enable realtime scheduling.
+[ros2_control_node-2] [INFO] [1791815183.732739650] [controller_manager]: Received robot description from topic.
+[ros2_control_node-2] [INFO] [1791815183.739177983] [controller_manager]: Loading hardware 'FeetechSystem' 
+[ros2_control_node-2] [INFO] [1791815183.743867243] [controller_manager]: Loaded hardware 'FeetechSystem' from plugin 'feetech_ros2_driver/FeetechHardwareInterface'
+[ros2_control_node-2] [INFO] [1791815183.744126743] [controller_manager]: Initialize hardware 'FeetechSystem' 
+[ros2_control_node-2] [2026-10-12 14:26:23.751] [info] Connecting to port: /dev/ttyWaveshare
+[ros2_control_node-2] [2026-10-12 14:26:23.756] [info] Loaded joint configuration for 6 joints from '/home/ubuntu/robot_ws/install/robot_arm_description/share/robot_arm_description/config/so_arm101_calibration.yaml'
+[ros2_control_node-2] [2026-10-12 14:26:23.812] [info] Publishing FeetechState on '/feetech_state'
+[ros2_control_node-2] [INFO] [1791815183.812504539] [controller_manager]: Successful initialization of hardware 'FeetechSystem'
+[ros2_control_node-2] [INFO] [1791815183.814536668] [resource_manager]: 'configure' hardware 'FeetechSystem' 
+[ros2_control_node-2] [INFO] [1791815183.814600780] [resource_manager]: Successful 'configure' of hardware 'FeetechSystem'
+[ros2_control_node-2] [INFO] [1791815183.814624780] [resource_manager]: 'activate' hardware 'FeetechSystem' 
+[ros2_control_node-2] [INFO] [1791815183.817177298] [resource_manager]: Successful 'activate' of hardware 'FeetechSystem'
+[ros2_control_node-2] [INFO] [1791815183.817394113] [controller_manager]: Registering statistics for : FeetechSystem
+[ros2_control_node-2] [INFO] [1791815183.817702798] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[ros2_control_node-2] [INFO] [1791815184.304929113] [controller_manager]: Loading controller : 'joint_state_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[ros2_control_node-2] [INFO] [1791815184.305006353] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1791815184.359720427] [controller_manager]: Controller 'joint_state_broadcaster' node arguments: --ros-args --params-file /home/ubuntu/robot_ws/install/robot_arm_description/share/robot_arm_description/config/so_arm101_controllers.yaml 
+[spawner-3] [INFO] [1791815184.398880742] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-2] [INFO] [1791815184.400432816] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1791815184.400714761] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[ros2_control_node-2] [INFO] [1791815184.457477427] [controller_manager]: Activating controllers: [ joint_state_broadcaster ]
+[ros2_control_node-2] [INFO] [1791815184.474814409] [controller_manager]: Successfully switched controllers!
+[spawner-3] [INFO] [1791815184.497277761] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[ros2_control_node-2] [INFO] [1791815184.498901594] [controller_manager]: Loading controller : 'arm_controller' of type 'joint_trajectory_controller/JointTrajectoryController'
+[ros2_control_node-2] [INFO] [1791815184.498980909] [controller_manager]: Loading controller 'arm_controller'
+[ros2_control_node-2] [INFO] [1791815184.549338835] [controller_manager]: Controller 'arm_controller' node arguments: --ros-args --params-file /home/ubuntu/robot_ws/install/robot_arm_description/share/robot_arm_description/config/so_arm101_controllers.yaml 
+[spawner-3] [INFO] [1791815184.576456742] [spawner_joint_state_broadcaster]: Loaded arm_controller
+[ros2_control_node-2] [INFO] [1791815184.576824075] [controller_manager]: Configuring controller: 'arm_controller'
+[ros2_control_node-2] [INFO] [1791815184.577371316] [arm_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-2] [INFO] [1791815184.577476872] [arm_controller]: Command interfaces are [position] and state interfaces are [position velocity].
+[ros2_control_node-2] [INFO] [1791815184.577539742] [arm_controller]: Using 'splines' interpolation method.
+[ros2_control_node-2] [INFO] [1791815184.581155853] [arm_controller]: Goals with partial set of joints are allowed
+[ros2_control_node-2] [INFO] [1791815184.581210298] [arm_controller]: Action status changes will be monitored at 20.00 Hz.
+[ros2_control_node-2] [INFO] [1791815184.595728909] [controller_manager]: Activating controllers: [ arm_controller ]
+[ros2_control_node-2] [INFO] [1791815184.615244575] [controller_manager]: Successfully switched controllers!
+[spawner-3] [INFO] [1791815184.637691020] [spawner_joint_state_broadcaster]: Configured and activated arm_controller
 ```
 
 ### Step 5: Launch the ball balance node and wrist balance controller
