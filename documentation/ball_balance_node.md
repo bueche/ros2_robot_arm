@@ -9,6 +9,12 @@ The `ball_balance_node` implements the core of the PID logic in this system. It 
 ## Parameters 
 # ball_balance_node Parameters
 
+Note: we have put the invocation parameters in to `src/robot_arm_control/config/balance/so_arm101.yaml` to simplify the invocation and ensure that all parameters are checked. The invocation would then be:
+```
+$ P=$(ros2 pkg prefix robot_arm_control)/share/robot_arm_control/config/balance/so_arm101.yaml
+$ ros2 run robot_arm_control ball_balance_node --ros-args --params-file $P
+```
+
 | parameter name | default | description |
 |----------------|---------|-------------|
 | `kp_flex` | 0.3 | Proportional gain on the camera ball-position error (y-axis / forward-back) driving the wrist_flex command. |
@@ -43,6 +49,13 @@ The `ball_balance_node` implements the core of the PID logic in this system. It 
 | `use_imu` | True | Enables IMU-based behavior. When `d_term_source='imu'`, this gates whether the IMU reading is used at all (False zeroes the D-term and disables the "wrist_velocity stale" warning logic associated with the joints path). When `d_term_source='joints'`, this primarily affects whether the stale-data warning is logged. |
 
 ## Example Invocation
+
+Note: we have put the invocation parameters in to `src/robot_arm_control/config/balance/so_arm101.yaml` to simplify the invocation and ensure that all parameters are checked. The invocation would then be:
+```
+$ P=$(ros2 pkg prefix robot_arm_control)/share/robot_arm_control/config/balance/so_arm101.yaml
+$ ros2 run robot_arm_control ball_balance_node --ros-args --params-file $P
+```
+But the invocation below shows all of the parameters explicitly on the command line.
 
 ```
 ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control ball_balance_node --ros-args   -p kp_flex:=0.15 \

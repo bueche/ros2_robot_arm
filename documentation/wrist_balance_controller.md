@@ -11,6 +11,12 @@ TODO: The defaults need to be updated to match the optimal values from the tests
  
 ## Parameters 
 
+Note: we have put the invocation parameters in to `src/robot_arm_control/config/balance/so_arm101.yaml` to simplify the invocation and ensure that all parameters are checked. The invocation would then be:
+```
+$ P=$(ros2 pkg prefix robot_arm_control)/share/robot_arm_control/config/balance/so_arm101.yaml
+$ ros2 run robot_arm_control wrist_balance_controller --ros-args --params-file $P
+```
+
 | parameter name | default | description |
 |----------------|---------|-------------|
 | `enabled` | True | Master enable switch. When False the control loop exits immediately on every tick without publishing any trajectory commands. Can be toggled at runtime: `ros2 param set /wrist_balance_controller enabled false`. |
@@ -32,6 +38,14 @@ TODO: The defaults need to be updated to match the optimal values from the tests
 | `roll_max_rad` | 1.900 | Hard upper limit (radians) for the wrist_roll joint position. |
 
 ## Example invocation
+
+Note: we have put the invocation parameters in to `src/robot_arm_control/config/balance/so_arm101.yaml` to simplify the invocation and ensure that all parameters are checked. The invocation would then be:
+```
+$ P=$(ros2 pkg prefix robot_arm_control)/share/robot_arm_control/config/balance/so_arm101.yaml
+$ ros2 run robot_arm_control wrist_balance_controller --ros-args --params-file $P
+```
+The invocation shown below illustrates the parameters fed from the command line.
+
 ```
 ubuntu@bueche-rpi5:~/robot_ws$ ros2 run robot_arm_control wrist_balance_controller --ros-args   -p correction_hz:=1.0   -p move_duration:=0.4  -p max_step_rad:=0.08 -p max_total_rad:=0.5  -p max_total_flex_rad:=0.80  -p max_total_roll_rad:=0.55
 [INFO] [1781131294.416975799] [wrist_balance_controller]: Wrist balance controller started.

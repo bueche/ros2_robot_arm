@@ -4,7 +4,7 @@ ball_balance_node.py — Combined camera + IMU ball balancing controller
 ======================================================================
 
 Replaces imu_balance_node for ball balancing. Uses camera ball position
-as the primary error signal and IMU tilt as a derivative/feedforward signal.
+as the primary error signal and servo position as a primary derivative/feedforward signal.
 
 Architecture:
   /ball/position      (geometry_msgs/Point)    — camera: where ball IS
@@ -31,7 +31,7 @@ Publishes:
   /ball/pid_detail_roll (geometry_msgs/Vector3) — (P_roll, I_roll, D_roll) per tick
                                                    x+y+z = pre-clamp flex/roll cmd
 
-Control law:
+Control logic:
   error_x = ball_pos.x   (positive = ball right  → roll  cup left  → +wrist_roll)
   error_y = ball_pos.y   (positive = ball toward robot → flex forward → -wrist_flex)
 
