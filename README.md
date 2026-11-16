@@ -14,12 +14,23 @@ The details in this project include:
  - Creating, calibrating, and tuning of the robot arm digital twin (that runs in [rviz](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/RViz/RViz-User-Guide/RViz-User-Guide.html)),
  - Refinement of ROS2-based software to support various actions of the robotic arm and the gathering of physical statistics (current, voltage, temperature, etc)
  - The development of the ML models for ball detection and the PID controller for for balance.
+### SO-ARM101 
+<p align="center">
+  <img src="./images/soarm101.photo.jpg" alt="Real Robot Arm" width="400">
+   <img src="./images/soarm101.sample.gif" alt="balance video for soamr101" width="700">
+</p>
 
+## Koch v1.1 arm
 <p align="center">
   <img src="./images/real_robot.jpg" alt="Real Robot Arm" width="400">
-  <img src="./images/digital_twin.jpg" alt="The digital twin" width="400">
-   <img src="./images/so-arm101.image.jpg" alt="ao-arm101" width="400">
+  <img src="./images/robot_arm_in_motion.gif" alt="Real Robot Arm" width="500">
+  <img src="./images/balance_video_camera_inference.gif" alt="balance video" width="700">
 </p>
+
+Animations above:
+1. The digital twin executing a series of poses that exercise all of the robotic joints.
+2. The full rviz output showing a small excerpt of the pose and PID operations. The lower lefthand side is an bounding box annotated view of the camera (image after inferencing) and the right hand side 3D view shows the corresponding movement of the cup, ball, and robot. In this video 5 different tipping poses are set moving the ball bearing to one of the cup. Following each the balance pid controller kicks in and balances the ball within the cup.
+
 
 The documentation for this repository covers the following:
 - [Software Setup](./documentation/software_setup.md): how to create the docker envrionment and any additional setup commands. 
@@ -31,15 +42,6 @@ The documentation for this repository covers the following:
 - [Pose Sequence Tools and Analysis](./documentation/utilities.md): Several tools are provided that drive the robot through a series of poses and analyze physical characteristics (position, temp, current, voltage, etc). This section also provides some analysis case studies that are of interest.
 - **NEW** [Balancing a cup with the robotic arm ](./documentation/balance.md): These notes include detailed descriptions of the add-ons to the Koch v1.1 hardware (3D Inferencing camera and IMU) and software: PID related nodes and Machine Learning models for inferencing on the Camera and on an Nvidia Orin Nano.
 
-<p align="center">
-  <img src="./images/robot_arm_in_motion.gif" alt="Real Robot Arm" width="500">
-<img src="./images/balance_video_camera_inference.gif" alt="balance video" width="700">
-<img src="./images/soarm101.sample.gif" alt="balance video for soamr101" width="700">
-</p>
-
-Animations above:
-1. The digital twin executing a series of poses that exercise all of the robotic joints.
-2. The full rviz output showing a small excerpt of the pose and PID operations. The lower lefthand side is an bounding box annotated view of the camera (image after inferencing) and the right hand side 3D view shows the corresponding movement of the cup, ball, and robot. In this video 5 different tipping poses are set moving the ball bearing to one of the cup. Following each the balance pid controller kicks in and balances the ball within the cup.
 
 ## FAQ
 ### How can this repository be useful?
