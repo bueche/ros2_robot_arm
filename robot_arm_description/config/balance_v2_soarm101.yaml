@@ -1,0 +1,142 @@
+# SO-ARM101 cup/ball balance run: setup -> poses -> teardown
+#
+# setup and teardown steps default to balance: false (PID stays off: MOVING is
+# published, SETTLED never is). poses default to balance: true.
+#
+# Per-step optional keys: balance, movement_time, delay, fill_from.
+# fill_from: previous keeps any joint not listed at its last commanded value.
+# It is set file-wide here so the gripper keeps the grip set in setup;
+# the balance poses therefore leave the gripper out.
+
+fill_from: previous
+
+setup:
+  # Assumes the cup is already in the gripper and the ball in the cup.
+  # Step 1 lists every joint because there is no previous command yet.
+  - name: setup 1 - lift cup
+    movement_time: 4.0     # slow, ball is loose in the cup
+    delay: 1.0
+    positions:
+      # TODO: set the lift height. Placeholder = the "back" balance pose.
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.6043884304269426
+      elbow_flex: 0.5123495831538042
+      wrist_flex: -1.3606409588545638
+      wrist_roll: 1.6214176927951227
+      gripper: 0.28532042654672923
+
+
+  - name: setup 2 - loosen grip, let cup slide
+    movement_time: 1.0
+    delay: 1.0            # time for the cup to slide
+    positions:
+      # TODO: check which direction opens on your calibration, and by how much
+      gripper: 0.35
+
+  - name: setup 3 - tighten grip
+    movement_time: 1.0
+    delay: 1.0
+    positions:
+      gripper: 0.28532042654672923   # TODO: a bit past contact for a firm grip
+
+poses:
+  - name: pose 1 - initial
+    positions:
+      shoulder_pan: 0.03681553890925539
+      shoulder_lift: 0.8237476830945893
+      elbow_flex: 0.342077715698498
+      wrist_flex: -0.9740778003073821
+      wrist_roll: 1.6935147898257479
+
+  - name: pose 2 - tilt cup right
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 2.1981944690401236
+
+  - name: pose 3 - tilt cup left
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.2333205534600555
+
+  - name: pose 4 - center
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.6198837120072371
+
+  - name: pose 5 - forward
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.543029198911517
+      elbow_flex: 0.5307573526084318
+      wrist_flex: -0.5982525072754
+      wrist_roll: 1.6198837120072371
+
+  - name: pose 6 - back
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.6043884304269426
+      elbow_flex: 0.5123495831538042
+      wrist_flex: -1.3606409588545638
+      wrist_roll: 1.6214176927951227
+
+  - name: pose 7 - center
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.6198837120072371
+
+  - name: pose 8 - tilt cup right
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 2.1981944690401236
+
+  - name: pose 9 - tilt cup left
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.2333205534600555
+
+  - name: pose 10 - back
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.44638840927472156
+      elbow_flex: 0.5031456984264903
+      wrist_flex: -1.217980745581199
+      wrist_roll: 1.6214176927951227
+
+  - name: pose 11 - center
+    positions:
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.5338253141842031
+      elbow_flex: 0.5875146417602005
+      wrist_flex: -1.0722525707320631
+      wrist_roll: 1.6198837120072371
+
+teardown:
+  # Also runs if setup/poses abort after the arm has moved.
+  - name: teardown 1 - lower cup to rest
+    movement_time: 4.0
+    delay: 1.0
+    positions:
+      # TODO: set your rest position. Placeholder = old "pose 1 - initial".
+      shoulder_pan: -0.0046019423636569235
+      shoulder_lift: 0.543029198911517
+      elbow_flex: 0.5307573526084318
+      wrist_flex: -0.5982525072754
+      wrist_roll: 1.6198837120072371

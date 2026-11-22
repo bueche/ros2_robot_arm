@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ROS2 Pose Testing Node with Validation and Servo Testing
-Version 17 - Updated with optional power monitoring
+Version 18 - Pose files may add non-balancing 'setup' and 'teardown' phases
 
 Features:
 - ROS2 node publishing JointTrajectory messages
@@ -14,7 +14,9 @@ Features:
 - Temperature, current, voltage monitoring
 - Thermal and overload detection
 - Validation with URDF limits
-- **NEW**: Optional power monitoring with INA226 sensors (primary), INA219 fallback
+- Optional power monitoring with INA226 sensors (primary), INA219 fallback
+- Pose files: optional 'setup' and 'teardown' lists around 'poses' (balance off
+  by default there), per-step balance / movement_time / delay / fill_from
 
 Usage (add -p arm_profile:=so_arm101 for the SO-ARM101; default koch_v1_1):
   ros2 run robot_arm_control pose_test --ros-args -p poses_file:=poses.yaml
@@ -643,6 +645,9 @@ class PoseTestNode(Node):
         self.joint_names = self.profile.joint_names
         self.servo_id_map = {j.name: j.id for j in self.profile.joints}
 
+        # Last commanded positions (set by send_pose); source for fill_from: previous
+        self._last_positions = None
+
         # Create publisher
         self.publisher = self.create_publisher(
             JointTrajectory,
@@ -856,8 +861,9 @@ class PoseTestNode(Node):
         point.time_from_start = Duration(sec=int(duration), nanosec=int((duration % 1) * 1e9))
         
         msg.points = [point]
-        
+
         self.publisher.publish(msg)
+        self._last_positions = dict(zip(self.joint_names, point.positions))
         self.get_logger().info(f'→ Sent: {pose_name}')
     
     def move_to_safe_position(self):
@@ -986,23 +992,41 @@ class PoseTestNode(Node):
         
         return True
     
+    # Pose file sections in run order, and whether balancing (SETTLED +
+    # wait_for_stable) is on by default for steps in that section.
+    PHASES = (('setup', False), ('poses', True), ('teardown', False))
+
     def load_poses_from_file(self, filename):
-        """Load poses from YAML file."""
+        """
+        Load pose sections from YAML file.
+
+        Returns {'setup': [...], 'poses': [...], 'teardown': [...]}. 'setup'
+        and 'teardown' are optional; a bare list is treated as 'poses' (old
+        format). A top-level 'fill_from' sets the default for every step
+        that does not set its own.
+        """
         try:
             with open(filename, 'r') as f:
                 data = yaml.safe_load(f)
-                # Extract the 'poses' list from the YAML structure
-                if isinstance(data, dict) and 'poses' in data:
-                    return data['poses']
-                elif isinstance(data, list):
-                    # Already a list of poses (old format)
-                    return data
-                else:
-                    self.get_logger().error(f'Invalid YAML structure in {filename}')
-                    return None
         except Exception as e:
             self.get_logger().error(f'Error loading {filename}: {e}')
             return None
+
+        if isinstance(data, list):
+            # Already a list of poses (old format)
+            return {'poses': data}
+        if not (isinstance(data, dict) and 'poses' in data):
+            self.get_logger().error(f'Invalid YAML structure in {filename}')
+            return None
+
+        fill_from = data.get('fill_from', 'safe')
+        sections = {}
+        for phase, _ in self.PHASES:
+            steps = data.get(phase) or []
+            for step in steps:
+                step.setdefault('fill_from', fill_from)
+            sections[phase] = steps
+        return sections
     
     def get_programmatic_poses(self, program_name):
         """Get a built-in pose program from the arm profile ('programs')."""
@@ -1014,26 +1038,73 @@ class PoseTestNode(Node):
             return None
         return [{'name': p['name'], 'positions': dict(p['positions'])} for p in poses]
 
-    def run_pose_sequence(self, poses):
-        """Run sequence of poses."""
+    def run_phases(self, sections):
+        """
+        Run setup -> poses -> teardown. If an earlier phase aborts after the
+        arm has moved, the remaining phases are skipped but teardown still
+        runs, so the cup is set down.
+        """
+        ok = True
+        for phase, default_balance in self.PHASES:
+            steps = sections.get(phase) or []
+            if not steps:
+                continue
+            if not ok:
+                if phase != 'teardown' or self._last_positions is None:
+                    continue
+                self.get_logger().warn('Earlier phase aborted - running teardown')
+            ok = self.run_pose_sequence(steps, phase, default_balance) and ok
+
+        self.print_summary()
+
+        # Print final telemetry summary if enabled
+        if self.telemetry and self.telemetry.enabled:
+            self.telemetry.print_summary()
+
+        return ok
+
+    def run_pose_sequence(self, poses, phase='poses', default_balance=True):
+        """
+        Run one phase's sequence of poses.
+
+        Optional per-step keys:
+          balance:       bool, default per phase (poses: true, setup/teardown: false).
+                         Non-balance steps publish MOVING but never SETTLED, so the
+                         balance PID stays off, and they skip wait_for_stable.
+          movement_time: seconds, overrides the movement_time parameter
+          delay:         seconds, overrides the delay parameter
+          fill_from:     'safe' (default) or 'previous': where joints not listed
+                         in positions come from (safe position or last command)
+        """
         self.get_logger().info('\n' + '='*60)
-        self.get_logger().info('POSE SEQUENCE TEST')
+        self.get_logger().info(f'POSE SEQUENCE: {phase.upper()}')
         self.get_logger().info('='*60)
         self.get_logger().info(f'Total poses: {len(poses)}')
         self.get_logger().info(f'Validation: {self.validate}')
         self.get_logger().info(f'Telemetry: {self.enable_telemetry}')
         self.get_logger().info('='*60)
-        
+
         for idx, pose in enumerate(poses, 1):
-            pose_name = pose.get('name', f'pose_{idx}')
+            pose_name = pose.get('name', f'{phase}_{idx}')
             positions_dict = pose.get('positions', {})
-            
-            # Fill in missing joints with safe position defaults
-            positions = self.safe_position.copy()
+            balance = bool(pose.get('balance', default_balance))
+            movement_time = float(pose.get('movement_time', self.movement_time))
+            delay = float(pose.get('delay', self.delay))
+            fill_from = pose.get('fill_from', 'safe')
+
+            # Fill in missing joints from the last command or the safe position
+            if fill_from == 'previous' and self._last_positions is not None:
+                positions = dict(self._last_positions)
+            else:
+                if fill_from != 'safe':
+                    self.get_logger().warn(
+                        f"  fill_from '{fill_from}' unavailable for {pose_name} - using safe position")
+                positions = self.safe_position.copy()
             positions.update(positions_dict)
-            
-            self.get_logger().info(f'\n[{idx}/{len(poses)}] {pose_name}')
-            
+
+            self.get_logger().info(
+                f'\n[{phase} {idx}/{len(poses)}] {pose_name}' + ('' if balance else '  (no balance)'))
+
             if self.validate:
                 valid = self.validate_pose(pose_name, positions)
                 if not valid:
@@ -1051,16 +1122,17 @@ class PoseTestNode(Node):
             if self.telemetry and self.telemetry.enabled:
                 self.telemetry.start_peak_tracking()
             
-            self.send_pose(pose_name, positions, self.movement_time)
-            
+            self.send_pose(pose_name, positions, movement_time)
+
             # Wait for movement + delay (spin to allow callbacks)
-            self.spin_for_duration(self.movement_time + self.delay)
+            self.spin_for_duration(movement_time + delay)
 
-            # Signal imu_balance_node that arm has settled — PID may activate
-            self._publish_arm_state('SETTLED')
+            if balance:
+                # Signal imu_balance_node that arm has settled — PID may activate
+                self._publish_arm_state('SETTLED')
 
-            # Optionally wait for cup to stabilise before moving to next pose
-            self._wait_for_stable()
+                # Optionally wait for cup to stabilise before moving to next pose
+                self._wait_for_stable()
             
             # Stop power tracking
             if self.power_monitor:
@@ -1086,8 +1158,12 @@ class PoseTestNode(Node):
                         )
                         for joint, temp in thermal['hot_joints']:
                             self.get_logger().error(f"     {joint}: {temp:.1f}°C")
-                        self.get_logger().error("  ABORTING FOR SAFETY!")
-                        return False
+                        if phase == 'teardown':
+                            # Aborting here would leave the cup held up
+                            self.get_logger().error("  Continuing teardown to set the cup down")
+                        else:
+                            self.get_logger().error("  ABORTING FOR SAFETY!")
+                            return False
                     elif thermal['status'] == 'warning':
                         self.get_logger().warn(
                             f"  ⚠️  High temperature: {thermal['max_temp']:.1f}°C"
@@ -1098,13 +1174,7 @@ class PoseTestNode(Node):
                 self.power_monitor.analyze_and_report(pose_name, all_data, peak_data)
             
             self.stats['total_poses'] += 1
-        
-        self.print_summary()
-        
-        # Print final telemetry summary if enabled
-        if self.telemetry and self.telemetry.enabled:
-            self.telemetry.print_summary()
-        
+
         return True
     
     def print_summary(self):
@@ -1140,18 +1210,20 @@ class PoseTestNode(Node):
         # Pose sequence mode
         elif self.poses_file or self.program:
             # Load poses
-            poses = None
+            sections = None
             if self.poses_file:
-                poses = self.load_poses_from_file(self.poses_file)
-                if poses:
-                    self.get_logger().info(f'✓ Loaded {len(poses)} poses from {self.poses_file}')
+                sections = self.load_poses_from_file(self.poses_file)
+                if sections:
+                    counts = ', '.join(f'{len(sections.get(p) or [])} {p}' for p, _ in self.PHASES)
+                    self.get_logger().info(f'✓ Loaded {counts} from {self.poses_file}')
             elif self.program:
                 poses = self.get_programmatic_poses(self.program)
                 if poses:
+                    sections = {'poses': poses}
                     self.get_logger().info(f'✓ Using program: {self.program}')
-            
-            if poses:
-                self.run_pose_sequence(poses)
+
+            if sections and any(sections.values()):
+                self.run_phases(sections)
             else:
                 self.get_logger().error('No poses to execute')
         
