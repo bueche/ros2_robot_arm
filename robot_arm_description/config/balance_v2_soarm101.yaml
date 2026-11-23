@@ -136,7 +136,7 @@ teardown:
     positions:
       # TODO: set your rest position. Placeholder = old "pose 1 - initial".
       shoulder_pan: -0.0046019423636569235
-      shoulder_lift: 0.543029198911517
-      elbow_flex: 0.5307573526084318
-      wrist_flex: -0.5982525072754
+      shoulder_lift: 0.8774370106705868
+      elbow_flex: 0.4341165629716365
+      wrist_flex: -1.0983302441261191
       wrist_roll: 1.6198837120072371
